@@ -2,20 +2,12 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Mail, Lock, User, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardBody, CardHeader, CardFooter } from '@/components/ui/Card';
 import api from '@/lib/api';
-import { validateEmail, validatePassword } from '@/lib/utils';
-
-interface AuthFormData {
-  email: string;
-  password: string;
-  name?: string;
-  passwordConfirm?: string;
-}
 
 interface TwoFAState {
   enabled: boolean;
@@ -27,7 +19,8 @@ export default function AuthPage() {
   const router = useRouter();
   const { setUser, setToken, setTwoFARequired } = useAuthStore();
 
-  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -37,79 +30,26 @@ export default function AuthPage() {
     email: '',
   });
 
-  const [formData, setFormData] = useState<AuthFormData>({
-    email: '',
-    password: '',
-    name: '',
-    passwordConfirm: '',
-  });
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-    setError('');
-  };
-
-  const validateForm = (): boolean => {
-    if (!formData.email || !formData.password) {
-      setError('Compila tutti i campi');
-      return false;
-    }
-
-    if (!validateEmail(formData.email)) {
-      setError('Email non valida');
-      return false;
-    }
-
-    if (!isLogin) {
-      if (!formData.name) {
-        setError('Il nome è obbligatorio');
-        return false;
-      }
-
-      const passwordValidation = validatePassword(formData.password);
-      if (!passwordValidation.valid) {
-        setError(
-          'La password deve contenere almeno 8 caratteri, una maiuscola, una minuscola, un numero e un carattere speciale'
-        );
-        return false;
-      }
-
-      if (formData.password !== formData.passwordConfirm) {
-        setError('Le password non corrispondono');
-        return false;
-      }
-    }
-
-    return true;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!validateForm()) return;
+    if (!email || !password) {
+      setError('Inserisci email e password');
+      return;
+    }
 
     setIsLoading(true);
     setError('');
 
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-      const endpoint = isLogin ? '/auth/login' : '/auth/register';
-      const body = {
-        email: formData.email,
-        password: formData.password,
-        ...(isLogin ? {} : { username: formData.name }),
-      };
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const base = API_URL.includes('/api/v1')
+        ? API_URL
+        : `${API_URL.replace(/\/$/, '')}/api/v1`;
 
-      const url = `${API_URL}${endpoint}`;
-
-      const res = await fetch(url, {
+      const res = await fetch(`${base}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ email, password }),
       });
 
       if (!res.ok) {
@@ -120,11 +60,7 @@ export default function AuthPage() {
       const data = await res.json();
 
       if (data.twoFARequired) {
-        setTwoFA({
-          enabled: true,
-          code: '',
-          email: formData.email,
-        });
+        setTwoFA({ enabled: true, code: '', email });
         setTwoFARequired(true);
       } else {
         setUser(data.user);
@@ -136,7 +72,7 @@ export default function AuthPage() {
         router.push('/dashboard');
       }
     } catch (err: any) {
-      setError(err.message || 'Si è verificato un errore durante l\'autenticazione');
+      setError(err.message || 'Credenziali non valide');
     } finally {
       setIsLoading(false);
     }
@@ -144,7 +80,6 @@ export default function AuthPage() {
 
   const handleTwoFASubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!twoFA.code || twoFA.code.length !== 6) {
       setError('Inserisci un codice a 6 cifre');
       return;
@@ -179,9 +114,7 @@ export default function AuthPage() {
         <Card className="w-full max-w-md">
           <CardHeader>
             <h1 className="text-2xl font-bold text-slate-100">Verifica a due fattori</h1>
-            <p className="text-sm text-slate-400 mt-2">
-              Inserisci il codice ricevuto nella tua email
-            </p>
+            <p className="text-sm text-slate-400 mt-2">Inserisci il codice dalla tua app authenticator</p>
           </CardHeader>
           <form onSubmit={handleTwoFASubmit}>
             <CardBody className="space-y-4">
@@ -200,10 +133,7 @@ export default function AuthPage() {
                 maxLength={6}
                 value={twoFA.code}
                 onChange={(e) =>
-                  setTwoFA((prev) => ({
-                    ...prev,
-                    code: e.target.value.replace(/\D/g, ''),
-                  }))
+                  setTwoFA((prev) => ({ ...prev, code: e.target.value.replace(/\D/g, '') }))
                 }
               />
             </CardBody>
@@ -211,19 +141,11 @@ export default function AuthPage() {
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => {
-                  setTwoFA({ enabled: false, code: '', email: '' });
-                  setFormData({ email: '', password: '', name: '', passwordConfirm: '' });
-                }}
+                onClick={() => setTwoFA({ enabled: false, code: '', email: '' })}
               >
                 Indietro
               </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                isLoading={isLoading}
-                className="flex-1"
-              >
+              <Button type="submit" variant="primary" isLoading={isLoading} className="flex-1">
                 Verifica
               </Button>
             </CardFooter>
@@ -237,14 +159,8 @@ export default function AuthPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <h1 className="text-2xl font-bold text-slate-100">
-            {isLogin ? 'Accedi' : 'Registrati'}
-          </h1>
-          <p className="text-sm text-slate-400 mt-2">
-            {isLogin
-              ? 'Accedi al tuo dashboard personale'
-              : 'Crea un nuovo account per iniziare'}
-          </p>
+          <h1 className="text-2xl font-bold text-slate-100">Bentornato</h1>
+          <p className="text-sm text-slate-400 mt-2">Accedi al tuo dashboard</p>
         </CardHeader>
 
         <form onSubmit={handleSubmit}>
@@ -256,24 +172,13 @@ export default function AuthPage() {
               </div>
             )}
 
-            {!isLogin && (
-              <Input
-                label="Nome completo"
-                name="name"
-                type="text"
-                placeholder="Giuseppe Rossi"
-                value={formData.name || ''}
-                onChange={handleInputChange}
-              />
-            )}
-
             <Input
               label="Email"
               name="email"
               type="email"
               placeholder="nome@esempio.com"
-              value={formData.email}
-              onChange={handleInputChange}
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); setError(''); }}
             />
 
             <div>
@@ -282,55 +187,23 @@ export default function AuthPage() {
                 name="password"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="••••••••"
-                value={formData.password}
-                onChange={handleInputChange}
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError(''); }}
               />
-              <div className="mt-2 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
-                >
-                  {showPassword ? 'Nascondi' : 'Mostra'} password
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="mt-2 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+              >
+                {showPassword ? 'Nascondi' : 'Mostra'} password
+              </button>
             </div>
-
-            {!isLogin && (
-              <Input
-                label="Conferma password"
-                name="passwordConfirm"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••"
-                value={formData.passwordConfirm || ''}
-                onChange={handleInputChange}
-              />
-            )}
           </CardBody>
 
-          <CardFooter className="flex flex-col gap-3">
-            <Button
-              type="submit"
-              variant="primary"
-              isLoading={isLoading}
-              className="w-full"
-            >
-              {isLogin ? 'Accedi' : 'Registrati'}
+          <CardFooter>
+            <Button type="submit" variant="primary" isLoading={isLoading} className="w-full">
+              Accedi
             </Button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setIsLogin(!isLogin);
-                setError('');
-                setFormData({ email: '', password: '', name: '', passwordConfirm: '' });
-              }}
-              className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
-            >
-              {isLogin
-                ? 'Non hai un account? Registrati'
-                : 'Hai già un account? Accedi'}
-            </button>
           </CardFooter>
         </form>
       </Card>

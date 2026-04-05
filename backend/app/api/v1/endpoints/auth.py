@@ -1,11 +1,10 @@
-"""Authentication endpoints."""
+"""Authentication endpoints — single-user, no registration."""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.core.database import get_db
 from app.core.security import (
-    hash_password,
     verify_password,
     create_access_token,
     create_refresh_token,
@@ -17,7 +16,6 @@ from app.core.security import (
 )
 from app.models.user import User
 from app.schemas.user import (
-    UserCreate,
     UserResponse,
     UserAuthResponse,
     UserLoginRequest,
@@ -30,47 +28,6 @@ from app.schemas.user import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-
-@router.post("/register", response_model=UserAuthResponse, status_code=status.HTTP_201_CREATED)
-async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)) -> UserAuthResponse:
-    """Register a new user."""
-    # Check if user exists
-    result = await db.execute(select(User).where(User.email == user_data.email))
-    existing_user = result.scalars().first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered",
-        )
-
-    result = await db.execute(select(User).where(User.username == user_data.username))
-    existing_user = result.scalars().first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already taken",
-        )
-
-    # Create new user
-    user = User(
-        email=user_data.email,
-        username=user_data.username,
-        hashed_password=hash_password(user_data.password),
-    )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-
-    # Generate tokens
-    access_token = create_access_token(data={"sub": str(user.id)})
-    refresh_token = create_refresh_token(str(user.id))
-
-    return UserAuthResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        user=UserResponse.from_orm(user),
-    )
 
 
 @router.post("/login", response_model=UserAuthResponse)
