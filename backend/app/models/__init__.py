@@ -8,6 +8,7 @@ from app.models.routine import Routine, RoutineStep, RoutineLog
 from app.models.focus import PomodoroSession, FocusScore
 from app.models.habit import Habit, HabitLog
 from app.models.mood import MoodEntry, SensoryLog
+from app.models.scadenza import Scadenza, TipoScadenza
 from app.models.budget import Transaction, BudgetGoal
 from app.models.ctf import CTFPlatform, CTFChallenge
 from app.models.meal import MealPlan
@@ -32,6 +33,8 @@ __all__ = [
     "HabitLog",
     "MoodEntry",
     "SensoryLog",
+    "Scadenza",
+    "TipoScadenza",
     "Transaction",
     "BudgetGoal",
     "CTFPlatform",
