@@ -1,0 +1,243 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: 15 23 42;
+  --bg-secondary: 30 41 59;
+  --bg-tertiary: 51 65 85;
+  --text-primary: 241 245 249;
+  --text-secondary: 203 213 225;
+  --text-tertiary: 148 163 184;
+  --border-color: 71 85 105;
+  --accent-color: 59 130 246;
+}
+
+[data-theme='light'] {
+  --bg-primary: 255 255 255;
+  --bg-secondary: 248 250 252;
+  --bg-tertiary: 241 245 249;
+  --text-primary: 15 23 42;
+  --text-secondary: 71 85 105;
+  --text-tertiary: 148 163 184;
+  --border-color: 203 213 225;
+  --accent-color: 59 130 246;
+}
+
+[data-theme='low-stim'] {
+  --bg-primary: 245 244 242;
+  --bg-secondary: 235 232 229;
+  --bg-tertiary: 214 208 202;
+  --text-primary: 58 58 56;
+  --text-secondary: 140 154 164;
+  --text-tertiary: 168 154 143;
+  --border-color: 214 208 202;
+  --accent-color: 142 124 111;
+}
+
+[data-theme='low-stim'].dark {
+  --bg-primary: 15 14 12;
+  --bg-secondary: 25 21 18;
+  --bg-tertiary: 38 38 37;
+  --text-primary: 232 232 230;
+  --text-secondary: 180 170 160;
+  --text-tertiary: 138 122 111;
+  --border-color: 82 72 64;
+  --accent-color: 138 124 111;
+}
+
+html {
+  scroll-behavior: smooth;
+  @apply dark;
+}
+
+body {
+  @apply bg-slate-900 text-slate-100 transition-colors duration-300;
+  background-color: rgb(var(--bg-primary));
+  color: rgb(var(--text-primary));
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.light {
+  background-color: rgb(var(--bg-primary));
+  color: rgb(var(--text-primary));
+}
+
+.low-stim {
+  --accent-color: 142 124 111;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(var(--bg-secondary));
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--border-color));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--text-tertiary));
+}
+
+/* Focus Styles */
+:focus-visible {
+  @apply outline-2 outline-offset-2;
+  outline-color: rgb(var(--accent-color));
+}
+
+/* Utility Classes */
+.transition-theme {
+  @apply transition-colors duration-300;
+}
+
+.text-primary {
+  color: rgb(var(--text-primary));
+}
+
+.text-secondary {
+  color: rgb(var(--text-secondary));
+}
+
+.text-tertiary {
+  color: rgb(var(--text-tertiary));
+}
+
+.bg-primary {
+  background-color: rgb(var(--bg-primary));
+}
+
+.bg-secondary {
+  background-color: rgb(var(--bg-secondary));
+}
+
+.bg-tertiary {
+  background-color: rgb(var(--bg-tertiary));
+}
+
+.border-color {
+  border-color: rgb(var(--border-color));
+}
+
+/* Animations - Respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    @apply !animate-none !transition-none;
+  }
+}
+
+/* Widget Grid */
+.react-grid-layout {
+  @apply bg-slate-900 dark:bg-slate-900;
+}
+
+.react-grid-item {
+  @apply rounded-lg;
+}
+
+.react-grid-item.react-grid-placeholder {
+  @apply bg-blue-500 opacity-20;
+  z-index: 2;
+}
+
+.react-grid-item.static {
+  @apply bg-slate-800;
+}
+
+.react-grid-item > .react-resizable-handle {
+  @apply bg-gradient-to-br from-slate-600 to-slate-700 opacity-0 hover:opacity-100 transition-opacity;
+}
+
+.react-grid-item > .react-resizable-handle::after {
+  @apply border-slate-300;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  @apply font-semibold;
+}
+
+h1 {
+  @apply text-3xl;
+}
+
+h2 {
+  @apply text-2xl;
+}
+
+h3 {
+  @apply text-xl;
+}
+
+/* Form Elements */
+input, textarea, select {
+  @apply rounded-md border border-slate-700 bg-slate-800 text-slate-100 placeholder-slate-500;
+  @apply focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20;
+  @apply transition-colors duration-200;
+}
+
+input[type='checkbox'], input[type='radio'] {
+  @apply rounded cursor-pointer;
+}
+
+/* Prevent animations in low-stim mode */
+.low-stim [class*='animate-'] {
+  @apply !animate-none;
+}
+
+.low-stim {
+  animation: none !important;
+}
+
+/* Smooth transitions for theme switching */
+.theme-transition * {
+  @apply transition-colors duration-300;
+}
+
+/* Modal backdrop */
+.modal-backdrop {
+  @apply fixed inset-0 bg-black/40 backdrop-blur-sm;
+}
+
+/* Loading spinner */
+.spinner {
+  @apply animate-spin inline-block;
+}
+
+.low-stim .spinner {
+  @apply !animate-none;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Pulse animation alternative for low-stim */
+.low-stim [class*='pulse'] {
+  @apply !animate-none opacity-100;
+}
+
+/* Responsive Grid */
+@media (max-width: 768px) {
+  .react-grid-layout {
+    @apply gap-2;
+  }
+
+  .react-grid-item {
+    @apply !static;
+  }
+}

@@ -1,0 +1,151 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gd-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gd-network
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: gd-redis
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gd-network
+    restart: always
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: ../docker/Dockerfile.backend
+    container_name: gd-backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRY_MINUTES: 30
+      ENVIRONMENT: production
+      LOG_LEVEL: warning
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      WEATHER_API_KEY: ${WEATHER_API_KEY:-}
+      WEATHER_API_UNITS: metric
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
+    networks:
+      - gd-network
+    restart: always
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: ../docker/Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    container_name: gd-frontend
+    environment:
+      NODE_ENV: production
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - gd-network
+    restart: always
+
+  celery-worker:
+    build:
+      context: ../backend
+      dockerfile: ../docker/Dockerfile.backend
+    container_name: gd-celery-worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+      ENVIRONMENT: production
+      LOG_LEVEL: warning
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    command: celery -A app.tasks.celery_app worker --loglevel=warning --concurrency=2
+    networks:
+      - gd-network
+    restart: always
+
+  celery-beat:
+    build:
+      context: ../backend
+      dockerfile: ../docker/Dockerfile.backend
+    container_name: gd-celery-beat
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+      ENVIRONMENT: production
+      LOG_LEVEL: warning
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    command: celery -A app.tasks.celery_app beat --loglevel=warning
+    networks:
+      - gd-network
+    restart: always
+
+  nginx:
+    image: nginx:alpine
+    container_name: gd-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      # Decommenta quando hai i certificati SSL:
+      # - /etc/letsencrypt/live/tuodominio.com/fullchain.pem:/etc/nginx/ssl/cert.pem:ro
+      # - /etc/letsencrypt/live/tuodominio.com/privkey.pem:/etc/nginx/ssl/key.pem:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - gd-network
+    restart: always
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  gd-network:
+    driver: bridge
