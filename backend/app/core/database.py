@@ -97,7 +97,7 @@ def _sync_missing_columns(conn):
 async def init_db() -> None:
     """Initialize database tables and sync missing columns."""
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(Base.metadata.create_all, checkfirst=True)
         await conn.run_sync(_sync_missing_columns)
 
 
