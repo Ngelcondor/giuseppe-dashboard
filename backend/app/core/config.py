@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     AWS_S3_BUCKET: str = "giuseppe-dashboard"
     AWS_S3_REGION: str = "us-east-1"
 
+    # Single-user credentials (used to auto-seed on first startup)
+    ADMIN_EMAIL: str = "giuseppe.diansr@hotmail.it"
+    ADMIN_PASSWORD: str = ""  # plain password, read at startup to seed DB
+
     # Feature Flags
     ENABLE_NOTIFICATIONS: bool = True
     ENABLE_FEED: bool = True

@@ -7,7 +7,7 @@ import logging
 import traceback
 
 from app.core.config import settings
-from app.core.database import init_db, close_db
+from app.core.database import init_db, close_db, AsyncSessionLocal
 # Import all models so SQLAlchemy registers them with Base.metadata
 from app.models import (  # noqa: F401
     user, budget, deadline, scadenza, habit, mood,
@@ -21,11 +21,40 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+async def seed_admin_user() -> None:
+    """Create the single admin user if the users table is empty."""
+    from sqlalchemy.future import select
+    from app.models.user import User
+    from app.core.security import hash_password
+
+    if not settings.ADMIN_PASSWORD:
+        logger.warning("ADMIN_PASSWORD not set — skipping admin seed.")
+        return
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(User))
+        existing = result.scalars().first()
+        if existing:
+            logger.info("Admin user already exists — skipping seed.")
+            return
+
+        admin = User(
+            email=settings.ADMIN_EMAIL,
+            username="giuseppe",
+            hashed_password=hash_password(settings.ADMIN_PASSWORD),
+            is_active=True,
+        )
+        db.add(admin)
+        await db.commit()
+        logger.info(f"Admin user created: {settings.ADMIN_EMAIL}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
     logger.info("Initializing database...")
     await init_db()
+    await seed_admin_user()
 
     logger.info("Connecting to Redis...")
     try:
