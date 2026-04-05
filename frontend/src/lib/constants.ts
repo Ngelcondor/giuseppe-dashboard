@@ -1,4 +1,7 @@
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const _rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+export const API_BASE_URL = _rawApiUrl.includes('/api/v1')
+  ? _rawApiUrl
+  : `${_rawApiUrl.replace(/\/$/, '')}/api/v1`;
 
 export const WIDGET_SIZES = {
   MIN_WIDTH: 1,
