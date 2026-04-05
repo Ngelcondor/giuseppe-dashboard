@@ -34,7 +34,7 @@ class Settings(BaseSettings):
 
     # CORS Configuration
     CORS_ORIGINS: str = "*"
-    CORS_CREDENTIALS: bool = True
+    CORS_CREDENTIALS: bool = False  # True only when CORS_ORIGINS is a specific domain list (not "*")
     CORS_METHODS: str = "*"
     CORS_HEADERS: str = "*"
 

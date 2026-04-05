@@ -13,6 +13,7 @@ from app.core.security import (
     setup_totp,
     verify_totp,
     get_current_user,
+    get_totp_provisioning_uri,
 )
 from app.models.user import User
 from app.schemas.user import (
@@ -149,7 +150,7 @@ async def setup_2fa(
     return TOTPSetupResponse(
         secret=secret,
         qr_code=qr_code,
-        provisioning_uri=setup_totp(user.email)[0],
+        provisioning_uri=get_totp_provisioning_uri(secret, user.email),
     )
 
 

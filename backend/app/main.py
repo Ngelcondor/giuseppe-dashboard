@@ -53,13 +53,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add CORS middleware - permissive for development
+# Add CORS middleware - configured via settings/environment variables
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.cors_origins_list,
+    allow_credentials=settings.CORS_CREDENTIALS,
+    allow_methods=settings.cors_methods_list,
+    allow_headers=settings.cors_headers_list,
 )
 
 

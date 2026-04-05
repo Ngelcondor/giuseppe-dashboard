@@ -2,6 +2,7 @@
 from app.models.user import User
 from app.models.health import HealthMetric, Medication, MedicationLog, SleepSession, SleepPhaseEntry
 from app.models.calendar_event import CalendarEvent
+from app.models.calendar_connection import CalendarConnection
 from app.models.deadline import Deadline
 from app.models.routine import Routine, RoutineStep, RoutineLog
 from app.models.focus import PomodoroSession, FocusScore
@@ -15,6 +16,7 @@ from app.models.notification import PushSubscription, Notification
 __all__ = [
     "User",
     "HealthMetric",
+    "CalendarConnection",
     "Medication",
     "MedicationLog",
     "SleepSession",
