@@ -96,7 +96,7 @@ export default function AuthPage() {
     setError('');
 
     try {
-      const API_URL = 'http://localhost:8000/api/v1';
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
       const endpoint = isLogin ? '/auth/login' : '/auth/register';
       const body = {
         email: formData.email,

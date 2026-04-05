@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Flame, Plus, X, RefreshCw, Trophy, ChevronDown, ChevronUp } from 'lucide-react';
 
-const API = 'http://localhost:8000/api/v1/habits-api';
+const API = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/habits-api`;
 
 interface Habit {
   id: string;
