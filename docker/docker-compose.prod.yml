@@ -59,7 +59,7 @@ services:
       redis:
         condition: service_healthy
     command: >
-      sh -c "alembic upgrade head &&
+      sh -c "PYTHONPATH=/app alembic upgrade head &&
              uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
     networks:
       - gd-network
