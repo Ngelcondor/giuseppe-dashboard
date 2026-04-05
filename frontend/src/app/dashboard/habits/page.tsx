@@ -3,8 +3,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Flame, Plus, X, RefreshCw, Trophy, ChevronDown, ChevronUp } from 'lucide-react';
+import { API_BASE_URL } from '@/lib/constants';
 
-const API = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/habits-api`;
+const API = `${API_BASE_URL}/habits-api`;
 
 interface Habit {
   id: string;

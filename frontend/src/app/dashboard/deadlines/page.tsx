@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Plus, X, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import { API_BASE_URL } from '@/lib/constants';
 
 type Tipo = 'Uscita' | 'Entrata' | 'Abbonamento' | 'Rata' | 'Ricorrente';
 
@@ -17,7 +18,7 @@ interface Scadenza {
   pagato: boolean;
 }
 
-const API = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/scadenze`;
+const API = `${API_BASE_URL}/scadenze`;
 const MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 const MESI_NUM: Record<string,number> = {Gennaio:1,Febbraio:2,Marzo:3,Aprile:4,Maggio:5,Giugno:6,Luglio:7,Agosto:8,Settembre:9,Ottobre:10,Novembre:11,Dicembre:12};
 
