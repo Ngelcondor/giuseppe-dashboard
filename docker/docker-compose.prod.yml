@@ -51,7 +51,6 @@ services:
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       WEATHER_API_KEY: ${WEATHER_API_KEY:-}
       WEATHER_API_UNITS: metric
-      PYTHONPATH: /app
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
