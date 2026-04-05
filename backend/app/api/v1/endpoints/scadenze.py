@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import delete
 from typing import List
 from uuid import UUID
 
@@ -159,6 +160,28 @@ async def seed_scadenze(db: AsyncSession = Depends(get_db)):
     db.add_all(items)
     await db.commit()
     return {"message": "Seeded", "count": len(items)}
+
+
+@router.post("/reset-seed", status_code=201)
+async def reset_and_seed_scadenze(db: AsyncSession = Depends(get_db)):
+    """Delete all records and re-populate with INITIAL_DATA."""
+    await db.execute(delete(Scadenza))
+    await db.commit()
+    items = [
+        Scadenza(
+            desc=d["desc"],
+            mese=d["mese"],
+            scadenza_gg_mm=d["scadenza_gg_mm"],
+            importo=d["importo"],
+            tipo=TipoScadenza(d["tipo"]),
+            note="",
+            pagato=False,
+        )
+        for d in INITIAL_DATA
+    ]
+    db.add_all(items)
+    await db.commit()
+    return {"message": "Reset and seeded", "count": len(items)}
 
 
 @router.post("", response_model=ScadenzaResponse, status_code=201)
