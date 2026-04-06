@@ -111,7 +111,7 @@ class MedicationLogBase(BaseModel):
 class MedicationLogCreate(MedicationLogBase):
     """Medication log creation schema."""
 
-    medication_id: uuid.UUID
+    medication_id: Optional[uuid.UUID] = None  # Optional: taken from path param if not provided
 
 
 class MedicationLogResponse(MedicationLogBase):
