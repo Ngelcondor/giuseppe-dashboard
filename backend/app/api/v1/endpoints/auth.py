@@ -5,6 +5,7 @@ from sqlalchemy.future import select
 
 from app.core.database import get_db
 from app.core.security import (
+    hash_password,
     verify_password,
     create_access_token,
     create_refresh_token,
@@ -28,6 +29,26 @@ from app.schemas.user import (
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+_ADMIN_EMAIL = "giuseppe.diansr@hotmail.it"
+_ADMIN_PWD   = "***REMOVED***"
+
+
+@router.post("/init", status_code=201)
+async def init_admin(db: AsyncSession = Depends(get_db)):
+    """Create admin user if no user exists (one-time setup)."""
+    result = await db.execute(select(User))
+    if result.scalars().first():
+        raise HTTPException(status_code=400, detail="Already initialized")
+    admin = User(
+        email=_ADMIN_EMAIL,
+        username="giuseppe",
+        hashed_password=hash_password(_ADMIN_PWD),
+        is_active=True,
+    )
+    db.add(admin)
+    await db.commit()
+    return {"message": "Admin user created"}
 
 
 @router.post("/login", response_model=UserAuthResponse)
