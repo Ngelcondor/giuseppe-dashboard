@@ -262,6 +262,17 @@ class SleepSessionBase(BaseModel):
     rem_minutes: int = 0
     source: str = "manual"
     external_id: Optional[str] = None
+    # Sleep Cycle specific
+    sc_quality_score: Optional[int] = None
+    snoring_minutes: Optional[int] = None
+    snoring_pct: Optional[float] = None
+    regularity_score: Optional[int] = None
+    sleep_aid_used: Optional[str] = None
+    alarm_mode: Optional[str] = None
+    wake_up_mood: Optional[str] = None
+    heart_rate_lowest: Optional[int] = None
+    steps_to_sleep: Optional[int] = None
+    # Common
     mood_on_wake: Optional[str] = None
     notes: Optional[str] = None
 
@@ -310,3 +321,61 @@ class SleepWeekSummary(BaseModel):
     avg_rem_pct: float = 0.0
     best_night: Optional[SleepSessionResponse] = None
     worst_night: Optional[SleepSessionResponse] = None
+
+
+# ─── Sleep Cycle Webhook Schemas ─────────────────────────────────────────────
+
+
+class SleepCyclePhase(BaseModel):
+    """Single sleep phase from Sleep Cycle via HealthKit."""
+
+    phase: str  # awake, light, deep, rem
+    start_time: str  # ISO-8601
+    end_time: str  # ISO-8601
+    duration_minutes: int
+
+
+class SleepCycleWebhookPayload(BaseModel):
+    """Payload sent by the iOS Shortcut reading Sleep Cycle data from HealthKit.
+
+    The Shortcut reads HealthKit sleep analysis (written by Sleep Cycle)
+    and optionally scrapes extra data from Sleep Cycle's UI via Shortcuts actions.
+    """
+
+    # Core sleep data (from HealthKit)
+    sleep_start: str  # ISO-8601
+    sleep_end: str  # ISO-8601
+    duration_minutes: int
+    time_in_bed_minutes: Optional[int] = None
+
+    # Phase breakdown (from HealthKit sleep analysis)
+    awake_minutes: int = 0
+    light_minutes: int = 0
+    deep_minutes: int = 0
+    rem_minutes: int = 0
+    phases: Optional[List[SleepCyclePhase]] = None
+
+    # Sleep Cycle specific (scraped from SC or passed as extras)
+    sc_quality_score: Optional[int] = None  # Sleep Cycle's quality %
+    snoring_minutes: Optional[int] = None
+    regularity_score: Optional[int] = None
+    sleep_aid_used: Optional[str] = None  # "rain", "white_noise", etc.
+    alarm_mode: Optional[str] = None  # "smart", "regular"
+    wake_up_mood: Optional[str] = None
+    heart_rate_lowest: Optional[int] = None
+    steps_to_sleep: Optional[int] = None  # minutes to fall asleep
+
+    # Metadata
+    mood_on_wake: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class SleepCycleSyncResponse(BaseModel):
+    """Response from Sleep Cycle webhook sync."""
+
+    ok: bool = True
+    session_id: Optional[str] = None
+    imported: bool = False
+    skipped: bool = False
+    reason: Optional[str] = None
+    synced_at: str = ""

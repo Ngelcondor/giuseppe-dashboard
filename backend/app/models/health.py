@@ -202,6 +202,17 @@ class SleepSession(Base):
     source = Column(String(100), nullable=False, default="manual")  # sleep_cycle, apple_health, manual
     external_id = Column(String(255), nullable=True)  # ID from Sleep Cycle / Apple Health
 
+    # Sleep Cycle specific data
+    sc_quality_score = Column(Integer, nullable=True)  # Sleep Cycle's own quality % (0-100)
+    snoring_minutes = Column(Integer, nullable=True)  # Total snoring duration
+    snoring_pct = Column(Float, nullable=True)  # Snoring as % of sleep time
+    regularity_score = Column(Integer, nullable=True)  # Sleep regularity index (0-100)
+    sleep_aid_used = Column(String(100), nullable=True)  # e.g. "rain", "white_noise", "none"
+    alarm_mode = Column(String(50), nullable=True)  # "smart", "regular", "none"
+    wake_up_mood = Column(String(50), nullable=True)  # Sleep Cycle's own mood rating
+    heart_rate_lowest = Column(Integer, nullable=True)  # Lowest HR during sleep (bpm)
+    steps_to_sleep = Column(Integer, nullable=True)  # Minutes to fall asleep
+
     # Morning report
     mood_on_wake = Column(String(50), nullable=True)  # great, good, okay, bad, terrible
     notes = Column(String(500), nullable=True)

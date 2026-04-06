@@ -15,6 +15,12 @@ import {
   Flame,
   Calendar,
   Trash2,
+  Volume2,
+  Heart,
+  Timer,
+  Zap,
+  Shield,
+  CloudMoon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Modal, ConfirmModal } from '@/components/ui/Modal';
@@ -201,6 +207,45 @@ function MorningReportCard({ report }: { report: SleepMorningReport }) {
             </div>
           </div>
 
+          {/* Sleep Cycle extras in morning report */}
+          {report.session?.source === 'sleep_cycle' && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {report.session.sc_quality_score != null && (
+                <div className="bg-cyan-900/10 border border-cyan-800/20 rounded-xl p-2.5 text-center">
+                  <Shield size={14} className="text-cyan-400 mx-auto mb-1" />
+                  <p className="text-sm font-semibold text-cyan-300">{report.session.sc_quality_score}%</p>
+                  <p className="text-[9px] text-slate-500">SC Quality</p>
+                </div>
+              )}
+              {report.session.snoring_minutes != null && (
+                <div className="bg-orange-900/10 border border-orange-800/20 rounded-xl p-2.5 text-center">
+                  <Volume2 size={14} className="text-orange-400 mx-auto mb-1" />
+                  <p className="text-sm font-semibold text-orange-300">
+                    {report.session.snoring_minutes}m
+                    {report.session.snoring_pct != null && (
+                      <span className="text-[10px] text-orange-400/60 ml-1">({report.session.snoring_pct}%)</span>
+                    )}
+                  </p>
+                  <p className="text-[9px] text-slate-500">Russamento</p>
+                </div>
+              )}
+              {report.session.heart_rate_lowest != null && (
+                <div className="bg-rose-900/10 border border-rose-800/20 rounded-xl p-2.5 text-center">
+                  <Heart size={14} className="text-rose-400 mx-auto mb-1" />
+                  <p className="text-sm font-semibold text-rose-300">{report.session.heart_rate_lowest} bpm</p>
+                  <p className="text-[9px] text-slate-500">FC minima</p>
+                </div>
+              )}
+              {report.session.regularity_score != null && (
+                <div className="bg-emerald-900/10 border border-emerald-800/20 rounded-xl p-2.5 text-center">
+                  <Zap size={14} className="text-emerald-400 mx-auto mb-1" />
+                  <p className="text-sm font-semibold text-emerald-300">{report.session.regularity_score}%</p>
+                  <p className="text-[9px] text-slate-500">Regolarità</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Tip */}
           {report.tip && (
             <div className="bg-amber-900/10 border border-amber-700/20 rounded-xl px-4 py-3">
@@ -244,13 +289,22 @@ function SessionCard({
   else if (score >= 50) label = 'Sufficiente';
   else if (score > 0) label = 'Scarso';
 
+  const isSleepCycle = session.source === 'sleep_cycle';
+
   return (
     <div className="rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 p-4 transition-all group">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
           <div className={`w-2 h-8 rounded-full ${qualityBgColor(label)}`} />
           <div>
-            <p className="text-sm font-medium text-slate-200">{dateStr}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium text-slate-200">{dateStr}</p>
+              {isSleepCycle && (
+                <span className="text-[9px] bg-cyan-600/20 text-cyan-300 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                  <CloudMoon size={9} /> Sleep Cycle
+                </span>
+              )}
+            </div>
             <p className="text-xs text-slate-500">
               {startTime} → {endTime} · {formatDuration(session.duration_minutes)}
             </p>
@@ -279,6 +333,40 @@ function SessionCard({
           rem={session.rem_minutes}
           total={total}
         />
+      )}
+
+      {/* Sleep Cycle extra data */}
+      {isSleepCycle && (session.sc_quality_score || session.snoring_minutes !== null || session.heart_rate_lowest) && (
+        <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {session.sc_quality_score != null && (
+            <div className="bg-cyan-900/10 border border-cyan-800/20 rounded-lg px-2.5 py-1.5 text-center">
+              <Shield size={12} className="text-cyan-400 mx-auto mb-0.5" />
+              <p className="text-xs font-semibold text-cyan-300">{session.sc_quality_score}%</p>
+              <p className="text-[9px] text-slate-500">SC Quality</p>
+            </div>
+          )}
+          {session.snoring_minutes != null && session.snoring_minutes > 0 && (
+            <div className="bg-orange-900/10 border border-orange-800/20 rounded-lg px-2.5 py-1.5 text-center">
+              <Volume2 size={12} className="text-orange-400 mx-auto mb-0.5" />
+              <p className="text-xs font-semibold text-orange-300">{session.snoring_minutes}m</p>
+              <p className="text-[9px] text-slate-500">Russamento</p>
+            </div>
+          )}
+          {session.heart_rate_lowest != null && (
+            <div className="bg-rose-900/10 border border-rose-800/20 rounded-lg px-2.5 py-1.5 text-center">
+              <Heart size={12} className="text-rose-400 mx-auto mb-0.5" />
+              <p className="text-xs font-semibold text-rose-300">{session.heart_rate_lowest} bpm</p>
+              <p className="text-[9px] text-slate-500">FC min</p>
+            </div>
+          )}
+          {session.steps_to_sleep != null && (
+            <div className="bg-violet-900/10 border border-violet-800/20 rounded-lg px-2.5 py-1.5 text-center">
+              <Timer size={12} className="text-violet-400 mx-auto mb-0.5" />
+              <p className="text-xs font-semibold text-violet-300">{session.steps_to_sleep}m</p>
+              <p className="text-[9px] text-slate-500">Addormentamento</p>
+            </div>
+          )}
+        </div>
       )}
 
       {session.notes && (
