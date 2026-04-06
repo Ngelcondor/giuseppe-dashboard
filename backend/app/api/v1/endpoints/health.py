@@ -580,15 +580,30 @@ async def _verify_med_webhook_token(
 
 
 @router.post("/medications/webhook", dependencies=[Depends(_verify_med_webhook_token)])
+@router.get("/medications/webhook", dependencies=[Depends(_verify_med_webhook_token)])
 async def medication_webhook(
-    payload: MedWebhookPayload,
+    payload: Optional[MedWebhookPayload] = None,  # JSON body (POST)
+    name: Optional[str] = Query(None, description="Medication name (alternative to JSON body)"),
+    skip: bool = Query(False, description="Mark as skipped instead of taken"),
+    note: Optional[str] = Query(None, description="Optional note"),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Log medication intake from iOS Shortcut.
 
-    Uses Bearer token auth (same as Apple Health webhook).
-    Finds medication by name (case-insensitive) and logs the intake.
+    Accepts both JSON body or query params:
+    - POST with JSON: {"medication_name": "Duloxetina"}
+    - GET/POST with query: ?name=Duloxetina
     """
+    # Resolve medication name from body or query param
+    med_name = name
+    skipped = skip
+    notes = note
+    if payload and payload.medication_name:
+        med_name = payload.medication_name
+        skipped = payload.skipped
+        notes = payload.notes
+    if not med_name:
+        raise HTTPException(status_code=400, detail="Specifica il nome del farmaco via ?name= o nel body JSON.")
     from app.models.user import User
 
     # Resolve single admin user
@@ -603,7 +618,7 @@ async def medication_webhook(
             and_(
                 Medication.user_id == user.id,
                 Medication.is_active == True,
-                func.lower(Medication.name) == payload.medication_name.lower().strip(),
+                func.lower(Medication.name) == med_name.lower().strip(),
             )
         )
     )
@@ -615,7 +630,7 @@ async def medication_webhook(
                 and_(
                     Medication.user_id == user.id,
                     Medication.is_active == True,
-                    func.lower(Medication.name).contains(payload.medication_name.lower().strip()),
+                    func.lower(Medication.name).contains(med_name.lower().strip()),
                 )
             )
         )
@@ -624,7 +639,7 @@ async def medication_webhook(
     if not medication:
         return {
             "ok": False,
-            "error": f"Farmaco '{payload.medication_name}' non trovato.",
+            "error": f"Farmaco '{med_name}' non trovato.",
             "available": [],
         }
 
@@ -636,7 +651,7 @@ async def medication_webhook(
                 MedicationLog.medication_id == medication.id,
                 MedicationLog.user_id == user.id,
                 MedicationLog.taken_at >= today_start,
-                MedicationLog.skipped == payload.skipped,
+                MedicationLog.skipped == skipped,
             )
         ).limit(1)
     )
@@ -652,8 +667,8 @@ async def medication_webhook(
         medication_id=medication.id,
         user_id=user.id,
         taken_at=datetime.utcnow(),
-        skipped=payload.skipped,
-        notes=payload.notes,
+        skipped=skipped,
+        notes=notes,
     )
     db.add(med_log)
     await db.commit()
