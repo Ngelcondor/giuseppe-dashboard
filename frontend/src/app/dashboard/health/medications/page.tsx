@@ -548,6 +548,14 @@ export default function MedicationsPage() {
     fetchData();
   }, [fetchData]);
 
+  // Auto-refresh every 10 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchData();
+    }, 10 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
   // ─── Actions ───────────────────────────────────────────────────────────────
 
   const handleTake = async (medId: string) => {

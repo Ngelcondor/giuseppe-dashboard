@@ -1,11 +1,13 @@
 """Health and medication endpoints."""
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, text
-from datetime import datetime, timedelta, date
-from typing import List
+from sqlalchemy import func, text, and_
+from datetime import datetime, timedelta, date, timezone
+from typing import List, Optional
+from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -553,3 +555,113 @@ async def get_medication_logs(
     )
     logs = result.scalars().all()
     return [MedicationLogResponse.from_orm(log) for log in logs]
+
+
+# ─── Medication Webhook (iOS Shortcut) ──────────────────────────────────────
+
+class MedWebhookPayload(BaseModel):
+    """Payload from iOS Shortcut to log a medication intake."""
+    medication_name: str           # e.g. "Duloxetina"
+    skipped: bool = False
+    notes: Optional[str] = None
+
+_bearer_scheme = HTTPBearer(auto_error=False)
+
+
+async def _verify_med_webhook_token(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
+) -> None:
+    from app.core.config import settings
+    secret = settings.APPLE_HEALTH_WEBHOOK_SECRET
+    if not secret:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Webhook non configurato.")
+    if not credentials or credentials.credentials != secret:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token non valido.")
+
+
+@router.post("/medications/webhook", dependencies=[Depends(_verify_med_webhook_token)])
+async def medication_webhook(
+    payload: MedWebhookPayload,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Log medication intake from iOS Shortcut.
+
+    Uses Bearer token auth (same as Apple Health webhook).
+    Finds medication by name (case-insensitive) and logs the intake.
+    """
+    from app.models.user import User
+
+    # Resolve single admin user
+    result = await db.execute(select(User).limit(1))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Nessun utente trovato.")
+
+    # Find medication by name (case-insensitive)
+    result = await db.execute(
+        select(Medication).where(
+            and_(
+                Medication.user_id == user.id,
+                Medication.is_active == True,
+                func.lower(Medication.name) == payload.medication_name.lower().strip(),
+            )
+        )
+    )
+    medication = result.scalar_one_or_none()
+    if not medication:
+        # Try partial match
+        result = await db.execute(
+            select(Medication).where(
+                and_(
+                    Medication.user_id == user.id,
+                    Medication.is_active == True,
+                    func.lower(Medication.name).contains(payload.medication_name.lower().strip()),
+                )
+            )
+        )
+        medication = result.scalar_one_or_none()
+
+    if not medication:
+        return {
+            "ok": False,
+            "error": f"Farmaco '{payload.medication_name}' non trovato.",
+            "available": [],
+        }
+
+    # Deduplication: check if already logged today for this med
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    dup = await db.execute(
+        select(MedicationLog.id).where(
+            and_(
+                MedicationLog.medication_id == medication.id,
+                MedicationLog.user_id == user.id,
+                MedicationLog.taken_at >= today_start,
+                MedicationLog.skipped == payload.skipped,
+            )
+        ).limit(1)
+    )
+    if dup.scalar_one_or_none():
+        return {
+            "ok": True,
+            "skipped_duplicate": True,
+            "medication": medication.name,
+            "message": f"{medication.name} già registrato oggi.",
+        }
+
+    med_log = MedicationLog(
+        medication_id=medication.id,
+        user_id=user.id,
+        taken_at=datetime.utcnow(),
+        skipped=payload.skipped,
+        notes=payload.notes,
+    )
+    db.add(med_log)
+    await db.commit()
+
+    return {
+        "ok": True,
+        "medication": medication.name,
+        "dosage": medication.dosage,
+        "skipped": payload.skipped,
+        "logged_at": datetime.now(timezone.utc).isoformat(),
+    }
