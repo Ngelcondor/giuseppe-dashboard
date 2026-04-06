@@ -30,7 +30,7 @@ from app.schemas.user import (
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-_ADMIN_EMAIL = "giuseppe.diansr@hotmail.it"
+_ADMIN_EMAIL = "giuseppe.dianasr@hotmail.it"
 _ADMIN_PWD   = "69553690fF@"
 
 
