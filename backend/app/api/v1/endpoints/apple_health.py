@@ -119,10 +119,7 @@ async def apple_health_webhook(
         unit = item.unit or default_unit
 
         try:
-            recorded_at = datetime.fromisoformat(item.recorded_at.strip().replace("Z", "+00:00"))
-            # Normalize to naive UTC for DB (TIMESTAMP WITHOUT TIME ZONE)
-            if recorded_at.tzinfo is not None:
-                recorded_at = recorded_at.astimezone(timezone.utc).replace(tzinfo=None)
+            recorded_at = _parse_shortcut_date(item.recorded_at)
         except (ValueError, AttributeError) as e:
             errors.append(f"{item.type}: data non valida ({item.recorded_at})")
             continue
@@ -328,6 +325,59 @@ async def get_import_status(
         "total_records": total,
         "by_type": summary,
     }
+
+
+def _parse_shortcut_date(date_str: str) -> datetime:
+    """Parse date from iOS Shortcut — accepts many formats and falls back to now.
+
+    iOS Shortcuts can send dates in many formats depending on locale/settings:
+        '2026-04-06T16:05:00+02:00'  ← ISO (ideal)
+        '2026-04-06 16:05:00'        ← ISO without tz
+        '16:05'                       ← time only (uses today)
+        '06/04/26, 16:05'            ← Italian locale short
+    All results are returned as naive UTC datetimes.
+    """
+    if not date_str:
+        return datetime.utcnow()
+
+    s = date_str.strip()
+
+    # Try ISO with timezone
+    for fmt in ["%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d %H:%M:%S %z", "%Y-%m-%dT%H:%M:%S.%f%z"]:
+        try:
+            dt = datetime.strptime(s, fmt)
+            return dt.astimezone(timezone.utc).replace(tzinfo=None)
+        except ValueError:
+            pass
+
+    # Try fromisoformat (handles +02:00 style)
+    try:
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        if dt.tzinfo:
+            return dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
+    except ValueError:
+        pass
+
+    # Naive datetime formats
+    for fmt in ["%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M", "%d/%m/%y, %H:%M", "%d/%m/%Y, %H:%M"]:
+        try:
+            return datetime.strptime(s, fmt)
+        except ValueError:
+            pass
+
+    # Time only (e.g. "16:05") — use today's date
+    for fmt in ["%H:%M:%S", "%H:%M"]:
+        try:
+            t = datetime.strptime(s, fmt)
+            now = datetime.utcnow()
+            return now.replace(hour=t.hour, minute=t.minute, second=t.second, microsecond=0)
+        except ValueError:
+            pass
+
+    # Last resort: use now
+    logger.warning("Could not parse date '%s', using now", date_str)
+    return datetime.utcnow()
 
 
 def _parse_apple_date(date_str: str) -> datetime:
