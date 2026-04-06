@@ -5,8 +5,9 @@ e li POSTa a questo endpoint, che li salva come SleepSession con source='sleep_c
 
 Autenticazione: stesso Bearer token di APPLE_HEALTH_WEBHOOK_SECRET.
 """
+import json
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select as sa_select, and_
@@ -99,13 +100,30 @@ def _map_phase(phase_str: str) -> SleepPhase:
     return mapping.get(phase_str.lower().replace(" ", ""), SleepPhase.LIGHT)
 
 
+@router.post("/sleep-cycle/debug", dependencies=[Depends(_verify_webhook_token)])
+async def sleep_cycle_debug(request: Request) -> dict:
+    """Debug endpoint: logga headers e body grezzi per capire cosa manda iOS."""
+    body_bytes = await request.body()
+    body_str = body_bytes.decode("utf-8", errors="replace")
+    headers = dict(request.headers)
+    logger.warning("=== SLEEP CYCLE DEBUG ===")
+    logger.warning("Headers: %s", headers)
+    logger.warning("Body raw: %s", body_str)
+    try:
+        parsed = json.loads(body_str)
+        logger.warning("Body parsed OK: %s", parsed)
+    except Exception as e:
+        logger.warning("Body parse FAILED: %s", e)
+    return {"headers": headers, "body": body_str}
+
+
 @router.post(
     "/sleep-cycle",
     response_model=SleepCycleSyncResponse,
     dependencies=[Depends(_verify_webhook_token)],
 )
 async def sleep_cycle_webhook(
-    payload: SleepCycleWebhookPayload,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> SleepCycleSyncResponse:
     """Ricevi dati sonno da Sleep Cycle tramite iOS Shortcut.
@@ -117,6 +135,24 @@ async def sleep_cycle_webhook(
     aggiorna i campi SC-specifici invece di crearne una nuova.
     """
     from app.models.user import User
+
+    # Leggi e parsa il body manualmente per gestire qualsiasi formato iOS
+    body_bytes = await request.body()
+    body_str = body_bytes.decode("utf-8", errors="replace")
+    logger.info("Sleep Cycle webhook raw body: %s", body_str)
+
+    try:
+        raw = json.loads(body_str)
+    except json.JSONDecodeError as e:
+        logger.error("Body non è JSON valido: %s | body: %s", e, body_str)
+        raise HTTPException(status_code=400, detail=f"Body non è JSON valido: {e}")
+
+    # Costruisci il payload dal dizionario grezzo
+    try:
+        payload = SleepCycleWebhookPayload(**raw)
+    except Exception as e:
+        logger.error("Payload non valido: %s | raw: %s", e, raw)
+        raise HTTPException(status_code=422, detail=f"Payload non valido: {e}")
 
     # Resolve single admin user
     result = await db.execute(sa_select(User).limit(1))
