@@ -62,6 +62,7 @@ class Settings(BaseSettings):
 
     # Apple Health Configuration
     APPLE_HEALTH_IMPORT_ENABLED: bool = True
+    APPLE_HEALTH_WEBHOOK_SECRET: str = ""  # Set in .env to enable iOS Shortcuts sync
 
     # CalDAV / Apple Calendar Configuration
     CALDAV_SYNC_ENABLED: bool = True
