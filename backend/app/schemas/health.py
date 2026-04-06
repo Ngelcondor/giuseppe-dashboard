@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional, List
 import uuid
-from app.models.health import MetricType
+from app.models.health import MetricType, WorkoutType, WorkoutIntensity
 
 
 class HealthMetricBase(BaseModel):
@@ -146,12 +146,80 @@ class AppleHealthImportRequest(BaseModel):
     """Request for Apple Health data import."""
 
     data: str  # CSV or XML data from Apple Health export
+    format: str = "csv"  # csv or xml
+
+
+class AppleHealthImportResponse(BaseModel):
+    """Response from Apple Health data import."""
+
+    metrics_imported: int = 0
+    workouts_imported: int = 0
+    sleep_sessions_imported: int = 0
+    errors: List[str] = []
 
 
 class HealthMetricBatch(BaseModel):
     """Batch health metrics for import."""
 
     metrics: List[HealthMetricCreate]
+
+
+# ─── Workout Schemas ─────────────────────────────────────────────────────────
+
+
+class WorkoutBase(BaseModel):
+    """Base workout schema."""
+
+    workout_type: WorkoutType
+    intensity: WorkoutIntensity = WorkoutIntensity.MODERATE
+    duration_minutes: int
+    calories_burned: Optional[int] = None
+    distance_km: Optional[float] = None
+    avg_heart_rate: Optional[int] = None
+    max_heart_rate: Optional[int] = None
+    notes: Optional[str] = None
+    source: str = "manual"
+    started_at: datetime
+    ended_at: Optional[datetime] = None
+
+
+class WorkoutCreate(WorkoutBase):
+    pass
+
+
+class WorkoutUpdate(BaseModel):
+    workout_type: Optional[WorkoutType] = None
+    intensity: Optional[WorkoutIntensity] = None
+    duration_minutes: Optional[int] = None
+    calories_burned: Optional[int] = None
+    distance_km: Optional[float] = None
+    avg_heart_rate: Optional[int] = None
+    max_heart_rate: Optional[int] = None
+    notes: Optional[str] = None
+    started_at: Optional[datetime] = None
+    ended_at: Optional[datetime] = None
+
+
+class WorkoutResponse(WorkoutBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class WorkoutWeekSummary(BaseModel):
+    """Weekly workout summary."""
+
+    workouts: List[WorkoutResponse]
+    total_workouts: int = 0
+    total_duration_minutes: int = 0
+    total_calories: int = 0
+    total_distance_km: float = 0.0
+    avg_duration_minutes: float = 0.0
+    by_type: dict = {}  # workout_type -> count
 
 
 # ─── Sleep Schemas ────────────────────────────────────────────────────────────

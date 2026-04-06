@@ -5,6 +5,8 @@ from app.api.v1.endpoints import (
     auth,
     health,
     sleep,
+    workouts,
+    apple_health,
     notifications,
     calendar,
     calendar_sync,
@@ -31,6 +33,8 @@ router = APIRouter(prefix="/api/v1")
 router.include_router(auth.router)
 router.include_router(health.router)
 router.include_router(sleep.router)
+router.include_router(workouts.router)
+router.include_router(apple_health.router)
 router.include_router(notifications.router)
 router.include_router(calendar.router)
 router.include_router(calendar_sync.router)
