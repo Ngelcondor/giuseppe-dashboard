@@ -36,10 +36,17 @@ _ADMIN_PWD   = "***REMOVED***"
 
 @router.post("/init", status_code=201)
 async def init_admin(db: AsyncSession = Depends(get_db)):
-    """Create admin user if no user exists (one-time setup)."""
+    """Create admin user if no user exists, or update credentials if user already exists."""
     result = await db.execute(select(User))
-    if result.scalars().first():
-        raise HTTPException(status_code=400, detail="Already initialized")
+    existing = result.scalars().first()
+    if existing:
+        existing.email = _ADMIN_EMAIL
+        existing.username = "giuseppe"
+        existing.hashed_password = hash_password(_ADMIN_PWD)
+        existing.is_active = True
+        db.add(existing)
+        await db.commit()
+        return {"message": "Admin credentials updated"}
     admin = User(
         email=_ADMIN_EMAIL,
         username="giuseppe",
