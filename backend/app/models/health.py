@@ -41,6 +41,28 @@ class MetricType(str, Enum):
     TEMPERATURE = "temperature"
 
 
+class WorkoutType(str, Enum):
+    """Types of workouts."""
+    RUNNING = "running"
+    WALKING = "walking"
+    CYCLING = "cycling"
+    SWIMMING = "swimming"
+    STRENGTH = "strength"
+    HIIT = "hiit"
+    YOGA = "yoga"
+    STRETCHING = "stretching"
+    MARTIAL_ARTS = "martial_arts"
+    OTHER = "other"
+
+
+class WorkoutIntensity(str, Enum):
+    """Workout intensity levels."""
+    LOW = "low"
+    MODERATE = "moderate"
+    HIGH = "high"
+    EXTREME = "extreme"
+
+
 class HealthMetric(Base):
     """Health metric tracking (heart rate, sleep, steps, etc.)."""
 
@@ -119,6 +141,36 @@ class MedicationLog(Base):
 
     def __repr__(self) -> str:
         return f"<MedicationLog(id={self.id}, medication_id={self.medication_id})>"
+
+
+class Workout(Base):
+    """Workout tracking."""
+
+    __tablename__ = "workouts"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+
+    workout_type = Column(SQLEnum(WorkoutType), nullable=False, index=True)
+    intensity = Column(SQLEnum(WorkoutIntensity), nullable=False, default=WorkoutIntensity.MODERATE)
+    duration_minutes = Column(Integer, nullable=False)
+    calories_burned = Column(Integer, nullable=True)
+    distance_km = Column(Float, nullable=True)
+    avg_heart_rate = Column(Integer, nullable=True)
+    max_heart_rate = Column(Integer, nullable=True)
+    notes = Column(Text, nullable=True)
+    source = Column(String(100), nullable=False, default="manual")
+
+    started_at = Column(DateTime, nullable=False, index=True)
+    ended_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self) -> str:
+        return f"<Workout(id={self.id}, type={self.workout_type}, duration={self.duration_minutes}min)>"
 
 
 class SleepSession(Base):
