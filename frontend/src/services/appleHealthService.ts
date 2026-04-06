@@ -17,6 +17,15 @@ export interface AppleHealthStatus {
   connected: boolean;
   total_records: number;
   by_type: Record<string, { count: number; latest: string | null }>;
+  last_shortcut_sync?: string | null;
+}
+
+export interface WebhookSyncResult {
+  ok: boolean;
+  imported: number;
+  skipped: number;
+  errors: string[];
+  synced_at: string;
 }
 
 // ─── API Methods ─────────────────────────────────────────────────────────────
@@ -45,6 +54,17 @@ const appleHealthService = {
   async getStatus(): Promise<AppleHealthStatus> {
     const { data } = await api.get('/health/apple/status');
     return data;
+  },
+
+  /**
+   * Returns the public webhook URL that the iOS Shortcut should POST to.
+   * The token must be set server-side; we just surface the URL.
+   */
+  getWebhookUrl(): string {
+    const base =
+      process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') ?? 'http://localhost:8000';
+    const apiBase = base.includes('/api/v1') ? base : `${base}/api/v1`;
+    return `${apiBase}/health/apple/webhook`;
   },
 };
 

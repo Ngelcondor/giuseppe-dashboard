@@ -2,11 +2,15 @@
 import logging
 import xml.etree.ElementTree as ET
 from io import StringIO
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, status, UploadFile, File
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime
-from typing import List
+from sqlalchemy import select as sa_select, and_, func
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional
+from pydantic import BaseModel
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.health import HealthMetric, MetricType
@@ -31,6 +35,132 @@ APPLE_HEALTH_TYPE_MAP = {
     "HKQuantityTypeIdentifierBodyTemperature": (MetricType.TEMPERATURE, "°C"),
 }
 
+
+# ── Webhook schemas ──────────────────────────────────────────────────────────
+
+class WebhookMetric(BaseModel):
+    """Single metric sent by the iOS Shortcut."""
+    type: str                  # e.g. "heart_rate", "steps"
+    value: float
+    unit: str = ""
+    recorded_at: str           # ISO-8601 string from Shortcut
+
+
+class AppleHealthWebhookPayload(BaseModel):
+    """Payload sent by the iOS Shortcut."""
+    metrics: List[WebhookMetric] = []
+
+
+# Shortcut type-string → (MetricType enum, fallback unit)
+SHORTCUT_TYPE_MAP: dict[str, tuple[MetricType, str]] = {
+    "heart_rate":     (MetricType.HEART_RATE, "bpm"),
+    "steps":          (MetricType.STEPS, "passi"),
+    "weight":         (MetricType.WEIGHT, "kg"),
+    "calories":       (MetricType.CALORIES, "kcal"),
+    "blood_pressure": (MetricType.BLOOD_PRESSURE, "mmHg"),
+    "oxygen":         (MetricType.OXYGEN, "%"),
+    "temperature":    (MetricType.TEMPERATURE, "°C"),
+}
+
+_bearer_scheme = HTTPBearer(auto_error=False)
+
+
+async def _verify_webhook_token(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
+) -> None:
+    """Raise 401 if the Bearer token does not match APPLE_HEALTH_WEBHOOK_SECRET."""
+    secret = settings.APPLE_HEALTH_WEBHOOK_SECRET
+    if not secret:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Webhook non configurato: imposta APPLE_HEALTH_WEBHOOK_SECRET nel .env del server.",
+        )
+    if not credentials or credentials.credentials != secret:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token non valido.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+@router.post("/webhook", dependencies=[Depends(_verify_webhook_token)])
+async def apple_health_webhook(
+    payload: AppleHealthWebhookPayload,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Receive real-time health data from an iOS Shortcut.
+
+    The Shortcut runs hourly and POSTs the latest metrics.
+    This endpoint is authenticated with a static Bearer token
+    (APPLE_HEALTH_WEBHOOK_SECRET) and does NOT require a user JWT —
+    the dashboard is single-user so we look up the admin user automatically.
+    """
+    from app.models.user import User
+
+    # Resolve the single admin user
+    result = await db.execute(sa_select(User).limit(1))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Nessun utente trovato.")
+
+    user_id = user.id
+    imported = 0
+    skipped = 0
+    errors: List[str] = []
+    window = timedelta(minutes=1)
+
+    for item in payload.metrics:
+        metric_key = item.type.lower()
+        if metric_key not in SHORTCUT_TYPE_MAP:
+            errors.append(f"Tipo sconosciuto: {item.type}")
+            continue
+
+        metric_type, default_unit = SHORTCUT_TYPE_MAP[metric_key]
+        unit = item.unit or default_unit
+
+        try:
+            recorded_at = datetime.fromisoformat(item.recorded_at.replace("Z", "+00:00"))
+        except (ValueError, AttributeError) as e:
+            errors.append(f"{item.type}: data non valida ({item.recorded_at})")
+            continue
+
+        # Deduplication: skip if same type exists within ±1 min
+        dup_check = await db.execute(
+            sa_select(HealthMetric.id).where(
+                and_(
+                    HealthMetric.user_id == user_id,
+                    HealthMetric.metric_type == metric_type,
+                    HealthMetric.recorded_at >= recorded_at - window,
+                    HealthMetric.recorded_at <= recorded_at + window,
+                )
+            ).limit(1)
+        )
+        if dup_check.scalar_one_or_none():
+            skipped += 1
+            continue
+
+        db.add(HealthMetric(
+            user_id=user_id,
+            metric_type=metric_type,
+            value=item.value,
+            unit=unit,
+            recorded_at=recorded_at,
+            source="ios_shortcut",
+        ))
+        imported += 1
+
+    await db.commit()
+
+    return {
+        "ok": True,
+        "imported": imported,
+        "skipped": skipped,
+        "errors": errors[:10],
+        "synced_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 @router.post("/import/csv", response_model=AppleHealthImportResponse)
 async def import_csv(
