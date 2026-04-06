@@ -119,7 +119,10 @@ async def apple_health_webhook(
         unit = item.unit or default_unit
 
         try:
-            recorded_at = datetime.fromisoformat(item.recorded_at.replace("Z", "+00:00"))
+            recorded_at = datetime.fromisoformat(item.recorded_at.strip().replace("Z", "+00:00"))
+            # Normalize to naive UTC for DB (TIMESTAMP WITHOUT TIME ZONE)
+            if recorded_at.tzinfo is not None:
+                recorded_at = recorded_at.astimezone(timezone.utc).replace(tzinfo=None)
         except (ValueError, AttributeError) as e:
             errors.append(f"{item.type}: data non valida ({item.recorded_at})")
             continue
