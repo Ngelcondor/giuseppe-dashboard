@@ -31,11 +31,28 @@ export interface SleepSession {
   rem_minutes: number;
   source: string;
   external_id: string | null;
+  // Sleep Cycle specific
+  sc_quality_score: number | null;
+  snoring_minutes: number | null;
+  snoring_pct: number | null;
+  regularity_score: number | null;
+  sleep_aid_used: string | null;
+  alarm_mode: string | null;
+  wake_up_mood: string | null;
+  heart_rate_lowest: number | null;
+  steps_to_sleep: number | null;
+  // Common
   mood_on_wake: string | null;
   notes: string | null;
   phases: SleepPhaseEntry[];
   created_at: string;
   updated_at: string;
+}
+
+export interface SleepCycleStatus {
+  connected: boolean;
+  total_sessions: number;
+  last_sync: string | null;
 }
 
 export interface SleepSessionCreate {
@@ -50,6 +67,17 @@ export interface SleepSessionCreate {
   deep_minutes?: number;
   rem_minutes?: number;
   source?: string;
+  // Sleep Cycle specific (populated via webhook, not manual form)
+  sc_quality_score?: number | null;
+  snoring_minutes?: number | null;
+  snoring_pct?: number | null;
+  regularity_score?: number | null;
+  sleep_aid_used?: string | null;
+  alarm_mode?: string | null;
+  wake_up_mood?: string | null;
+  heart_rate_lowest?: number | null;
+  steps_to_sleep?: number | null;
+  // Common
   mood_on_wake?: string | null;
   notes?: string | null;
 }
@@ -110,6 +138,12 @@ const sleepService = {
 
   async delete(id: string): Promise<void> {
     await api.delete(`/health/sleep/${id}`);
+  },
+
+  // Sleep Cycle sync status
+  async getSleepCycleStatus(): Promise<SleepCycleStatus> {
+    const { data } = await api.get('/health/sleep/sync/sleep-cycle/status');
+    return data;
   },
 };
 
