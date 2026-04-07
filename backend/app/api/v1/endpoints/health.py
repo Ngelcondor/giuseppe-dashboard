@@ -516,10 +516,15 @@ async def log_medication(
     if not medication:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Medication not found")
 
+    # Strip timezone info — DB column is naive UTC
+    taken_at = log_data.taken_at
+    if taken_at.tzinfo is not None:
+        taken_at = taken_at.astimezone(timezone.utc).replace(tzinfo=None)
+
     med_log = MedicationLog(
         medication_id=medication_id,
         user_id=current_user["sub"],
-        taken_at=log_data.taken_at,
+        taken_at=taken_at,
         skipped=log_data.skipped,
         notes=log_data.notes,
     )
