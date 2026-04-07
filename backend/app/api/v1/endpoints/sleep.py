@@ -180,6 +180,7 @@ async def get_week_summary(
             (SleepSession.user_id == DEFAULT_USER_ID)
             & (SleepSession.sleep_start >= start_date)
         )
+        .options(selectinload(SleepSession.phases))
         .order_by(SleepSession.sleep_start.desc())
     )
     sessions = result.scalars().all()
