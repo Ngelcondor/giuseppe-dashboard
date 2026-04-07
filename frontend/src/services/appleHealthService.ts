@@ -66,6 +66,14 @@ const appleHealthService = {
     const apiBase = base.includes('/api/v1') ? base : `${base}/api/v1`;
     return `${apiBase}/health/apple/webhook`;
   },
+
+  /** Returns the medication sync webhook URL for Health Auto Export. */
+  getMedicationSyncUrl(): string {
+    const base =
+      process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') ?? 'http://localhost:8000';
+    const apiBase = base.includes('/api/v1') ? base : `${base}/api/v1`;
+    return `${apiBase}/health/apple/medications/sync`;
+  },
 };
 
 export default appleHealthService;
