@@ -395,16 +395,20 @@ async def health_auto_export_webhook(
     if sleep_start > sleep_end:
         sleep_start, sleep_end = sleep_end, sleep_start
 
-    # Fasi del sonno (in minuti)
-    deep_min = int(sleep_record.get("deep", 0) or 0)
-    rem_min = int(sleep_record.get("rem", 0) or 0)
-    light_min = int(sleep_record.get("core", 0) or 0)  # HealthKit "core" = light
-    awake_min = int(sleep_record.get("awake", 0) or 0)
-    asleep_min = int(sleep_record.get("asleep", 0) or 0)
-    in_bed_min = int(sleep_record.get("inBed", 0) or 0)
+    # Fasi del sonno — Health Auto Export invia valori in ORE, convertiamo in minuti
+    def _hrs_to_min(val) -> int:
+        """Converti ore (float) in minuti (int)."""
+        return round((float(val) if val else 0) * 60)
+
+    deep_min = _hrs_to_min(sleep_record.get("deep"))
+    rem_min = _hrs_to_min(sleep_record.get("rem"))
+    light_min = _hrs_to_min(sleep_record.get("core"))  # HealthKit "core" = light
+    awake_min = _hrs_to_min(sleep_record.get("awake"))
+    asleep_min = _hrs_to_min(sleep_record.get("asleep"))
+    in_bed_min = _hrs_to_min(sleep_record.get("inBed"))
 
     # Calcola duration
-    total_sleep = int(sleep_record.get("totalSleep", 0) or 0)
+    total_sleep = _hrs_to_min(sleep_record.get("totalSleep"))
     duration = total_sleep or asleep_min or max(0, int((sleep_end - sleep_start).total_seconds() / 60))
     time_in_bed = in_bed_min or duration
 
