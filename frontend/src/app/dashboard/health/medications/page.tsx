@@ -16,6 +16,9 @@ import {
   Edit3,
   Download,
   History,
+  Heart,
+  Copy,
+  ExternalLink,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Modal, ConfirmModal } from '@/components/ui/Modal';
@@ -26,6 +29,7 @@ import medicationService, {
   MedicationCreate,
   MedicationLogResponse,
 } from '@/services/medicationService';
+import appleHealthService from '@/services/appleHealthService';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -120,28 +124,28 @@ function MedCard({
         </p>
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-        {!done && !skipped && (
-          <>
-            <button
-              onClick={onTake}
-              disabled={loading}
-              className="p-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 transition-colors disabled:opacity-30"
-              title="Preso"
-            >
-              <Check size={16} />
-            </button>
-            <button
-              onClick={onSkip}
-              disabled={loading}
-              className="p-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 transition-colors disabled:opacity-30"
-              title="Saltato"
-            >
-              <SkipForward size={16} />
-            </button>
-          </>
-        )}
+      {/* Actions — primary (take/skip) always visible, secondary on hover */}
+      {!done && !skipped && (
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <button
+            onClick={onTake}
+            disabled={loading}
+            className="px-3 py-1.5 rounded-lg bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 transition-colors disabled:opacity-30 text-xs font-medium"
+          >
+            <Check size={16} className="inline -mt-0.5 mr-1" />
+            Preso
+          </button>
+          <button
+            onClick={onSkip}
+            disabled={loading}
+            className="p-1.5 rounded-lg bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 transition-colors disabled:opacity-30"
+            title="Saltato"
+          >
+            <SkipForward size={16} />
+          </button>
+        </div>
+      )}
+      <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex-shrink-0">
         <button
           onClick={onShowHistory}
           className="p-1.5 rounded-lg bg-white/5 text-slate-400 hover:bg-white/10 transition-colors"
@@ -508,6 +512,18 @@ export default function MedicationsPage() {
   // Tab state
   const [tab, setTab] = useState<'oggi' | 'tutti'>('oggi');
 
+  // Apple Health sync panel
+  const [showSyncPanel, setShowSyncPanel] = useState(false);
+  const [syncUrlCopied, setSyncUrlCopied] = useState(false);
+
+  const handleCopySyncUrl = () => {
+    const url = appleHealthService.getMedicationSyncUrl();
+    navigator.clipboard.writeText(url).then(() => {
+      setSyncUrlCopied(true);
+      setTimeout(() => setSyncUrlCopied(false), 2000);
+    });
+  };
+
   // ─── Data fetching ─────────────────────────────────────────────────────────
 
   const fetchData = useCallback(async () => {
@@ -699,6 +715,17 @@ export default function MedicationsPage() {
         <Pill size={18} className="text-indigo-400" />
         <h1 className="text-base font-semibold flex-1">Farmaci</h1>
         <button
+          onClick={() => setShowSyncPanel(!showSyncPanel)}
+          className={`p-2 rounded-lg transition-colors ${
+            showSyncPanel
+              ? 'bg-red-600/20 text-red-300 hover:bg-red-600/30'
+              : 'bg-emerald-600/15 text-emerald-400 hover:bg-emerald-600/25'
+          }`}
+          title="Sync Apple Health"
+        >
+          <Heart size={18} />
+        </button>
+        <button
           onClick={() => setShowForm(true)}
           className="p-2 rounded-lg bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 transition-colors"
           title="Aggiungi farmaco"
@@ -714,6 +741,52 @@ export default function MedicationsPage() {
           <div className="mb-4 px-4 py-3 rounded-lg bg-amber-900/20 border border-amber-700/30 flex items-center gap-2">
             <AlertTriangle size={16} className="text-amber-400" />
             <p className="text-sm text-amber-300">Modalità offline — alcune funzioni non disponibili</p>
+          </div>
+        )}
+
+        {/* Apple Health Sync Panel */}
+        {showSyncPanel && (
+          <div className="px-4 py-4 rounded-xl bg-emerald-900/10 border border-emerald-700/20 space-y-3">
+            <div className="flex items-center gap-2">
+              <Heart size={16} className="text-emerald-400" />
+              <h3 className="text-sm font-semibold text-emerald-300">Sync con Apple Health</h3>
+            </div>
+            <p className="text-xs text-slate-400">
+              Configura <strong>Health Auto Export</strong> per inviare automaticamente i dati farmaci alla dashboard.
+              L'app sincronizza le assunzioni registrate in Apple Salute.
+            </p>
+            <div className="space-y-2">
+              <label className="block text-[11px] text-slate-500 uppercase tracking-wider">Webhook URL (Farmaci)</label>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 px-3 py-2 rounded-lg bg-slate-900/80 border border-slate-700 text-[11px] text-slate-300 font-mono truncate">
+                  {appleHealthService.getMedicationSyncUrl()}
+                </code>
+                <button
+                  onClick={handleCopySyncUrl}
+                  className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors flex-shrink-0"
+                  title="Copia URL"
+                >
+                  {syncUrlCopied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                </button>
+              </div>
+            </div>
+            <div className="pt-2 border-t border-white/5">
+              <p className="text-[11px] text-slate-500">
+                <strong>Setup:</strong> In Health Auto Export → Automations → REST API, incolla l'URL sopra.
+                Imposta il metodo su POST, aggiungi header{' '}
+                <code className="text-emerald-400/80">Authorization: Bearer &lt;token&gt;</code>{' '}
+                con lo stesso APPLE_HEALTH_WEBHOOK_SECRET del server. Abilita "Medications" nei dati da esportare.
+              </p>
+            </div>
+            <a
+              href="https://apps.apple.com/us/app/health-auto-export-json-csv/id1115567069"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+            >
+              <ExternalLink size={12} />
+              Health Auto Export su App Store
+            </a>
           </div>
         )}
 
@@ -906,7 +979,7 @@ export default function MedicationsPage() {
                     {!med.is_active && <span className="ml-2 text-red-400">(inattivo)</span>}
                   </p>
                 </div>
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={() => handleShowHistory(med)}
                     className="p-1.5 rounded-lg bg-white/5 text-slate-400 hover:bg-white/10 transition-colors"

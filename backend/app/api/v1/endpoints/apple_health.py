@@ -10,10 +10,12 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from pydantic import BaseModel
 
+from zoneinfo import ZoneInfo
+
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.health import HealthMetric, MetricType
+from app.models.health import HealthMetric, MetricType, Medication, MedicationLog
 from app.schemas.health import (
     AppleHealthImportResponse,
     HealthMetricCreate,
@@ -532,6 +534,205 @@ async def health_auto_export(
         "ok": True,
         "imported": imported,
         "skipped": skipped,
+        "errors": errors[:10],
+        "synced_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+# ─── Health Auto Export — Medication Sync ─────────────────────────────────────
+
+# Mapping from Health Auto Export status → (skipped: bool)
+_HAE_MED_STATUS_MAP: dict[str, bool] = {
+    "taken": False,
+    "skipped": True,
+}
+
+
+class HAEMedicationEntry(BaseModel):
+    """Single medication entry from Health Auto Export.
+
+    See: https://github.com/Lybron/health-auto-export/wiki/API-Export---JSON-Format
+    """
+    displayText: str = ""            # e.g. "Duloxetina 60 mg Capsule"
+    nickname: Optional[str] = None   # user-assigned nickname in Apple Health
+    start: str = ""                  # ISO-ish date from HAE
+    end: Optional[str] = None
+    scheduledDate: Optional[str] = None
+    form: Optional[str] = None       # Capsule, Tablet, etc.
+    status: str = ""                 # Taken, Skipped, Not Interacted, ...
+    isArchived: bool = False
+    dosage: Optional[float] = None
+    codings: Optional[list] = None
+
+
+class HAEMedicationPayload(BaseModel):
+    """Payload wrapper — Health Auto Export sends {data: {medications: [...]}}."""
+    medications: List[HAEMedicationEntry] = []
+
+
+@router.post("/medications/sync", dependencies=[Depends(_verify_webhook_token)])
+async def sync_medications_from_hae(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Receive medication dose events from Health Auto Export.
+
+    Health Auto Export sends a JSON payload like:
+    {
+      "data": {
+        "medications": [
+          {
+            "displayText": "Duloxetina 60 mg Capsule",
+            "nickname": "Duloxetina",
+            "status": "Taken",
+            "start": "2026-04-07 08:30:00 +0200",
+            "form": "Capsule",
+            "dosage": 60
+          }
+        ]
+      }
+    }
+
+    This endpoint matches each entry to an existing Medication by name
+    (using displayText or nickname) and creates a MedicationLog entry.
+    """
+    from app.models.user import User
+
+    # Parse raw JSON
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    # Resolve admin user
+    result = await db.execute(sa_select(User).limit(1))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=503, detail="Nessun utente trovato.")
+
+    user_id = user.id
+
+    # Extract medications array (support both nested and flat)
+    data = body.get("data", body)
+    med_entries_raw = data.get("medications", [])
+
+    # Parse entries
+    med_entries: List[HAEMedicationEntry] = []
+    for raw in med_entries_raw:
+        try:
+            med_entries.append(HAEMedicationEntry(**raw))
+        except Exception as e:
+            logger.warning("Skipping invalid medication entry: %s", e)
+
+    if not med_entries:
+        return {
+            "ok": True,
+            "imported": 0,
+            "skipped": 0,
+            "message": "Nessun farmaco nel payload.",
+            "synced_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    # Pre-load all active medications for this user (for matching)
+    meds_result = await db.execute(
+        sa_select(Medication).where(
+            and_(Medication.user_id == user_id, Medication.is_active == True)
+        )
+    )
+    user_meds = meds_result.scalars().all()
+
+    # Build lookup: lowercase name → Medication object
+    med_lookup: dict[str, "Medication"] = {}
+    for m in user_meds:
+        med_lookup[m.name.lower().strip()] = m
+
+    imported = 0
+    skipped = 0
+    not_matched = 0
+    errors: List[str] = []
+
+    tz_rome = ZoneInfo("Europe/Rome")
+
+    for entry in med_entries:
+        # Only process Taken / Skipped
+        status_lower = entry.status.lower().strip()
+        if status_lower not in _HAE_MED_STATUS_MAP:
+            skipped += 1
+            continue
+
+        is_skipped = _HAE_MED_STATUS_MAP[status_lower]
+
+        # Parse timestamp
+        try:
+            taken_at = _parse_shortcut_date(entry.start)
+        except Exception:
+            errors.append(f"Data non valida per '{entry.displayText}': {entry.start}")
+            continue
+
+        # Match to a known medication by nickname (preferred) or displayText
+        matched_med = None
+
+        # Try nickname first (exact match)
+        if entry.nickname:
+            matched_med = med_lookup.get(entry.nickname.lower().strip())
+
+        # Try displayText — it often looks like "Duloxetina 60 mg Capsule"
+        if not matched_med and entry.displayText:
+            display_lower = entry.displayText.lower().strip()
+            # Exact match
+            matched_med = med_lookup.get(display_lower)
+            # Partial match: check if any known med name is contained in displayText
+            if not matched_med:
+                for med_name, med_obj in med_lookup.items():
+                    if med_name in display_lower or display_lower.startswith(med_name):
+                        matched_med = med_obj
+                        break
+
+        if not matched_med:
+            not_matched += 1
+            errors.append(f"Farmaco non trovato: '{entry.nickname or entry.displayText}'")
+            continue
+
+        # Deduplication: same medication + same day (Italian TZ) + same skipped status
+        if taken_at.tzinfo is None:
+            day_local = taken_at.replace(tzinfo=timezone.utc).astimezone(tz_rome).date()
+        else:
+            day_local = taken_at.astimezone(tz_rome).date()
+        day_start_utc = datetime.combine(day_local, datetime.min.time(), tzinfo=tz_rome).astimezone(timezone.utc).replace(tzinfo=None)
+        day_end_utc = datetime.combine(day_local, datetime.max.time(), tzinfo=tz_rome).astimezone(timezone.utc).replace(tzinfo=None)
+
+        dup = await db.execute(
+            sa_select(MedicationLog.id).where(
+                and_(
+                    MedicationLog.medication_id == matched_med.id,
+                    MedicationLog.user_id == user_id,
+                    MedicationLog.taken_at >= day_start_utc,
+                    MedicationLog.taken_at <= day_end_utc,
+                    MedicationLog.skipped == is_skipped,
+                )
+            ).limit(1)
+        )
+        if dup.scalar_one_or_none():
+            skipped += 1
+            continue
+
+        # Create the log
+        db.add(MedicationLog(
+            medication_id=matched_med.id,
+            user_id=user_id,
+            taken_at=taken_at,
+            skipped=is_skipped,
+            notes=f"Sync da Apple Health ({entry.form or 'auto'})",
+        ))
+        imported += 1
+
+    await db.commit()
+
+    return {
+        "ok": True,
+        "imported": imported,
+        "skipped": skipped,
+        "not_matched": not_matched,
         "errors": errors[:10],
         "synced_at": datetime.now(timezone.utc).isoformat(),
     }

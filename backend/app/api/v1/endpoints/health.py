@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func, text, and_
 from datetime import datetime, timedelta, date, timezone
+from zoneinfo import ZoneInfo
 from typing import List, Optional
 from pydantic import BaseModel
 
@@ -239,9 +240,11 @@ async def get_today_medications(
     )
     medications = result.scalars().all()
 
-    # Get today's logs
-    today_start = datetime.combine(date.today(), datetime.min.time())
-    today_end = datetime.combine(date.today(), datetime.max.time())
+    # Get today's logs — use Italian timezone so "today" matches the user's local day
+    tz_rome = ZoneInfo("Europe/Rome")
+    today_local = datetime.now(tz_rome).date()
+    today_start = datetime.combine(today_local, datetime.min.time(), tzinfo=tz_rome).astimezone(timezone.utc).replace(tzinfo=None)
+    today_end = datetime.combine(today_local, datetime.max.time(), tzinfo=tz_rome).astimezone(timezone.utc).replace(tzinfo=None)
     logs_result = await db.execute(
         select(MedicationLog).where(
             (MedicationLog.user_id == current_user["sub"])
@@ -643,8 +646,10 @@ async def medication_webhook(
             "available": [],
         }
 
-    # Deduplication: check if already logged today for this med
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    # Deduplication: check if already logged today for this med (Italian timezone)
+    tz_rome = ZoneInfo("Europe/Rome")
+    today_local = datetime.now(tz_rome).date()
+    today_start = datetime.combine(today_local, datetime.min.time(), tzinfo=tz_rome).astimezone(timezone.utc).replace(tzinfo=None)
     dup = await db.execute(
         select(MedicationLog.id).where(
             and_(
@@ -677,6 +682,6 @@ async def medication_webhook(
         "ok": True,
         "medication": medication.name,
         "dosage": medication.dosage,
-        "skipped": payload.skipped,
+        "skipped": skipped,
         "logged_at": datetime.now(timezone.utc).isoformat(),
     }
