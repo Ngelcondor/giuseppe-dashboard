@@ -8,8 +8,10 @@ from datetime import datetime, timedelta, date
 from typing import List
 
 from app.core.database import get_db
-from app.core.security import get_current_user
 from app.models.health import SleepSession, SleepPhaseEntry
+
+# Dashboard personale — utente singolo, niente auth
+DEFAULT_USER_ID = "686859db-326c-4a2a-847e-99042c35eafc"
 from app.schemas.health import (
     SleepSessionCreate,
     SleepSessionResponse,
@@ -25,12 +27,11 @@ router = APIRouter(prefix="/health/sleep", tags=["sleep"])
 @router.post("", response_model=SleepSessionResponse, status_code=status.HTTP_201_CREATED)
 async def create_sleep_session(
     session_data: SleepSessionCreate,
-    current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> SleepSessionResponse:
     """Create a new sleep session with optional phase data."""
     session = SleepSession(
-        user_id=current_user["sub"],
+        user_id=DEFAULT_USER_ID,
         sleep_start=session_data.sleep_start,
         sleep_end=session_data.sleep_end,
         duration_minutes=session_data.duration_minutes,
@@ -69,7 +70,6 @@ async def create_sleep_session(
 @router.get("", response_model=List[SleepSessionResponse])
 async def list_sleep_sessions(
     days: int = Query(30),
-    current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[SleepSessionResponse]:
     """List sleep sessions for the last N days."""
@@ -77,7 +77,7 @@ async def list_sleep_sessions(
     result = await db.execute(
         select(SleepSession)
         .where(
-            (SleepSession.user_id == current_user["sub"])
+            (SleepSession.user_id == DEFAULT_USER_ID)
             & (SleepSession.sleep_start >= start_date)
         )
         .options(selectinload(SleepSession.phases))
@@ -89,13 +89,12 @@ async def list_sleep_sessions(
 
 @router.get("/last-night", response_model=SleepSessionResponse)
 async def get_last_night(
-    current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> SleepSessionResponse:
     """Get last night's sleep session."""
     result = await db.execute(
         select(SleepSession)
-        .where(SleepSession.user_id == current_user["sub"])
+        .where(SleepSession.user_id == DEFAULT_USER_ID)
         .options(selectinload(SleepSession.phases))
         .order_by(SleepSession.sleep_start.desc())
         .limit(1)
@@ -108,14 +107,13 @@ async def get_last_night(
 
 @router.get("/morning-report", response_model=SleepMorningReport)
 async def get_morning_report(
-    current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> SleepMorningReport:
     """Get the morning report based on last night's sleep."""
     # Get last night session
     result = await db.execute(
         select(SleepSession)
-        .where(SleepSession.user_id == current_user["sub"])
+        .where(SleepSession.user_id == DEFAULT_USER_ID)
         .options(selectinload(SleepSession.phases))
         .order_by(SleepSession.sleep_start.desc())
         .limit(1)
@@ -156,7 +154,7 @@ async def get_morning_report(
     tip = _generate_sleep_tip(total_hours, deep_pct, rem_pct, efficiency)
 
     # Calculate streak
-    streak = await _calculate_sleep_streak(db, current_user["sub"])
+    streak = await _calculate_sleep_streak(db, DEFAULT_USER_ID)
 
     return SleepMorningReport(
         session=SleepSessionResponse.from_orm(session),
@@ -172,7 +170,6 @@ async def get_morning_report(
 
 @router.get("/week-summary", response_model=SleepWeekSummary)
 async def get_week_summary(
-    current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> SleepWeekSummary:
     """Get weekly sleep summary."""
@@ -180,7 +177,7 @@ async def get_week_summary(
     result = await db.execute(
         select(SleepSession)
         .where(
-            (SleepSession.user_id == current_user["sub"])
+            (SleepSession.user_id == DEFAULT_USER_ID)
             & (SleepSession.sleep_start >= start_date)
         )
         .order_by(SleepSession.sleep_start.desc())
@@ -221,14 +218,13 @@ async def get_week_summary(
 @router.get("/{session_id}", response_model=SleepSessionResponse)
 async def get_sleep_session(
     session_id: str,
-    current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> SleepSessionResponse:
     """Get a specific sleep session with phase data."""
     result = await db.execute(
         select(SleepSession).where(
             (SleepSession.id == session_id)
-            & (SleepSession.user_id == current_user["sub"])
+            & (SleepSession.user_id == DEFAULT_USER_ID)
         )
     )
     session = result.scalars().first()
@@ -241,14 +237,13 @@ async def get_sleep_session(
 async def update_sleep_session(
     session_id: str,
     update_data: SleepSessionUpdate,
-    current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> SleepSessionResponse:
     """Update a sleep session (mood, notes, quality)."""
     result = await db.execute(
         select(SleepSession).where(
             (SleepSession.id == session_id)
-            & (SleepSession.user_id == current_user["sub"])
+            & (SleepSession.user_id == DEFAULT_USER_ID)
         )
     )
     session = result.scalars().first()
@@ -269,14 +264,13 @@ async def update_sleep_session(
 @router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_sleep_session(
     session_id: str,
-    current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete a sleep session."""
     result = await db.execute(
         select(SleepSession).where(
             (SleepSession.id == session_id)
-            & (SleepSession.user_id == current_user["sub"])
+            & (SleepSession.user_id == DEFAULT_USER_ID)
         )
     )
     session = result.scalars().first()
