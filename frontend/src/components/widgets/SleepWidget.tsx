@@ -260,13 +260,13 @@ export function SleepWidget() {
   /* Loading state */
   if (loading) {
     return (
-      <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/5">
-        <div className="flex items-center gap-2.5 mb-5">
-          <Moon size={15} className="text-indigo-400" />
-          <span className="text-xs font-medium text-slate-500 uppercase tracking-widest">Sonno</span>
+      <div className="p-7 rounded-2xl bg-white/[0.03] border border-white/5">
+        <div className="flex items-center gap-3 mb-6">
+          <Moon size={18} className="text-indigo-400" />
+          <span className="text-sm font-medium text-slate-500 uppercase tracking-widest">Sonno</span>
         </div>
         <div className="flex justify-center py-8">
-          <div className="w-5 h-5 border-2 border-white/10 border-t-indigo-400/60 rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-white/10 border-t-indigo-400/60 rounded-full animate-spin" />
         </div>
       </div>
     );
@@ -275,13 +275,13 @@ export function SleepWidget() {
   /* No data / error */
   if (error || !report?.session) {
     return (
-      <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/5">
-        <div className="flex items-center gap-2.5 mb-5">
-          <Moon size={15} className="text-indigo-400" />
-          <span className="text-xs font-medium text-slate-500 uppercase tracking-widest">Sonno</span>
+      <div className="p-7 rounded-2xl bg-white/[0.03] border border-white/5">
+        <div className="flex items-center gap-3 mb-6">
+          <Moon size={18} className="text-indigo-400" />
+          <span className="text-sm font-medium text-slate-500 uppercase tracking-widest">Sonno</span>
         </div>
-        <p className="text-xs text-slate-600">Nessun dato sul sonno disponibile.</p>
-        <p className="text-[11px] text-slate-700 mt-1">I dati verranno sincronizzati da Health Auto Export.</p>
+        <p className="text-sm text-slate-600">Nessun dato sul sonno disponibile.</p>
+        <p className="text-xs text-slate-700 mt-1.5">I dati verranno sincronizzati da Health Auto Export.</p>
       </div>
     );
   }
@@ -293,30 +293,30 @@ export function SleepWidget() {
   const inBed = s.time_in_bed_minutes ?? s.duration_minutes;
 
   return (
-    <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.055] hover:border-white/10 transition-all duration-200">
+    <div className="p-7 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.055] hover:border-white/10 transition-all duration-200">
 
       {/* Header */}
-      <div className="flex items-center gap-2.5 mb-5">
-        <Moon size={15} className="text-indigo-400" />
-        <span className="text-xs font-medium text-indigo-400/80 uppercase tracking-widest">Sonno</span>
-        <span className="text-[10px] text-slate-700 ml-auto capitalize">{s.source.replace(/_/g, ' ')}</span>
+      <div className="flex items-center gap-3 mb-6">
+        <Moon size={18} className="text-indigo-400" />
+        <span className="text-sm font-medium text-indigo-400/80 uppercase tracking-widest">Sonno</span>
+        <span className="text-xs text-slate-700 ml-auto capitalize">{s.source.replace(/_/g, ' ')}</span>
       </div>
 
       {/* Top section: Ring + Stats */}
-      <div className="flex items-center gap-6 mb-5">
-        <QualityRing score={s.quality_score ?? 0} />
-        <div className="flex-1 space-y-2.5">
+      <div className="flex items-center gap-6 mb-6">
+        <QualityRing score={s.quality_score ?? 0} size={110} />
+        <div className="flex-1 space-y-3">
           <div>
             <p className="text-2xl font-semibold text-slate-100 leading-none">
               {fmtDuration(inBed)}
             </p>
-            <p className="text-[11px] text-slate-500 mt-0.5">A letto</p>
+            <p className="text-xs text-slate-500 mt-1">A letto</p>
           </div>
           <div>
-            <p className="text-lg font-semibold text-slate-200 leading-none">
+            <p className="text-xl font-semibold text-slate-200 leading-none">
               {fmtDuration(s.duration_minutes)}
             </p>
-            <p className="text-[11px] text-slate-500 mt-0.5">Addormentato</p>
+            <p className="text-xs text-slate-500 mt-1">Addormentato</p>
           </div>
           {s.sleep_efficiency != null && (
             <div className="flex items-center gap-1.5">
@@ -343,7 +343,7 @@ export function SleepWidget() {
       )}
 
       {/* Phase legend */}
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mb-5 px-1">
+      <div className="grid grid-cols-2 gap-x-5 gap-y-2 mb-6 px-1">
         <PhaseLegend phase="awake" minutes={s.awake_minutes} totalMinutes={totalPhaseMin} />
         <PhaseLegend phase="rem" minutes={s.rem_minutes} totalMinutes={totalPhaseMin} />
         <PhaseLegend phase="light" minutes={s.light_minutes} totalMinutes={totalPhaseMin} />
@@ -351,35 +351,35 @@ export function SleepWidget() {
       </div>
 
       {/* Separator */}
-      <div className="border-t border-white/[0.04] pt-4">
+      <div className="border-t border-white/[0.04] pt-5">
         {/* Bedtime / wake time */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BedDouble size={13} className="text-indigo-400/60" />
+          <div className="flex items-center gap-2.5">
+            <BedDouble size={15} className="text-indigo-400/60" />
             <div>
               <p className="text-xs text-slate-500">Coricato</p>
-              <p className="text-sm font-semibold text-slate-200">{fmt(sleepStart)}</p>
+              <p className="text-base font-semibold text-slate-200">{fmt(sleepStart)}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-right">
+          <div className="flex items-center gap-2.5 text-right">
             <div>
               <p className="text-xs text-slate-500">Svegliato</p>
-              <p className="text-sm font-semibold text-slate-200">{fmt(sleepEnd)}</p>
+              <p className="text-base font-semibold text-slate-200">{fmt(sleepEnd)}</p>
             </div>
-            <AlarmClock size={13} className="text-amber-400/60" />
+            <AlarmClock size={15} className="text-amber-400/60" />
           </div>
         </div>
 
         {/* Morning tip */}
         {report.tip && (
-          <p className="text-[11px] text-slate-600 mt-3 italic leading-relaxed">
+          <p className="text-xs text-slate-600 mt-4 italic leading-relaxed">
             💡 {report.tip}
           </p>
         )}
 
         {/* Streak */}
         {report.streak_days > 1 && (
-          <p className="text-[10px] text-indigo-400/50 mt-2">
+          <p className="text-xs text-indigo-400/50 mt-2.5">
             🔥 {report.streak_days} notti consecutive tracciate
           </p>
         )}
