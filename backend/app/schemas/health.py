@@ -1,5 +1,5 @@
 """Health and medication schemas."""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 from typing import Optional, List
 import uuid
@@ -340,34 +340,65 @@ class SleepCycleWebhookPayload(BaseModel):
 
     The Shortcut reads HealthKit sleep analysis (written by Sleep Cycle)
     and optionally scrapes extra data from Sleep Cycle's UI via Shortcuts actions.
+
+    Empty strings from iOS Shortcuts are coerced to None/0 by validators.
     """
 
     # Core sleep data (from HealthKit)
-    sleep_start: str  # ISO-8601
-    sleep_end: str  # ISO-8601
-    duration_minutes: int
+    sleep_start: str = ""  # ISO-8601
+    sleep_end: str = ""    # ISO-8601
+    duration_minutes: Optional[int] = None
     time_in_bed_minutes: Optional[int] = None
 
     # Phase breakdown (from HealthKit sleep analysis)
-    awake_minutes: int = 0
-    light_minutes: int = 0
-    deep_minutes: int = 0
-    rem_minutes: int = 0
+    awake_minutes: Optional[int] = 0
+    light_minutes: Optional[int] = 0
+    deep_minutes: Optional[int] = 0
+    rem_minutes: Optional[int] = 0
     phases: Optional[List[SleepCyclePhase]] = None
 
     # Sleep Cycle specific (scraped from SC or passed as extras)
-    sc_quality_score: Optional[int] = None  # Sleep Cycle's quality %
+    sc_quality_score: Optional[int] = None
     snoring_minutes: Optional[int] = None
     regularity_score: Optional[int] = None
-    sleep_aid_used: Optional[str] = None  # "rain", "white_noise", etc.
-    alarm_mode: Optional[str] = None  # "smart", "regular"
+    sleep_aid_used: Optional[str] = None
+    alarm_mode: Optional[str] = None
     wake_up_mood: Optional[str] = None
     heart_rate_lowest: Optional[int] = None
-    steps_to_sleep: Optional[int] = None  # minutes to fall asleep
+    steps_to_sleep: Optional[int] = None
 
     # Metadata
     mood_on_wake: Optional[str] = None
     notes: Optional[str] = None
+
+    @field_validator(
+        "duration_minutes", "time_in_bed_minutes", "awake_minutes",
+        "light_minutes", "deep_minutes", "rem_minutes",
+        "sc_quality_score", "snoring_minutes", "regularity_score",
+        "heart_rate_lowest", "steps_to_sleep",
+        mode="before",
+    )
+    @classmethod
+    def empty_str_to_none_int(cls, v: object) -> object:
+        """Convert empty string '' to None for Optional[int] fields."""
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return None
+            try:
+                return int(float(v))
+            except (ValueError, TypeError):
+                return None
+        return v
+
+    @field_validator("sleep_aid_used", "alarm_mode", "wake_up_mood",
+                     "mood_on_wake", "notes", mode="before")
+    @classmethod
+    def empty_str_to_none_str(cls, v: object) -> object:
+        """Convert empty string '' to None for Optional[str] fields."""
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
 
 
 class SleepCycleSyncResponse(BaseModel):

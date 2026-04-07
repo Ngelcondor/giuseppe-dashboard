@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
+from sqlalchemy.orm import selectinload
 from datetime import datetime, timedelta, date
 from typing import List
 
@@ -79,6 +80,7 @@ async def list_sleep_sessions(
             (SleepSession.user_id == current_user["sub"])
             & (SleepSession.sleep_start >= start_date)
         )
+        .options(selectinload(SleepSession.phases))
         .order_by(SleepSession.sleep_start.desc())
     )
     sessions = result.scalars().all()
@@ -94,6 +96,7 @@ async def get_last_night(
     result = await db.execute(
         select(SleepSession)
         .where(SleepSession.user_id == current_user["sub"])
+        .options(selectinload(SleepSession.phases))
         .order_by(SleepSession.sleep_start.desc())
         .limit(1)
     )
@@ -113,6 +116,7 @@ async def get_morning_report(
     result = await db.execute(
         select(SleepSession)
         .where(SleepSession.user_id == current_user["sub"])
+        .options(selectinload(SleepSession.phases))
         .order_by(SleepSession.sleep_start.desc())
         .limit(1)
     )
