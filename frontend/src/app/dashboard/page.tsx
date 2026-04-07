@@ -9,6 +9,7 @@ import {
   Settings, Zap, Menu, X, ChevronRight, CheckCircle2, Circle, Sun, Sunset, CloudMoon, Play
 } from 'lucide-react';
 import routineService, { type RoutineResponse, type TimeOfDay } from '@/services/routineService';
+import SleepWidget from '@/components/widgets/SleepWidget';
 
 const navSections = [
   { label: 'Dashboard',      href: '/dashboard',           icon: LayoutDashboard },
@@ -329,12 +330,14 @@ export default function DashboardPage() {
           {/* Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
 
+            {/* Sleep (stile Sleep Cycle) */}
+            <SleepWidget />
+
             {/* Health */}
             <Widget href="/dashboard/health">
               <WidgetHeader icon={Heart} label="Salute" />
               <div className="grid grid-cols-2 gap-4">
                 <Stat label="Battito" value="— bpm" color="#f87171" />
-                <Stat label="Sonno" value="— ore" color="#818cf8" />
                 <Stat label="Passi" value="—" color="#4ade80" />
                 <Stat label="Calorie" value="— kcal" color="#fb923c" />
               </div>
