@@ -400,3 +400,138 @@ def _parse_apple_date(date_str: str) -> datetime:
 
     # Fallback: try fromisoformat
     return datetime.fromisoformat(date_str.strip())
+
+
+# ─── Health Auto Export app integration ──────────────────────────────────────
+
+# Mapping from Health Auto Export metric names → our MetricType
+AUTO_EXPORT_NAME_MAP: dict[str, tuple[MetricType, str]] = {
+    "heart_rate":                  (MetricType.HEART_RATE, "bpm"),
+    "resting_heart_rate":          (MetricType.HEART_RATE, "bpm"),
+    "walking_heart_rate_average":  (MetricType.HEART_RATE, "bpm"),
+    "active_energy":               (MetricType.CALORIES, "kcal"),
+    "basal_energy_burned":         (MetricType.CALORIES, "kcal"),
+    "step_count":                  (MetricType.STEPS, "passi"),
+    "body_mass":                   (MetricType.WEIGHT, "kg"),
+    "weight":                      (MetricType.WEIGHT, "kg"),
+    "blood_pressure_systolic":     (MetricType.BLOOD_PRESSURE, "mmHg"),
+    "blood_pressure":              (MetricType.BLOOD_PRESSURE, "mmHg"),
+    "oxygen_saturation":           (MetricType.OXYGEN, "%"),
+    "body_temperature":            (MetricType.TEMPERATURE, "°C"),
+}
+
+
+@router.post("/auto-export", dependencies=[Depends(_verify_webhook_token)])
+async def health_auto_export(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Receive data from the Health Auto Export iOS app.
+
+    The app sends a JSON payload with this structure:
+    {
+      "data": {
+        "metrics": [
+          {
+            "name": "heart_rate",
+            "units": "count/min",
+            "data": [
+              {"date": "2026-04-06 10:00:00 +0200", "Avg": 72, "Min": 60, "Max": 85},
+              ...
+            ]
+          },
+          {
+            "name": "step_count",
+            "units": "count",
+            "data": [
+              {"date": "2026-04-06 10:00:00 +0200", "qty": 8500},
+              ...
+            ]
+          }
+        ]
+      }
+    }
+    """
+    from app.models.user import User
+
+    # Parse raw JSON
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    # Resolve admin user
+    result = await db.execute(sa_select(User).limit(1))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=503, detail="Nessun utente trovato.")
+
+    user_id = user.id
+    data = body.get("data", body)  # Support both {"data": {...}} and flat format
+    metrics_list = data.get("metrics", [])
+
+    imported = 0
+    skipped = 0
+    errors: List[str] = []
+    window = timedelta(minutes=1)
+
+    for metric_group in metrics_list:
+        metric_name = metric_group.get("name", "").lower().replace(" ", "_")
+        unit = metric_group.get("units", "")
+        data_points = metric_group.get("data", [])
+
+        if metric_name not in AUTO_EXPORT_NAME_MAP:
+            continue  # Skip unsupported metrics silently
+
+        metric_type, default_unit = AUTO_EXPORT_NAME_MAP[metric_name]
+        unit = unit or default_unit
+
+        for point in data_points:
+            try:
+                # Extract value: prefer "qty", then "Avg", then "value"
+                value = point.get("qty") or point.get("Avg") or point.get("avg") or point.get("value")
+                if value is None:
+                    continue
+                value = float(value)
+
+                # Parse date
+                date_str = point.get("date", "")
+                recorded_at = _parse_shortcut_date(date_str)
+
+                # Deduplication
+                dup = await db.execute(
+                    sa_select(HealthMetric.id).where(
+                        and_(
+                            HealthMetric.user_id == user_id,
+                            HealthMetric.metric_type == metric_type,
+                            HealthMetric.recorded_at >= recorded_at - window,
+                            HealthMetric.recorded_at <= recorded_at + window,
+                        )
+                    ).limit(1)
+                )
+                if dup.scalar_one_or_none():
+                    skipped += 1
+                    continue
+
+                db.add(HealthMetric(
+                    user_id=user_id,
+                    metric_type=metric_type,
+                    value=value,
+                    unit=unit,
+                    recorded_at=recorded_at,
+                    source="health_auto_export",
+                ))
+                imported += 1
+
+            except (ValueError, TypeError) as e:
+                errors.append(f"{metric_name}: {str(e)}")
+
+    await db.commit()
+
+    return {
+        "ok": True,
+        "imported": imported,
+        "skipped": skipped,
+        "errors": errors[:10],
+        "synced_at": datetime.now(timezone.utc).isoformat(),
+    }
