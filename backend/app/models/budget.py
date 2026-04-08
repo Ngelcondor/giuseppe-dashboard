@@ -115,9 +115,10 @@ class Transaction(Base):
 
     # Source tracking
     source = Column(
-        SQLEnum(TransactionSource),
-        default=TransactionSource.MANUAL,
-        nullable=False,
+        String(20),
+        default="manual",
+        server_default="manual",
+        nullable=True,
     )
 
     # Bank sync fields (from GoCardless)
