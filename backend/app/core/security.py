@@ -102,15 +102,22 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> Dict[str, Any
     """
     Dependency to get current authenticated user.
 
+    Supports both JWT tokens and API tokens (prefixed with 'gd_').
+
     Args:
-        token: JWT token from Authorization header.
+        token: JWT or API token from Authorization header.
 
     Returns:
-        Dict: Decoded token data.
+        Dict: Decoded token data (JWT) or synthetic payload (API token).
 
     Raises:
         HTTPException: If token is invalid.
     """
+    # Check if it's an API token (starts with "gd_")
+    if token.startswith("gd_"):
+        return await _verify_api_token(token)
+
+    # Otherwise treat as JWT
     payload = verify_token(token)
     user_id: str = payload.get("sub")
     if user_id is None:
@@ -119,6 +126,47 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> Dict[str, Any
             detail="Invalid authentication credentials",
         )
     return payload
+
+
+async def _verify_api_token(token: str) -> Dict[str, Any]:
+    """Verify an API token against the database."""
+    import hashlib
+    from app.core.database import AsyncSessionLocal as async_session_factory
+    from sqlalchemy.future import select
+
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+    async with async_session_factory() as db:
+        from app.models.api_token import APIToken
+        result = await db.execute(
+            select(APIToken).where(
+                APIToken.token_hash == token_hash,
+                APIToken.is_active == True,
+            )
+        )
+        api_token = result.scalars().first()
+
+        if not api_token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="API token non valido o revocato",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Check expiry
+        if api_token.expires_at and api_token.expires_at < __import__("datetime").datetime.utcnow():
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="API token scaduto",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Update last_used_at
+        api_token.last_used_at = __import__("datetime").datetime.utcnow()
+        db.add(api_token)
+        await db.commit()
+
+        return {"sub": str(api_token.user_id), "type": "api_token", "scope": api_token.scope}
 
 
 def setup_totp(user_email: str) -> tuple[str, str]:

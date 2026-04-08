@@ -19,6 +19,11 @@ import {
   Heart,
   Copy,
   ExternalLink,
+  BarChart3,
+  ChevronLeft,
+  ChevronRight,
+  TrendingUp,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Modal, ConfirmModal } from '@/components/ui/Modal';
@@ -28,6 +33,7 @@ import medicationService, {
   MedicationTodayResponse,
   MedicationCreate,
   MedicationLogResponse,
+  MedicationStatsResponse,
 } from '@/services/medicationService';
 import appleHealthService from '@/services/appleHealthService';
 
@@ -491,6 +497,186 @@ function HistoryModal({
   );
 }
 
+// ─── Stats Panel ────────────────────────────────────────────────────────────
+
+function AdherenceBar({ pct, color }: { pct: number; color: string }) {
+  return (
+    <div className="h-2 bg-card-solid rounded-full overflow-hidden">
+      <div
+        className="h-full rounded-full transition-all duration-500"
+        style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: color }}
+      />
+    </div>
+  );
+}
+
+function StatsPanel({
+  stats,
+  loading,
+  onPrev,
+  onNext,
+}: {
+  stats: MedicationStatsResponse | null;
+  loading: boolean;
+  onPrev: () => void;
+  onNext: () => void;
+}) {
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <div className="w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <div className="text-center py-12">
+        <BarChart3 size={32} className="text-tertiary mx-auto mb-3" />
+        <p className="text-sm text-tertiary">Nessun dato statistico disponibile</p>
+      </div>
+    );
+  }
+
+  const adherenceColor = (pct: number) =>
+    pct >= 90 ? '#10B981' : pct >= 70 ? '#F59E0B' : '#EF4444';
+
+  return (
+    <div className="space-y-6">
+      {/* Period navigation */}
+      <div className="flex items-center justify-between">
+        <button onClick={onPrev} className="p-2 rounded-lg bg-card text-body hover:bg-surface-hover transition-colors">
+          <ChevronLeft size={18} />
+        </button>
+        <div className="text-center">
+          <h3 className="text-sm font-semibold text-heading">{stats.period_label}</h3>
+          <p className="text-[11px] text-tertiary">{stats.total_days} giorni</p>
+        </div>
+        <button onClick={onNext} className="p-2 rounded-lg bg-card text-body hover:bg-surface-hover transition-colors">
+          <ChevronRight size={18} />
+        </button>
+      </div>
+
+      {/* Overall adherence card */}
+      <div className="px-5 py-4 rounded-xl bg-card border border-border-default">
+        <div className="flex items-center gap-3 mb-3">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ backgroundColor: adherenceColor(stats.overall_adherence_pct) + '20' }}
+          >
+            <TrendingUp size={20} style={{ color: adherenceColor(stats.overall_adherence_pct) }} />
+          </div>
+          <div>
+            <p className="text-xs text-tertiary">Aderenza complessiva</p>
+            <p className="text-2xl font-bold text-heading">{stats.overall_adherence_pct}%</p>
+          </div>
+        </div>
+        <AdherenceBar pct={stats.overall_adherence_pct} color={adherenceColor(stats.overall_adherence_pct)} />
+      </div>
+
+      {/* Per-medication stats */}
+      {stats.scheduled_stats.length > 0 && (
+        <div>
+          <h4 className="text-xs font-semibold text-body uppercase tracking-wider mb-3 px-1">
+            Farmaci schedulati
+          </h4>
+          <div className="space-y-3">
+            {stats.scheduled_stats.map((item) => (
+              <div
+                key={item.medication_id}
+                className="px-4 py-3 rounded-xl bg-card border border-border-default"
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0"
+                    style={{ backgroundColor: (item.color || '#6366F1') + '20' }}
+                  >
+                    {item.icon || '💊'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-heading">{item.name} {item.dosage}</p>
+                    <p className="text-[11px] text-tertiary">{item.scheduled_time || ''}</p>
+                  </div>
+                  <span
+                    className="text-lg font-bold"
+                    style={{ color: adherenceColor(item.adherence_pct) }}
+                  >
+                    {item.adherence_pct}%
+                  </span>
+                </div>
+                <AdherenceBar pct={item.adherence_pct} color={item.color || '#6366F1'} />
+                <div className="flex gap-4 mt-2 text-[11px]">
+                  <span className="text-emerald-400">
+                    {item.total_taken} prese
+                  </span>
+                  <span className="text-amber-400">
+                    {item.total_skipped} saltate
+                  </span>
+                  <span className="text-red-400">
+                    {item.total_missed} mancate
+                  </span>
+                  <span className="text-tertiary ml-auto">
+                    su {item.total_expected} previste
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* PRN stats */}
+      {stats.prn_stats.length > 0 && (
+        <div>
+          <h4 className="text-xs font-semibold text-red-400 uppercase tracking-wider mb-3 px-1">
+            🆘 Farmaci al bisogno (PRN)
+          </h4>
+          <div className="space-y-3">
+            {stats.prn_stats.map((item) => (
+              <div
+                key={item.medication_id}
+                className="px-4 py-3 rounded-xl bg-card border border-border-default"
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0"
+                    style={{ backgroundColor: (item.color || '#EF4444') + '20' }}
+                  >
+                    {item.icon || '🆘'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-heading">{item.name} {item.dosage}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-heading">{item.total_intakes}</p>
+                    <p className="text-[10px] text-tertiary">assunzioni</p>
+                  </div>
+                </div>
+                <div className="flex gap-4 mt-2 text-[11px] text-tertiary">
+                  <span>Usato in {item.days_used} giorni</span>
+                  {item.avg_per_day_used > 0 && (
+                    <span>Media {item.avg_per_day_used}/giorno quando usato</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Total PRN summary */}
+          <div className="mt-3 px-4 py-2 rounded-lg bg-red-900/10 border border-red-700/20">
+            <div className="flex items-center gap-2">
+              <AlertCircle size={14} className="text-red-400" />
+              <p className="text-xs text-red-300">
+                Totale assunzioni al bisogno nel periodo: <strong>{stats.total_prn_intakes}</strong>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function MedicationsPage() {
@@ -510,7 +696,13 @@ export default function MedicationsPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
 
   // Tab state
-  const [tab, setTab] = useState<'oggi' | 'tutti'>('oggi');
+  const [tab, setTab] = useState<'oggi' | 'tutti' | 'stats'>('oggi');
+
+  // Stats state
+  const [statsData, setStatsData] = useState<MedicationStatsResponse | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsYear, setStatsYear] = useState<number>(new Date().getFullYear());
+  const [statsMonth, setStatsMonth] = useState<number>(new Date().getMonth() + 1);
 
   // Apple Health sync panel
   const [showSyncPanel, setShowSyncPanel] = useState(false);
@@ -685,7 +877,50 @@ export default function MedicationsPage() {
     }
   };
 
-  // ─── Stats ─────────────────────────────────────────────────────────────────
+  // ─── Stats fetching ────────────────────────────────────────────────────────
+
+  const fetchStats = useCallback(async (y: number, m: number) => {
+    setStatsLoading(true);
+    try {
+      const data = await medicationService.getStats(y, m);
+      setStatsData(data);
+    } catch (err: any) {
+      console.error('Failed to fetch stats:', err);
+      setStatsData(null);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  // Fetch stats when switching to the stats tab or changing month
+  useEffect(() => {
+    if (tab === 'stats') {
+      fetchStats(statsYear, statsMonth);
+    }
+  }, [tab, statsYear, statsMonth, fetchStats]);
+
+  const handleStatsPrev = () => {
+    if (statsMonth === 1) {
+      setStatsMonth(12);
+      setStatsYear(statsYear - 1);
+    } else {
+      setStatsMonth(statsMonth - 1);
+    }
+  };
+
+  const handleStatsNext = () => {
+    const now = new Date();
+    const nextMonth = statsMonth === 12 ? 1 : statsMonth + 1;
+    const nextYear = statsMonth === 12 ? statsYear + 1 : statsYear;
+    // Don't allow navigating past current month
+    if (nextYear > now.getFullYear() || (nextYear === now.getFullYear() && nextMonth > now.getMonth() + 1)) {
+      return;
+    }
+    setStatsMonth(nextMonth);
+    setStatsYear(nextYear);
+  };
+
+  // ─── Today Stats ──────────────────────────────────────────────────────────
 
   const scheduledItems = todayData
     ? Object.values(todayData.scheduled).flat()
@@ -808,15 +1043,20 @@ export default function MedicationsPage() {
 
         {/* Tabs */}
         <div className="flex gap-1 p-1 bg-card rounded-xl border border-border-default">
-          {(['oggi', 'tutti'] as const).map((t) => (
+          {([
+            { key: 'oggi' as const, label: 'Oggi' },
+            { key: 'tutti' as const, label: 'Tutti' },
+            { key: 'stats' as const, label: 'Statistiche' },
+          ]).map((t) => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
+              key={t.key}
+              onClick={() => setTab(t.key)}
               className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${
-                tab === t ? 'bg-indigo-600/30 text-indigo-300' : 'text-tertiary hover:text-body'
+                tab === t.key ? 'bg-indigo-600/30 text-indigo-300' : 'text-tertiary hover:text-body'
               }`}
             >
-              {t === 'oggi' ? 'Oggi' : 'Tutti i farmaci'}
+              {t.key === 'stats' && <BarChart3 size={12} className="inline mr-1 -mt-0.5" />}
+              {t.label}
             </button>
           ))}
         </div>
@@ -956,6 +1196,16 @@ export default function MedicationsPage() {
               </>
             )}
           </div>
+        )}
+
+        {/* STATS tab */}
+        {tab === 'stats' && allMeds.length > 0 && (
+          <StatsPanel
+            stats={statsData}
+            loading={statsLoading}
+            onPrev={handleStatsPrev}
+            onNext={handleStatsNext}
+          />
         )}
 
         {/* ALL tab */}

@@ -6,8 +6,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-dashboard}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
       POSTGRES_DB: ${POSTGRES_DB:-dashboard}
+    # Porta esposta solo su localhost per debug locale
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -23,8 +24,9 @@ services:
   redis:
     image: redis:7-alpine
     container_name: dashboard-redis
+    # Porta esposta solo su localhost per debug locale
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes

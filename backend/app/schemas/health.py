@@ -142,6 +142,53 @@ class MedicationTodayResponse(BaseModel):
     prn: list[MedicationScheduleItem]
 
 
+# ─── Medication Statistics Schemas ────────────────────────────────────────────
+
+
+class MedicationStatItem(BaseModel):
+    """Stats for a single scheduled medication over a period."""
+
+    medication_id: uuid.UUID
+    name: str
+    dosage: str
+    color: Optional[str] = None
+    icon: Optional[str] = None
+    scheduled_time: Optional[str] = None
+    total_expected: int  # giorni nel periodo in cui il farmaco era attivo
+    total_taken: int
+    total_skipped: int
+    total_missed: int  # expected - taken - skipped (nessun log)
+    adherence_pct: float  # (taken / expected) * 100
+
+
+class PRNStatItem(BaseModel):
+    """Stats for a single PRN (al bisogno) medication."""
+
+    medication_id: uuid.UUID
+    name: str
+    dosage: str
+    color: Optional[str] = None
+    icon: Optional[str] = None
+    total_intakes: int  # quante volte è stato assunto nel periodo
+    days_used: int  # in quanti giorni diversi
+    avg_per_day_used: float  # media assunzioni nei giorni in cui è stato usato
+
+
+class MedicationStatsResponse(BaseModel):
+    """Monthly/custom period medication statistics report."""
+
+    period_start: str  # YYYY-MM-DD
+    period_end: str  # YYYY-MM-DD
+    period_label: str  # e.g. "Marzo 2026"
+    total_days: int
+    # Farmaci schedulati
+    scheduled_stats: List[MedicationStatItem]
+    overall_adherence_pct: float  # media aderenza globale
+    # Farmaci al bisogno
+    prn_stats: List[PRNStatItem]
+    total_prn_intakes: int  # totale assunzioni PRN nel periodo
+
+
 class AppleHealthImportRequest(BaseModel):
     """Request for Apple Health data import."""
 
