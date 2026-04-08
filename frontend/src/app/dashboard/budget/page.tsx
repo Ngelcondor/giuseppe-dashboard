@@ -287,6 +287,8 @@ export default function BudgetPage() {
 
   return (
     <div className="min-h-screen bg-page text-heading">
+      {/* Global hidden file input for CSV */}
+      <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVImport} />
 
       {/* Header */}
       <header className="px-6 py-5 border-b border-border-default sticky top-0 bg-page/90 backdrop-blur-sm z-10">
@@ -481,7 +483,6 @@ export default function BudgetPage() {
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs bg-card border border-border-default hover:bg-surface-hover text-heading transition-colors">
                       <Upload size={12} /> CSV
                     </button>
-                    <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVImport} />
                     {dashboard.bank_connected && (
                       <button onClick={handleSync} disabled={syncing}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs bg-card border border-border-default hover:bg-surface-hover text-heading transition-colors">
