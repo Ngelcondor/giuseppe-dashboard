@@ -69,7 +69,7 @@ def check_deadline_reminders():
                 for deadline in deadlines:
                     days_until = (deadline.due_date - today).days
                     if days_until == deadline.reminder_days_before:
-                        await send_reminder(str(user.id), deadline.title, deadline.due_date)
+                        await send_reminder(db, str(user.id), deadline.title, deadline.due_date)
 
         await engine.dispose()
 
@@ -125,6 +125,7 @@ def check_medication_reminders():
 
             for medication in medications:
                 await send_medication_reminder(
+                    db,
                     str(medication.user_id),
                     medication.name,
                     medication.time_of_day,
@@ -151,6 +152,7 @@ def check_routine_reminders():
 
             for routine in routines:
                 await send_routine_reminder(
+                    db,
                     str(routine.user_id),
                     routine.name,
                     routine.time_of_day.value,
