@@ -274,38 +274,38 @@ export default function DeadlinesPage() {
 
             {/* AGGIUNGI */}
             {view === 'aggiungi' && (
-              <div className="rounded-2xl bg-white/[0.03] border border-white/5 p-6 max-w-md mx-auto">
+              <div className="rounded-2xl bg-card border border-border-default p-6 max-w-md mx-auto">
                 <p className="text-xs font-medium text-tertiary uppercase tracking-widest mb-5">Nuova scadenza</p>
                 <div className="space-y-4">
                   <div>
                     <label className="text-[11px] text-muted mb-1.5 block uppercase tracking-widest">Descrizione</label>
                     <input value={form.desc} onChange={e => setForm(f => ({...f, desc: e.target.value}))} placeholder="es. Netflix"
-                      className="w-full bg-transparent border border-border-hover rounded-xl px-4 py-2.5 text-sm placeholder-muted focus:outline-none focus:border-white/20 transition-colors" />
+                      className="w-full bg-transparent border border-border-hover rounded-xl px-4 py-2.5 text-sm placeholder-muted focus:outline-none focus:border-border-hover transition-colors" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-[11px] text-muted mb-1.5 block uppercase tracking-widest">Importo (€)</label>
                       <input value={form.importo} onChange={e => setForm(f => ({...f, importo: e.target.value}))} placeholder="-9.99"
-                        className="w-full bg-transparent border border-border-hover rounded-xl px-4 py-2.5 text-sm placeholder-muted focus:outline-none focus:border-white/20 transition-colors" />
+                        className="w-full bg-transparent border border-border-hover rounded-xl px-4 py-2.5 text-sm placeholder-muted focus:outline-none focus:border-border-hover transition-colors" />
                     </div>
                     <div>
                       <label className="text-[11px] text-muted mb-1.5 block uppercase tracking-widest">Giorno/Mese</label>
                       <input value={form.scadenza_gg_mm} onChange={e => setForm(f => ({...f, scadenza_gg_mm: e.target.value}))} placeholder="01/04"
-                        className="w-full bg-transparent border border-border-hover rounded-xl px-4 py-2.5 text-sm placeholder-muted focus:outline-none focus:border-white/20 transition-colors" />
+                        className="w-full bg-transparent border border-border-hover rounded-xl px-4 py-2.5 text-sm placeholder-muted focus:outline-none focus:border-border-hover transition-colors" />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-[11px] text-muted mb-1.5 block uppercase tracking-widest">Tipo</label>
                       <select value={form.tipo} onChange={e => setForm(f => ({...f, tipo: e.target.value as Tipo}))}
-                        className="w-full bg-input border border-border-hover rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white/20 transition-colors text-heading >
+                        className="w-full bg-input border border-border-hover rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-border-hover transition-colors text-heading >
                         {['Uscita','Entrata','Abbonamento','Rata','Ricorrente'].map(t => <option key={t}>{t}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className="text-[11px] text-muted mb-1.5 block uppercase tracking-widest">Mese</label>
                       <select value={form.mese} onChange={e => setForm(f => ({...f, mese: e.target.value}))}
-                        className="w-full bg-input border border-border-hover rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-white/20 transition-colors text-heading >
+                        className="w-full bg-input border border-border-hover rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-border-hover transition-colors text-heading >
                         {MESI.map(m => <option key={m}>{m}</option>)}
                       </select>
                     </div>

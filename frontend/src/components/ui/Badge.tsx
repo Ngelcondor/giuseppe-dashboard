@@ -20,7 +20,7 @@ export const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(
   ) => {
     const variants = {
       primary: 'bg-blue-900/50 text-blue-100 border border-blue-700',
-      secondary: 'bg-slate-700 text-slate-100 border border-slate-600',
+      secondary: 'bg-surface-hover text-heading border border-border-default',
       success: 'bg-green-900/50 text-green-100 border border-green-700',
       warning: 'bg-yellow-900/50 text-yellow-100 border border-yellow-700',
       danger: 'bg-red-900/50 text-red-100 border border-red-700',
@@ -77,8 +77,8 @@ export const StatusBadge = React.forwardRef<HTMLDivElement, StatusBadgeProps>(
         label: 'Attivo',
       },
       inactive: {
-        bg: 'bg-slate-700 border-slate-600',
-        text: 'text-slate-300',
+        bg: 'bg-surface-hover border-border-default',
+        text: 'text-body',
         label: 'Inattivo',
       },
       pending: {
