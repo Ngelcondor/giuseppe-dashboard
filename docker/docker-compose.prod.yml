@@ -52,6 +52,9 @@ services:
       WEATHER_API_KEY: ${WEATHER_API_KEY:-}
       WEATHER_API_UNITS: metric
       APPLE_HEALTH_WEBHOOK_SECRET: ${APPLE_HEALTH_WEBHOOK_SECRET:-}
+      CALDAV_SYNC_ENABLED: ${CALDAV_SYNC_ENABLED:-true}
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/2
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -94,12 +97,14 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       ENVIRONMENT: production
       LOG_LEVEL: warning
+      CALDAV_SYNC_ENABLED: ${CALDAV_SYNC_ENABLED:-true}
+      CALDAV_DEFAULT_SYNC_INTERVAL: ${CALDAV_DEFAULT_SYNC_INTERVAL:-15}
     depends_on:
       redis:
         condition: service_healthy
       postgres:
         condition: service_healthy
-    command: celery -A app.tasks.celery_app worker --loglevel=warning --concurrency=2
+    command: celery -A app.tasks.celery_app worker --loglevel=warning --pool=solo
     networks:
       - gd-network
     restart: always
@@ -117,6 +122,8 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       ENVIRONMENT: production
       LOG_LEVEL: warning
+      CALDAV_SYNC_ENABLED: ${CALDAV_SYNC_ENABLED:-true}
+      CALDAV_DEFAULT_SYNC_INTERVAL: ${CALDAV_DEFAULT_SYNC_INTERVAL:-15}
     depends_on:
       redis:
         condition: service_healthy
