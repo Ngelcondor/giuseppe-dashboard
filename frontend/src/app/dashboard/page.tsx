@@ -33,7 +33,7 @@ function Widget({ href, children }: { href: string; children: React.ReactNode })
   return (
     <Link
       href={href}
-      className="group block p-7 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.055] hover:border-white/10 transition-all duration-200"
+      className="group block p-7 rounded-2xl bg-card border border-border-default hover:bg-surface-hover hover:border-border-hover transition-all duration-200"
     >
       {children}
     </Link>
@@ -44,10 +44,10 @@ function WidgetHeader({ icon: Icon, label }: { icon: React.ElementType; label: s
   return (
     <div className="flex items-center justify-between mb-6">
       <div className="flex items-center gap-3">
-        <Icon size={18} className="text-slate-500" />
-        <span className="text-sm font-medium text-slate-500 uppercase tracking-widest">{label}</span>
+        <Icon size={18} className="text-tertiary" />
+        <span className="text-sm font-medium text-tertiary uppercase tracking-widest">{label}</span>
       </div>
-      <ChevronRight size={16} className="text-slate-700 group-hover:text-slate-500 transition-colors" />
+      <ChevronRight size={16} className="text-muted group-hover:text-tertiary transition-colors" />
     </div>
   );
 }
@@ -55,7 +55,7 @@ function WidgetHeader({ icon: Icon, label }: { icon: React.ElementType; label: s
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div>
-      <p className="text-xs text-slate-600 mb-1">{label}</p>
+      <p className="text-xs text-muted mb-1">{label}</p>
       <p className="text-xl font-semibold" style={{ color: color || '#e2e8f0' }}>{value}</p>
     </div>
   );
@@ -114,7 +114,7 @@ function HealthWidget() {
             <Stat label="Calorie" value={cal ? `${Math.round(cal.value)} kcal` : '—'} color="#fb923c" />
           </div>
           {hr?.source && (
-            <p className="text-xs text-slate-700 mt-5 capitalize">Fonte: {hr.source.replace(/_/g, ' ')}</p>
+            <p className="text-xs text-muted mt-5 capitalize">Fonte: {hr.source.replace(/_/g, ' ')}</p>
           )}
         </>
       ) : (
@@ -124,7 +124,7 @@ function HealthWidget() {
             <Stat label="Passi" value="—" color="#4ade80" />
             <Stat label="Calorie" value="— kcal" color="#fb923c" />
           </div>
-          <p className="text-xs text-slate-700 mt-5">Collega Apple Health per i dati reali</p>
+          <p className="text-xs text-muted mt-5">Collega Apple Health per i dati reali</p>
         </>
       )}
     </Widget>
@@ -211,21 +211,21 @@ function DeadlinesWidget() {
             <div key={item.id} className="flex items-center gap-3">
               <div className="w-1.5 h-8 rounded-full shrink-0" style={{ backgroundColor: PRIORITY_COLORS[item.priority] || '#6b7280' }} />
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-slate-300 truncate">
+                <p className="text-sm text-body truncate">
                   {CATEGORY_EMOJI[item.category] || '📋'} {item.title}
                 </p>
-                <p className="text-xs text-slate-600">{formatDate(item.due_date)}</p>
+                <p className="text-xs text-muted">{formatDate(item.due_date)}</p>
               </div>
             </div>
           ))}
           {(data?.upcoming?.length ?? 0) > 4 && (
-            <p className="text-xs text-slate-600 pl-5">+{(data?.upcoming?.length ?? 0) - 4} altre →</p>
+            <p className="text-xs text-muted pl-5">+{(data?.upcoming?.length ?? 0) - 4} altre →</p>
           )}
         </div>
       ) : (
         <>
-          <p className="text-sm text-slate-600">Nessuna scadenza imminente</p>
-          <p className="text-xs text-slate-700 mt-1.5">Vai alla sezione per aggiungere scadenze</p>
+          <p className="text-sm text-muted">Nessuna scadenza imminente</p>
+          <p className="text-xs text-muted mt-1.5">Vai alla sezione per aggiungere scadenze</p>
         </>
       )}
     </Widget>
@@ -295,8 +295,8 @@ function RoutineWidget() {
     return (
       <Widget href="/dashboard/routines">
         <WidgetHeader icon={Activity} label="Routine" />
-        <p className="text-sm text-slate-600">Nessuna routine attiva.</p>
-        <div className="mt-4 flex items-center gap-2 text-xs text-slate-500">
+        <p className="text-sm text-muted">Nessuna routine attiva.</p>
+        <div className="mt-4 flex items-center gap-2 text-xs text-tertiary">
           <Play size={12} /> Crea la tua prima routine
         </div>
       </Widget>
@@ -320,7 +320,7 @@ function RoutineWidget() {
   const color = TIME_COLORS[routine.time_of_day];
 
   return (
-    <div className="group block p-7 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.055] hover:border-white/10 transition-all duration-200">
+    <div className="group block p-7 rounded-2xl bg-card border border-border-default hover:bg-surface-hover hover:border-border-hover transition-all duration-200">
       <Link href="/dashboard/routines">
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
@@ -329,7 +329,7 @@ function RoutineWidget() {
               Routine {TIME_LABELS[routine.time_of_day]}
             </span>
           </div>
-          <ChevronRight size={16} className="text-slate-700 group-hover:text-slate-500 transition-colors" />
+          <ChevronRight size={16} className="text-muted group-hover:text-tertiary transition-colors" />
         </div>
       </Link>
 
@@ -337,10 +337,10 @@ function RoutineWidget() {
       {completedSteps.size > 0 && (
         <div className="mb-5">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs text-slate-600">{completedSteps.size}/{sortedSteps.length}</span>
+            <span className="text-xs text-muted">{completedSteps.size}/{sortedSteps.length}</span>
             <span className="text-xs font-medium" style={{ color }}>{pct}%</span>
           </div>
-          <div className="w-full h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
+          <div className="w-full h-1.5 rounded-full bg-card-inner overflow-hidden">
             <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: color }} />
           </div>
         </div>
@@ -359,9 +359,9 @@ function RoutineWidget() {
               {done ? (
                 <CheckCircle2 size={17} className="text-emerald-400 shrink-0" />
               ) : (
-                <Circle size={17} className="text-slate-600 group-hover/step:text-slate-400 shrink-0 transition-colors" />
+                <Circle size={17} className="text-muted group-hover/step:text-body shrink-0 transition-colors" />
               )}
-              <span className={`text-sm ${done ? 'text-slate-500 line-through' : 'text-slate-400'}`}>
+              <span className={`text-sm ${done ? 'text-tertiary line-through' : 'text-body'}`}>
                 {step.icon && <span className="mr-1.5">{step.icon}</span>}
                 {step.title}
               </span>
@@ -369,7 +369,7 @@ function RoutineWidget() {
           );
         })}
         {sortedSteps.length > 5 && (
-          <Link href="/dashboard/routines" className="text-xs text-slate-600 hover:text-slate-400 transition-colors pl-8">
+          <Link href="/dashboard/routines" className="text-xs text-muted hover:text-body transition-colors pl-8">
             +{sortedSteps.length - 5} altri step →
           </Link>
         )}
@@ -392,7 +392,7 @@ export default function DashboardPage() {
   const greeting = hour < 12 ? 'Buongiorno' : hour < 18 ? 'Buon pomeriggio' : 'Buonasera';
 
   return (
-    <div className="min-h-screen bg-[#0f1117] text-slate-100 flex">
+    <div className="min-h-screen bg-page text-heading flex">
 
       {/* Mobile overlay */}
       {sidebarOpen && (
@@ -401,20 +401,20 @@ export default function DashboardPage() {
 
       {/* Sidebar */}
       <aside className={`
-        fixed top-0 left-0 h-full w-56 bg-[#0a0c10] border-r border-white/[0.04] z-40
+        fixed top-0 left-0 h-full w-56 bg-card-solid border-r border-border-default z-40
         flex flex-col transform transition-transform duration-200
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         lg:translate-x-0 lg:static lg:z-auto
       `}>
         {/* Logo */}
-        <div className="px-5 pt-6 pb-5 border-b border-white/[0.04] flex items-center justify-between">
+        <div className="px-5 pt-6 pb-5 border-b border-border-default flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-xs font-bold text-slate-300">
+            <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-xs font-bold text-body">
               G
             </div>
-            <span className="text-sm font-semibold text-slate-200">Dashboard</span>
+            <span className="text-sm font-semibold text-heading">Dashboard</span>
           </div>
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-500 hover:text-slate-300">
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-tertiary hover:text-body">
             <X size={16} />
           </button>
         </div>
@@ -430,11 +430,11 @@ export default function DashboardPage() {
                 onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150 ${
                   active
-                    ? 'bg-white/[0.07] text-slate-100'
-                    : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04]'
+                    ? 'bg-surface-hover text-heading'
+                    : 'text-tertiary hover:text-body hover:bg-surface-hover'
                 }`}
               >
-                <Icon size={15} className={active ? 'text-slate-300' : 'text-slate-600'} />
+                <Icon size={15} className={active ? 'text-body' : 'text-muted'} />
                 <span>{label}</span>
               </Link>
             );
@@ -442,12 +442,12 @@ export default function DashboardPage() {
         </nav>
 
         {/* User */}
-        <div className="px-5 py-4 border-t border-white/[0.04]">
+        <div className="px-5 py-4 border-t border-border-default">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs font-medium text-slate-300">G</div>
+            <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs font-medium text-body">G</div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium truncate text-slate-300">Giuseppe</p>
-              <p className="text-[11px] text-slate-600 truncate">Cybersec Student</p>
+              <p className="text-xs font-medium truncate text-body">Giuseppe</p>
+              <p className="text-[11px] text-muted truncate">Cybersec Student</p>
             </div>
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/80" />
           </div>
@@ -458,23 +458,23 @@ export default function DashboardPage() {
       <div className="flex-1 flex flex-col min-w-0">
 
         {/* Top bar */}
-        <header className="px-8 py-5 border-b border-white/[0.04] flex items-center justify-between sticky top-0 bg-[#0f1117]/90 backdrop-blur-sm z-20">
+        <header className="px-8 py-5 border-b border-border-default flex items-center justify-between sticky top-0 bg-page/90 backdrop-blur-sm z-20">
           <div className="flex items-center gap-4">
-            <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-slate-500 hover:text-slate-300">
+            <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-tertiary hover:text-body">
               <Menu size={20} />
             </button>
             <div>
-              <h1 className="text-xl font-semibold text-slate-200">
+              <h1 className="text-xl font-semibold text-heading">
                 {greeting}, Giuseppe
               </h1>
-              <p className="text-sm text-slate-600 mt-1">
+              <p className="text-sm text-muted mt-1">
                 {currentTime.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
                 <span className="mx-2 opacity-40">·</span>
                 {currentTime.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
               </p>
             </div>
           </div>
-          <Link href="/dashboard/settings" className="text-slate-600 hover:text-slate-400 transition-colors">
+          <Link href="/dashboard/settings" className="text-muted hover:text-tertiary transition-colors">
             <Settings size={18} />
           </Link>
         </header>
@@ -492,7 +492,7 @@ export default function DashboardPage() {
               { label: 'Log sensoriale', emoji: '🧠', href: '/dashboard/sensory' },
             ].map(a => (
               <Link key={a.label} href={a.href}
-                className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/[0.04] border border-white/[0.06] text-sm text-slate-400 hover:bg-white/[0.07] hover:text-slate-200 transition-all whitespace-nowrap">
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-card-inner border border-border-hover text-sm text-body hover:bg-surface-hover hover:text-heading transition-all whitespace-nowrap">
                 <span>{a.emoji}</span>
                 <span>{a.label}</span>
               </Link>
@@ -514,7 +514,7 @@ export default function DashboardPage() {
               <div className="flex items-center justify-center py-4">
                 <div className="relative w-24 h-24">
                   <svg width="96" height="96" className="-rotate-90">
-                    <circle cx="48" cy="48" r="40" stroke="#1e293b" strokeWidth="6" fill="none" />
+                    <circle cx="48" cy="48" r="40" stroke="rgb(var(--border-color))" strokeWidth="6" fill="none" />
                     <circle cx="48" cy="48" r="40" stroke="#a78bfa" strokeWidth="6" fill="none"
                       strokeDasharray={`${2 * Math.PI * 40 * 0.75} ${2 * Math.PI * 40}`}
                       strokeLinecap="round" />
@@ -522,17 +522,17 @@ export default function DashboardPage() {
                   <span className="absolute inset-0 flex items-center justify-center text-2xl font-bold text-violet-400">75</span>
                 </div>
               </div>
-              <p className="text-center text-sm text-slate-600 mt-2">Buona giornata per il deep work</p>
+              <p className="text-center text-sm text-muted mt-2">Buona giornata per il deep work</p>
             </Widget>
 
             {/* Pomodoro */}
             <Widget href="/dashboard/focus">
               <WidgetHeader icon={Clock} label="Pomodoro" />
               <div className="text-center py-4">
-                <p className="text-5xl font-mono font-semibold text-slate-200 tracking-tight">25:00</p>
-                <p className="text-sm text-slate-600 mt-3">Pronto per iniziare</p>
+                <p className="text-5xl font-mono font-semibold text-heading tracking-tight">25:00</p>
+                <p className="text-sm text-muted mt-3">Pronto per iniziare</p>
               </div>
-              <div className="mt-5 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06] text-center text-sm text-slate-400">
+              <div className="mt-5 py-2.5 rounded-xl bg-card-inner border border-border-hover text-center text-sm text-body">
                 Avvia sessione →
               </div>
             </Widget>
@@ -547,12 +547,12 @@ export default function DashboardPage() {
             <Widget href="/dashboard/calendar">
               <WidgetHeader icon={Calendar} label="Calendario" />
               <div className="space-y-3">
-                <p className="text-sm text-slate-500">I tuoi prossimi eventi</p>
+                <p className="text-sm text-tertiary">I tuoi prossimi eventi</p>
                 <div className="flex items-center gap-3">
                   <div className="w-1.5 h-10 rounded-full bg-blue-500" />
                   <div>
-                    <p className="text-sm text-slate-300">Nessun evento imminente</p>
-                    <p className="text-xs text-slate-600">Collega Apple Calendar per sincronizzare</p>
+                    <p className="text-sm text-body">Nessun evento imminente</p>
+                    <p className="text-xs text-muted">Collega Apple Calendar per sincronizzare</p>
                   </div>
                 </div>
               </div>
@@ -565,13 +565,13 @@ export default function DashboardPage() {
                 <Stat label="Challenge" value="0" color="#4ade80" />
                 <Stat label="Punti" value="0" color="#4ade80" />
               </div>
-              <p className="text-xs text-slate-700 mt-5">Collega HackTheBox o TryHackMe</p>
+              <p className="text-xs text-muted mt-5">Collega HackTheBox o TryHackMe</p>
             </Widget>
 
             {/* Mood */}
             <Widget href="/dashboard/mood">
               <WidgetHeader icon={TrendingUp} label="Umore" />
-              <p className="text-sm text-slate-500 mb-5">Come ti senti oggi?</p>
+              <p className="text-sm text-tertiary mb-5">Come ti senti oggi?</p>
               <div className="flex justify-between items-center">
                 {['😫', '😕', '😐', '🙂', '😄'].map((e, i) => (
                   <span key={i} className="text-3xl opacity-50 hover:opacity-100 cursor-pointer transition-opacity">{e}</span>
@@ -586,7 +586,7 @@ export default function DashboardPage() {
                 {['Farmaci mattina', 'Idratazione', 'Routine mattino', 'Studio cybersecurity'].map((h, i) => (
                   <div key={i} className="flex items-center gap-3.5">
                     <div className="w-4 h-4 rounded-full border border-white/10 shrink-0" />
-                    <span className="text-sm text-slate-400">{h}</span>
+                    <span className="text-sm text-body">{h}</span>
                   </div>
                 ))}
               </div>
@@ -599,7 +599,7 @@ export default function DashboardPage() {
                 <Stat label="Entrate" value="—" color="#4ade80" />
                 <Stat label="Uscite" value="—" color="#f87171" />
               </div>
-              <p className="text-xs text-slate-700 mt-5">Collega le scadenze per il saldo</p>
+              <p className="text-xs text-muted mt-5">Collega le scadenze per il saldo</p>
             </Widget>
 
           </div>

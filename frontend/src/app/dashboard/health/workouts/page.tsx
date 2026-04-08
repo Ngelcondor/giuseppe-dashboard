@@ -316,17 +316,17 @@ function RestTimer() {
   const presets = [45, 60, 90, 120];
 
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 border border-white/5 p-4">
+    <div className="rounded-2xl bg-card-solid border border-border-default p-4">
       <div className="flex items-center gap-2 mb-3">
         <Timer size={16} className="text-blue-400" />
-        <span className="text-xs font-semibold text-slate-300">Recupero</span>
+        <span className="text-xs font-semibold text-heading">Recupero</span>
       </div>
 
       {/* Timer display */}
       <div className="text-center mb-3">
         <span
           className={`text-3xl font-mono font-bold tabular-nums ${
-            seconds === 0 ? 'text-green-400 animate-pulse' : isRunning ? 'text-blue-400' : 'text-slate-300'
+            seconds === 0 ? 'text-green-400 animate-pulse' : isRunning ? 'text-blue-400' : 'text-heading'
           }`}
         >
           {formatTime(seconds)}
@@ -337,7 +337,7 @@ function RestTimer() {
       </div>
 
       {/* Progress bar */}
-      <div className="h-1 bg-slate-700 rounded-full mb-3 overflow-hidden">
+      <div className="h-1 bg-card rounded-full mb-3 overflow-hidden">
         <div
           className="h-full bg-blue-500 rounded-full transition-all duration-1000"
           style={{ width: `${progress}%` }}
@@ -369,7 +369,7 @@ function RestTimer() {
             setIsRunning(false);
             setSeconds(initialSeconds);
           }}
-          className="p-2.5 rounded-xl bg-white/[0.04] text-slate-400 hover:bg-white/[0.08] transition-colors"
+          className="p-2.5 rounded-xl bg-card-inner text-body hover:bg-surface-hover transition-colors"
         >
           <RotateCcw size={18} />
         </button>
@@ -388,7 +388,7 @@ function RestTimer() {
             className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${
               initialSeconds === p
                 ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30'
-                : 'bg-white/[0.03] text-slate-500 hover:text-slate-300'
+                : 'bg-card text-tertiary hover:text-body'
             }`}
           >
             {p}s
@@ -422,8 +422,8 @@ function ExerciseRow({
     <div
       className={`rounded-xl border transition-all ${
         allDone
-          ? 'bg-white/[0.02] border-emerald-500/20'
-          : 'bg-white/[0.02] border-white/5 hover:border-white/10'
+          ? 'bg-card border-emerald-500/20'
+          : 'bg-card border-border-default hover:border-border-hover'
       }`}
     >
       {/* Exercise Header */}
@@ -434,12 +434,12 @@ function ExerciseRow({
         <span className="text-xl">{exercise.emoji}</span>
         <div className="flex-1 text-left">
           <div className="flex items-center gap-2">
-            <p className={`text-sm font-medium ${allDone ? 'text-emerald-400' : 'text-slate-200'}`}>
+            <p className={`text-sm font-medium ${allDone ? 'text-emerald-400' : 'text-heading'}`}>
               {exercise.name}
             </p>
             {allDone && <Check size={14} className="text-emerald-400" />}
           </div>
-          <p className="text-[10px] text-slate-500">
+          <p className="text-[10px] text-tertiary">
             {exercise.muscleGroup} · {completedSets}/{exercise.sets.length} serie
           </p>
         </div>
@@ -449,15 +449,15 @@ function ExerciseRow({
             <div
               key={i}
               className={`w-2 h-2 rounded-full transition-colors ${
-                s.completed ? 'bg-emerald-400' : 'bg-slate-700'
+                s.completed ? 'bg-emerald-400' : 'bg-input'
               }`}
             />
           ))}
         </div>
         {expanded ? (
-          <ChevronUp size={16} className="text-slate-500" />
+          <ChevronUp size={16} className="text-tertiary" />
         ) : (
-          <ChevronDown size={16} className="text-slate-500" />
+          <ChevronDown size={16} className="text-tertiary" />
         )}
       </button>
 
@@ -472,7 +472,7 @@ function ExerciseRow({
                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all flex-shrink-0 ${
                   set.completed
                     ? 'bg-emerald-600/30 border border-emerald-500/40'
-                    : 'bg-white/[0.03] border border-white/10 hover:border-white/20'
+                    : 'bg-card border border-border-hover hover:border-border-hover'
                 }`}
               >
                 {set.completed && <Check size={14} className="text-emerald-400" />}
@@ -486,7 +486,7 @@ function ExerciseRow({
                 >
                   Set {setIdx + 1}
                 </span>
-                <span className={`text-sm ${set.completed ? 'text-slate-500 line-through' : 'text-slate-300'}`}>
+                <span className={`text-sm ${set.completed ? 'text-tertiary line-through' : 'text-heading'}`}>
                   {set.reps} rep
                 </span>
                 {set.note && (
@@ -509,9 +509,9 @@ function ExerciseRow({
                     )
                   }
                   placeholder="—"
-                  className="w-16 px-2 py-1.5 rounded-lg bg-slate-900/80 border border-slate-700 text-slate-200 text-sm text-center focus:border-blue-500 focus:outline-none"
+                  className="w-16 px-2 py-1.5 rounded-lg bg-input border border-border-default text-heading text-sm text-center focus:border-blue-500 focus:outline-none"
                 />
-                <span className="text-[10px] text-slate-600">kg</span>
+                <span className="text-[10px] text-muted">kg</span>
               </div>
             </div>
           ))}
@@ -519,8 +519,8 @@ function ExerciseRow({
           {/* Rest info if specific */}
           {exercise.sets.some((s) => s.restSeconds) && (
             <div className="flex items-center gap-1.5 pt-1 pl-11">
-              <Clock size={10} className="text-slate-600" />
-              <span className="text-[10px] text-slate-600">
+              <Clock size={10} className="text-muted" />
+              <span className="text-[10px] text-muted">
                 Recupero specifico: {exercise.sets.find((s) => s.restSeconds)?.restSeconds}s tra le serie
               </span>
             </div>
@@ -550,20 +550,20 @@ function HistoryPanel({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" onClick={onClose} />
+      <div className="fixed inset-0 bg-card-inner backdrop-blur-sm z-40" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
-          className="bg-slate-800 border border-slate-700 rounded-xl max-h-[85vh] overflow-y-auto w-full max-w-lg"
+          className="bg-card-solid border border-border-default rounded-xl max-h-[85vh] overflow-y-auto w-full max-w-lg"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700 sticky top-0 bg-slate-800 z-10">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border-default sticky top-0 bg-card-solid z-10">
             <div className="flex items-center gap-2">
               <History size={18} className="text-violet-400" />
-              <h2 className="text-base font-semibold text-slate-100">Storico allenamenti</h2>
+              <h2 className="text-base font-semibold text-heading">Storico allenamenti</h2>
             </div>
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-slate-200 transition-colors"
+              className="text-body hover:text-heading transition-colors"
             >
               <X size={20} />
             </button>
@@ -572,8 +572,8 @@ function HistoryPanel({
           <div className="px-5 py-4">
             {history.length === 0 ? (
               <div className="text-center py-8">
-                <Dumbbell size={28} className="text-slate-700 mx-auto mb-3" />
-                <p className="text-sm text-slate-500">Nessun allenamento completato</p>
+                <Dumbbell size={28} className="text-muted mx-auto mb-3" />
+                <p className="text-sm text-tertiary">Nessun allenamento completato</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -587,7 +587,7 @@ function HistoryPanel({
                   const color = dayColors[entry.dayId] || '#64748b';
 
                   return (
-                    <div key={i} className="rounded-xl bg-white/[0.02] border border-white/5 p-4">
+                    <div key={i} className="rounded-xl bg-card border border-border-default p-4">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <span
@@ -596,7 +596,7 @@ function HistoryPanel({
                           >
                             {entry.dayName} {entry.dayLabel}
                           </span>
-                          <span className="text-xs text-slate-400">{dayStr}</span>
+                          <span className="text-xs text-body">{dayStr}</span>
                         </div>
                         <span className="text-[10px] text-emerald-400">
                           {entry.totalSetsCompleted}/{entry.totalSets} serie
@@ -612,13 +612,13 @@ function HistoryPanel({
 
                           return (
                             <div key={j} className="flex items-center justify-between text-xs">
-                              <span className="text-slate-400">{ex.name}</span>
+                              <span className="text-body">{ex.name}</span>
                               <div className="flex items-center gap-2">
-                                <span className="text-slate-500">
+                                <span className="text-tertiary">
                                   {ex.sets.filter((s) => s.completed).length}/{ex.sets.length}
                                 </span>
                                 {maxWeight && (
-                                  <span className="text-slate-300 font-medium">{maxWeight}kg</span>
+                                  <span className="text-heading font-medium">{maxWeight}kg</span>
                                 )}
                               </div>
                             </div>
@@ -786,12 +786,12 @@ export default function WorkoutsPage() {
   const sessionProgress = totalSets > 0 ? (completedSets / totalSets) * 100 : 0;
 
   return (
-    <div className="min-h-screen bg-[#0f1117] text-slate-100">
+    <div className="min-h-screen bg-page text-heading">
       {/* Header */}
-      <header className="px-6 py-5 border-b border-white/5 flex items-center gap-3">
+      <header className="px-6 py-5 border-b border-border-default flex items-center gap-3">
         <Link
           href="/dashboard/health"
-          className="text-slate-500 hover:text-slate-300 transition-colors"
+          className="text-tertiary hover:text-body transition-colors"
         >
           <ArrowLeft size={18} />
         </Link>
@@ -799,7 +799,7 @@ export default function WorkoutsPage() {
         <h1 className="text-base font-semibold flex-1">Scheda Allenamento</h1>
         <button
           onClick={() => setShowHistory(true)}
-          className="p-2 rounded-lg bg-white/[0.04] text-slate-400 hover:text-slate-200 transition-colors"
+          className="p-2 rounded-lg bg-card text-body hover:text-heading transition-colors"
           title="Storico"
         >
           <History size={18} />
@@ -812,21 +812,21 @@ export default function WorkoutsPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Trophy size={16} className="text-amber-400" />
-              <span className="text-xs font-semibold text-slate-300">Questa settimana</span>
+              <span className="text-xs font-semibold text-heading">Questa settimana</span>
             </div>
-            <span className="text-xs text-slate-500">Split: Upper / Lower / Upper</span>
+            <span className="text-xs text-tertiary">Split: Upper / Lower / Upper</span>
           </div>
           <div className="flex gap-2">
             {[1, 2, 3].map((n) => (
               <div
                 key={n}
                 className={`flex-1 h-2.5 rounded-full transition-colors ${
-                  n <= sessionsThisWeek ? 'bg-emerald-500' : 'bg-slate-700/50'
+                  n <= sessionsThisWeek ? 'bg-emerald-500' : 'bg-input/50'
                 }`}
               />
             ))}
           </div>
-          <p className="text-[11px] text-slate-500 mt-2">
+          <p className="text-[11px] text-tertiary mt-2">
             {sessionsThisWeek}/3 sessioni completate
             {sessionsThisWeek >= 3 && ' — Settimana completata! 🎉'}
           </p>
@@ -843,8 +843,8 @@ export default function WorkoutsPage() {
                 idx === activeDay
                   ? 'border-2'
                   : sessionActive
-                  ? 'bg-white/[0.01] border border-white/5 opacity-40 cursor-not-allowed'
-                  : 'bg-white/[0.02] border border-white/5 hover:border-white/10'
+                  ? 'bg-card border border-border-default opacity-40 cursor-not-allowed'
+                  : 'bg-card border border-border-default hover:border-border-hover'
               }`}
               style={
                 idx === activeDay
@@ -858,9 +858,9 @@ export default function WorkoutsPage() {
               >
                 {day.name}
               </p>
-              <p className="text-xs text-slate-400 mt-0.5">{day.label}</p>
+              <p className="text-xs text-body mt-0.5">{day.label}</p>
               {day.id === 2 && (
-                <p className="text-[9px] text-slate-600 mt-0.5">Focus glutei</p>
+                <p className="text-[9px] text-muted mt-0.5">Focus glutei</p>
               )}
             </button>
           ))}
@@ -881,7 +881,7 @@ export default function WorkoutsPage() {
             {/* Progress bar */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] text-slate-500">Progresso sessione</span>
+                <span className="text-[10px] text-tertiary">Progresso sessione</span>
                 <span
                   className="text-xs font-bold"
                   style={{ color: currentDay.color }}
@@ -889,7 +889,7 @@ export default function WorkoutsPage() {
                   {completedSets}/{totalSets} serie
                 </span>
               </div>
-              <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+              <div className="h-2 bg-card-solid rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-300"
                   style={{
@@ -915,7 +915,7 @@ export default function WorkoutsPage() {
 
         {/* Exercises */}
         <div className="space-y-3">
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1">
+          <h3 className="text-xs font-semibold text-body uppercase tracking-wider px-1">
             Esercizi — {currentDay.label}
           </h3>
           {exercises.map((ex, i) => (
@@ -935,7 +935,7 @@ export default function WorkoutsPage() {
           <div className="flex gap-3 pt-2">
             <button
               onClick={discardSession}
-              className="flex-1 py-3 rounded-xl bg-white/[0.03] border border-white/5 text-slate-500 text-sm hover:text-slate-300 transition-colors"
+              className="flex-1 py-3 rounded-xl bg-card border border-border-default text-body text-sm hover:text-heading transition-colors"
             >
               Annulla sessione
             </button>
@@ -950,44 +950,44 @@ export default function WorkoutsPage() {
         )}
 
         {/* Rules / Info */}
-        <div className="rounded-2xl bg-white/[0.015] border border-white/5 overflow-hidden">
+        <div className="rounded-2xl bg-card border border-border-default overflow-hidden">
           <button
             onClick={() => setShowRules(!showRules)}
             className="w-full flex items-center gap-3 px-5 py-4"
           >
             <Info size={16} className="text-blue-400" />
-            <span className="text-xs font-semibold text-slate-300 flex-1 text-left">
+            <span className="text-xs font-semibold text-heading flex-1 text-left">
               Regolamento & Consigli
             </span>
             {showRules ? (
-              <ChevronUp size={16} className="text-slate-500" />
+              <ChevronUp size={16} className="text-tertiary" />
             ) : (
-              <ChevronDown size={16} className="text-slate-500" />
+              <ChevronDown size={16} className="text-tertiary" />
             )}
           </button>
 
           {showRules && (
-            <div className="px-5 pb-5 space-y-4 text-xs text-slate-400 leading-relaxed">
+            <div className="px-5 pb-5 space-y-4 text-xs text-body leading-relaxed">
               <div>
-                <p className="text-slate-300 font-semibold mb-1">Recuperi</p>
+                <p className="text-heading font-semibold mb-1">Recuperi</p>
                 <p>
                   Autogestito: min <span className="text-amber-400">45 secondi</span>, max{' '}
                   <span className="text-amber-400">2 minuti</span>. Usa il timer qui sopra.
                 </p>
               </div>
               <div>
-                <p className="text-slate-300 font-semibold mb-1">Carico</p>
+                <p className="text-heading font-semibold mb-1">Carico</p>
                 <p>
                   Autogestito. Nei primi allenamenti evita carichi troppo faticosi. Carico basso e
                   dai tempo al muscolo di adattarsi.
                 </p>
               </div>
               <div>
-                <p className="text-slate-300 font-semibold mb-1">Stretching & Riscaldamento</p>
+                <p className="text-heading font-semibold mb-1">Stretching & Riscaldamento</p>
                 <p>Riscaldamento pre allenamento. Stretching pre o post e nei giorni liberi.</p>
               </div>
               <div>
-                <p className="text-slate-300 font-semibold mb-1">Corsi consigliati</p>
+                <p className="text-heading font-semibold mb-1">Corsi consigliati</p>
                 <p>
                   <span className="text-violet-400">Postural</span> — allungare e rafforzare muscoli
                   legati alla respirazione, addio mal di schiena.
@@ -996,7 +996,7 @@ export default function WorkoutsPage() {
                   <span className="text-violet-400">Flexibility</span> — migliorare flessibilità e
                   postura.
                 </p>
-                <p className="text-slate-500 mt-1">
+                <p className="text-tertiary mt-1">
                   Video &quot;Mobility&quot; (30 min stretching) disponibile in app nei giorni liberi.
                 </p>
               </div>
@@ -1005,7 +1005,7 @@ export default function WorkoutsPage() {
         </div>
 
         {/* Program info footer */}
-        <div className="text-center text-[10px] text-slate-600 pb-6 space-y-0.5">
+        <div className="text-center text-[10px] text-muted pb-6 space-y-0.5">
           <p>Scheda: Upper / Lower / Upper — 4 settimane</p>
           <p>Obiettivo: reclutamento fibre, adattamento muscolare, gesto motorio</p>
         </div>

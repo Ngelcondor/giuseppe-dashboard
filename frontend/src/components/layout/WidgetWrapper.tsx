@@ -26,12 +26,12 @@ export const WidgetWrapper: React.FC<WidgetWrapperProps> = ({
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
 
   return (
-    <div className="flex flex-col h-full bg-slate-800 border border-slate-700 rounded-lg overflow-hidden hover:border-slate-600 transition-colors">
+    <div className="flex flex-col h-full bg-card-solid border border-border-default rounded-lg overflow-hidden hover:border-border-hover transition-colors">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-900/50">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border-default bg-page">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {icon && <span className="flex-shrink-0 text-blue-400">{icon}</span>}
-          <h3 className="text-sm font-semibold text-slate-100 truncate">
+          <h3 className="text-sm font-semibold text-heading truncate">
             {title}
           </h3>
         </div>
@@ -39,7 +39,7 @@ export const WidgetWrapper: React.FC<WidgetWrapperProps> = ({
           {onSettings && (
             <button
               onClick={onSettings}
-              className="p-1.5 hover:bg-slate-700 rounded transition-colors text-slate-400 hover:text-slate-200"
+              className="p-1.5 hover:bg-surface-hover rounded transition-colors text-muted hover:text-heading"
               title="Impostazioni"
             >
               <Settings size={16} />
@@ -47,7 +47,7 @@ export const WidgetWrapper: React.FC<WidgetWrapperProps> = ({
           )}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-1.5 hover:bg-slate-700 rounded transition-colors text-slate-400 hover:text-slate-200"
+            className="p-1.5 hover:bg-surface-hover rounded transition-colors text-muted hover:text-heading"
             title={isCollapsed ? 'Espandi' : 'Collassa'}
           >
             {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
@@ -55,7 +55,7 @@ export const WidgetWrapper: React.FC<WidgetWrapperProps> = ({
           {onRemove && (
             <button
               onClick={onRemove}
-              className="p-1.5 hover:bg-red-900/20 rounded transition-colors text-slate-400 hover:text-red-400"
+              className="p-1.5 hover:bg-red-900/20 rounded transition-colors text-muted hover:text-red-400"
               title="Rimuovi"
             >
               <X size={16} />
@@ -89,11 +89,11 @@ export const CompactWidget: React.FC<CompactWidgetProps> = ({
   action,
 }) => {
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 h-full flex flex-col">
+    <div className="bg-card-solid border border-border-default rounded-lg p-4 h-full flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           {icon && <span className="text-blue-400">{icon}</span>}
-          <h3 className="text-sm font-semibold text-slate-100">{title}</h3>
+          <h3 className="text-sm font-semibold text-heading">{title}</h3>
         </div>
         {action && action}
       </div>

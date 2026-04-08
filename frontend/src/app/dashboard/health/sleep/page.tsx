@@ -99,7 +99,7 @@ function PhaseBar({
 
   return (
     <div className="space-y-2">
-      <div className="h-4 rounded-full overflow-hidden flex bg-slate-800">
+      <div className="h-4 rounded-full overflow-hidden flex bg-card-solid">
         {segments.map((seg) => (
           <div
             key={seg.phase}
@@ -112,7 +112,7 @@ function PhaseBar({
           />
         ))}
       </div>
-      <div className="flex gap-4 text-[10px] text-slate-500">
+      <div className="flex gap-4 text-[10px] text-tertiary">
         {segments.map((seg) => (
           <div key={seg.phase} className="flex items-center gap-1">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: seg.color }} />
@@ -132,7 +132,7 @@ function MorningReportCard({ report }: { report: SleepMorningReport }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Sun size={18} className="text-amber-400" />
-          <h3 className="text-sm font-semibold text-slate-200">Buongiorno</h3>
+          <h3 className="text-sm font-semibold text-heading">Buongiorno</h3>
         </div>
         {report.streak_days > 0 && (
           <span className="text-[10px] bg-indigo-600/20 text-indigo-300 px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -155,17 +155,17 @@ function MorningReportCard({ report }: { report: SleepMorningReport }) {
             </div>
             <div className="h-10 w-px bg-slate-700" />
             <div>
-              <p className="text-2xl font-bold text-slate-200">
+              <p className="text-2xl font-bold text-heading">
                 {report.total_hours}h
               </p>
-              <p className="text-xs text-slate-500 mt-0.5">Durata totale</p>
+              <p className="text-xs text-tertiary mt-0.5">Durata totale</p>
             </div>
-            <div className="h-10 w-px bg-slate-700" />
+            <div className="h-10 w-px bg-border-default" />
             <div>
-              <p className="text-2xl font-bold text-slate-200">
+              <p className="text-2xl font-bold text-heading">
                 {report.efficiency_pct}%
               </p>
-              <p className="text-xs text-slate-500 mt-0.5">Efficienza</p>
+              <p className="text-xs text-tertiary mt-0.5">Efficienza</p>
             </div>
           </div>
 
@@ -182,19 +182,19 @@ function MorningReportCard({ report }: { report: SleepMorningReport }) {
 
           {/* Stats row */}
           <div className="grid grid-cols-3 gap-3">
-            <div className="bg-white/[0.03] rounded-xl p-3 text-center">
+            <div className="bg-card rounded-xl p-3 text-center">
               <Brain size={16} className="text-indigo-400 mx-auto mb-1" />
-              <p className="text-sm font-semibold text-slate-200">{report.deep_pct}%</p>
-              <p className="text-[10px] text-slate-500">Profondo</p>
+              <p className="text-sm font-semibold text-heading">{report.deep_pct}%</p>
+              <p className="text-[10px] text-tertiary">Profondo</p>
             </div>
-            <div className="bg-white/[0.03] rounded-xl p-3 text-center">
+            <div className="bg-card rounded-xl p-3 text-center">
               <Eye size={16} className="text-purple-400 mx-auto mb-1" />
-              <p className="text-sm font-semibold text-slate-200">{report.rem_pct}%</p>
-              <p className="text-[10px] text-slate-500">REM</p>
+              <p className="text-sm font-semibold text-heading">{report.rem_pct}%</p>
+              <p className="text-[10px] text-tertiary">REM</p>
             </div>
-            <div className="bg-white/[0.03] rounded-xl p-3 text-center">
+            <div className="bg-card rounded-xl p-3 text-center">
               <Clock size={16} className="text-blue-400 mx-auto mb-1" />
-              <p className="text-sm font-semibold text-slate-200">
+              <p className="text-sm font-semibold text-heading">
                 {report.session
                   ? new Date(report.session.sleep_start).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
                   : '--'}
@@ -203,7 +203,7 @@ function MorningReportCard({ report }: { report: SleepMorningReport }) {
                   ? new Date(report.session.sleep_end).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
                   : '--'}
               </p>
-              <p className="text-[10px] text-slate-500">Orari</p>
+              <p className="text-[10px] text-tertiary">Orari</p>
             </div>
           </div>
 
@@ -255,9 +255,9 @@ function MorningReportCard({ report }: { report: SleepMorningReport }) {
         </>
       ) : (
         <div className="text-center py-6">
-          <Moon size={24} className="text-slate-600 mx-auto mb-2" />
-          <p className="text-sm text-slate-500">Nessun dato per la notte scorsa</p>
-          <p className="text-xs text-slate-600 mt-1">Registra una sessione di sonno per vedere il report</p>
+          <Moon size={24} className="text-muted mx-auto mb-2" />
+          <p className="text-sm text-tertiary">Nessun dato per la notte scorsa</p>
+          <p className="text-xs text-muted mt-1">Registra una sessione di sonno per vedere il report</p>
         </div>
       )}
     </div>
@@ -292,20 +292,20 @@ function SessionCard({
   const isSleepCycle = session.source === 'sleep_cycle';
 
   return (
-    <div className="rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 p-4 transition-all group">
+    <div className="rounded-xl bg-card border border-border-default hover:border-border-hover p-4 transition-all group">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
           <div className={`w-2 h-8 rounded-full ${qualityBgColor(label)}`} />
           <div>
             <div className="flex items-center gap-2">
-              <p className="text-sm font-medium text-slate-200">{dateStr}</p>
+              <p className="text-sm font-medium text-heading">{dateStr}</p>
               {isSleepCycle && (
                 <span className="text-[9px] bg-cyan-600/20 text-cyan-300 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
                   <CloudMoon size={9} /> Sleep Cycle
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-tertiary">
               {startTime} → {endTime} · {formatDuration(session.duration_minutes)}
             </p>
           </div>
@@ -370,7 +370,7 @@ function SessionCard({
       )}
 
       {session.notes && (
-        <p className="text-[11px] text-slate-500 mt-2 italic">{session.notes}</p>
+        <p className="text-[11px] text-tertiary mt-2 italic">{session.notes}</p>
       )}
     </div>
   );
@@ -441,24 +441,24 @@ function SleepFormModal({
       <div className="space-y-4">
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Data</label>
+            <label className="block text-xs text-body mb-1">Data</label>
             <input type="date" value={form.sleepDate} onChange={e => setForm({...form, sleepDate: e.target.value})}
-              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-sm focus:border-blue-500 focus:outline-none" />
+              className="w-full px-3 py-2 rounded-lg bg-input border border-border-default text-heading text-sm focus:border-blue-500 focus:outline-none" />
           </div>
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Addormentato</label>
+            <label className="block text-xs text-body mb-1">Addormentato</label>
             <input type="time" value={form.sleepTime} onChange={e => setForm({...form, sleepTime: e.target.value})}
-              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-sm focus:border-blue-500 focus:outline-none" />
+              className="w-full px-3 py-2 rounded-lg bg-input border border-border-default text-heading text-sm focus:border-blue-500 focus:outline-none" />
           </div>
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Sveglia</label>
+            <label className="block text-xs text-body mb-1">Sveglia</label>
             <input type="time" value={form.wakeTime} onChange={e => setForm({...form, wakeTime: e.target.value})}
-              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-sm focus:border-blue-500 focus:outline-none" />
+              className="w-full px-3 py-2 rounded-lg bg-input border border-border-default text-heading text-sm focus:border-blue-500 focus:outline-none" />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Qualità ({form.quality}/100)</label>
+          <label className="block text-xs text-body mb-1">Qualità ({form.quality}/100)</label>
           <input type="range" min={0} max={100} value={form.quality} onChange={e => setForm({...form, quality: Number(e.target.value)})}
             className="w-full accent-indigo-500" />
         </div>
@@ -474,15 +474,15 @@ function SleepFormModal({
               <label className="block text-[10px] mb-1" style={{ color }}>{label} (min)</label>
               <input type="number" min={0} max={600} value={(form as any)[key]}
                 onChange={e => setForm({...form, [key]: Number(e.target.value)})}
-                className="w-full px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-xs focus:border-blue-500 focus:outline-none text-center" />
+                className="w-full px-2 py-1.5 rounded-lg bg-input border border-border-default text-heading text-xs focus:border-blue-500 focus:outline-none text-center" />
             </div>
           ))}
         </div>
 
-        <p className="text-[10px] text-slate-600 text-center">Totale fasi: {formatDuration(totalMin)}</p>
+        <p className="text-[10px] text-muted text-center">Totale fasi: {formatDuration(totalMin)}</p>
 
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Umore al risveglio</label>
+          <label className="block text-xs text-body mb-1">Umore al risveglio</label>
           <div className="flex gap-2">
             {[
               { value: 'great', emoji: '😊' },
@@ -493,7 +493,7 @@ function SleepFormModal({
             ].map(({ value, emoji }) => (
               <button key={value} onClick={() => setForm({...form, mood: value})}
                 className={`flex-1 py-2 rounded-lg text-lg transition-all ${
-                  form.mood === value ? 'bg-indigo-600/30 border border-indigo-500/30 scale-110' : 'bg-white/[0.03] border border-white/5'
+                  form.mood === value ? 'bg-indigo-600/30 border border-indigo-500/30 scale-110' : 'bg-card border border-border-default'
                 }`}
               >
                 {emoji}
@@ -503,9 +503,9 @@ function SleepFormModal({
         </div>
 
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Note</label>
+          <label className="block text-xs text-body mb-1">Note</label>
           <textarea value={form.notes} onChange={e => setForm({...form, notes: e.target.value})}
-            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-sm focus:border-blue-500 focus:outline-none resize-none"
+            className="w-full px-3 py-2 rounded-lg bg-input border border-border-default text-heading text-sm focus:border-blue-500 focus:outline-none resize-none"
             rows={2} placeholder="Come ti sei sentito..." />
         </div>
       </div>
@@ -519,27 +519,27 @@ function WeekSummaryCard({ summary }: { summary: SleepWeekSummary }) {
   if (summary.sessions.length === 0) return null;
 
   return (
-    <div className="rounded-xl bg-white/[0.02] border border-white/5 p-4 space-y-3">
+    <div className="rounded-xl bg-card border border-border-default p-4 space-y-3">
       <div className="flex items-center gap-2">
         <Calendar size={16} className="text-blue-400" />
-        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Riepilogo settimanale</h3>
+        <h3 className="text-xs font-semibold text-body uppercase tracking-wider">Riepilogo settimanale</h3>
       </div>
       <div className="grid grid-cols-4 gap-3 text-center">
         <div>
-          <p className="text-lg font-bold text-slate-200">{formatDuration(Math.round(summary.avg_duration_minutes))}</p>
-          <p className="text-[10px] text-slate-500">Media durata</p>
+          <p className="text-lg font-bold text-heading">{formatDuration(Math.round(summary.avg_duration_minutes))}</p>
+          <p className="text-[10px] text-tertiary">Media durata</p>
         </div>
         <div>
-          <p className="text-lg font-bold text-slate-200">{Math.round(summary.avg_quality)}</p>
-          <p className="text-[10px] text-slate-500">Media qualità</p>
+          <p className="text-lg font-bold text-heading">{Math.round(summary.avg_quality)}</p>
+          <p className="text-[10px] text-tertiary">Media qualità</p>
         </div>
         <div>
           <p className="text-lg font-bold text-indigo-400">{Math.round(summary.avg_deep_pct)}%</p>
-          <p className="text-[10px] text-slate-500">Profondo</p>
+          <p className="text-[10px] text-tertiary">Profondo</p>
         </div>
         <div>
           <p className="text-lg font-bold text-purple-400">{Math.round(summary.avg_rem_pct)}%</p>
-          <p className="text-[10px] text-slate-500">REM</p>
+          <p className="text-[10px] text-tertiary">REM</p>
         </div>
       </div>
     </div>
@@ -609,16 +609,16 @@ export default function SleepPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0f1117] text-slate-100 flex items-center justify-center">
+      <div className="min-h-screen bg-page text-heading flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0f1117] text-slate-100">
-      <header className="px-6 py-5 border-b border-white/5 flex items-center gap-3">
-        <Link href="/dashboard/health" className="text-slate-500 hover:text-slate-300 transition-colors">
+    <div className="min-h-screen bg-page text-heading">
+      <header className="px-6 py-5 border-b border-border-default flex items-center gap-3">
+        <Link href="/dashboard/health" className="text-tertiary hover:text-body transition-colors">
           <ArrowLeft size={18} />
         </Link>
         <Moon size={18} className="text-indigo-400" />
@@ -649,13 +649,13 @@ export default function SleepPage() {
 
         {/* History */}
         <div>
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">
+          <h3 className="text-xs font-semibold text-body uppercase tracking-wider mb-3 px-1">
             Ultime notti
           </h3>
           {sessions.length === 0 ? (
             <div className="text-center py-10">
-              <Moon size={28} className="text-slate-700 mx-auto mb-3" />
-              <p className="text-sm text-slate-500">Nessuna sessione registrata</p>
+              <Moon size={28} className="text-muted mx-auto mb-3" />
+              <p className="text-sm text-tertiary">Nessuna sessione registrata</p>
               <Button variant="primary" className="mt-4" onClick={() => setShowForm(true)}>
                 <Plus size={16} className="mr-1" /> Registra sonno
               </Button>

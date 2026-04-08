@@ -53,9 +53,9 @@ const sections = [
 
 export default function HealthPage() {
   return (
-    <div className="min-h-screen bg-[#0f1117] text-slate-100">
-      <header className="px-6 py-5 border-b border-white/5 flex items-center gap-3">
-        <Link href="/dashboard" className="text-slate-500 hover:text-slate-300 transition-colors">
+    <div className="min-h-screen bg-page text-heading">
+      <header className="px-6 py-5 border-b border-border-default flex items-center gap-3">
+        <Link href="/dashboard" className="text-tertiary hover:text-body transition-colors">
           <ArrowLeft size={18} />
         </Link>
         <Heart size={18} className="text-red-400" />
@@ -72,8 +72,8 @@ export default function HealthPage() {
             >
               <div className={`flex-shrink-0 ${s.color}`}>{s.icon}</div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-200">{s.label}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{s.description}</p>
+                <p className="text-sm font-medium text-heading">{s.label}</p>
+                <p className="text-xs text-tertiary mt-0.5">{s.description}</p>
               </div>
             </Link>
           ))}
