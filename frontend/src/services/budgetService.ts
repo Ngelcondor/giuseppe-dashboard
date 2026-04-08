@@ -114,12 +114,12 @@ export interface ImportResult {
 // ─── Bank Connection ─────────────────────────────────────────────────────────
 
 export async function getBankConnection(): Promise<BankConnection | null> {
-  const { data } = await api.get('/api/v1/budget/bank/connection');
+  const { data } = await api.get('/budget/bank/connection');
   return data;
 }
 
 export async function getBankBalance(): Promise<BankBalance[]> {
-  const { data } = await api.get('/api/v1/budget/bank/balance');
+  const { data } = await api.get('/budget/bank/balance');
   return data;
 }
 
@@ -129,12 +129,12 @@ export interface BankProviderStatus {
 }
 
 export async function getBankProviderStatus(): Promise<BankProviderStatus> {
-  const { data } = await api.get('/api/v1/budget/bank/status');
+  const { data } = await api.get('/budget/bank/status');
   return data;
 }
 
 export async function initBankAuth(institutionId?: string, country = 'FR'): Promise<BankAuthResponse> {
-  const { data } = await api.post('/api/v1/budget/bank/auth', {
+  const { data } = await api.post('/budget/bank/auth', {
     institution_id: institutionId,
     country,
   });
@@ -142,23 +142,23 @@ export async function initBankAuth(institutionId?: string, country = 'FR'): Prom
 }
 
 export async function completeBankAuth(requisitionId: string): Promise<BankConnection> {
-  const { data } = await api.post('/api/v1/budget/bank/callback', {
+  const { data } = await api.post('/budget/bank/callback', {
     requisition_id: requisitionId,
   });
   return data;
 }
 
 export async function syncBankTransactions(daysBack = 30): Promise<ImportResult> {
-  const { data } = await api.post(`/api/v1/budget/bank/sync?days_back=${daysBack}`);
+  const { data } = await api.post(`/budget/bank/sync?days_back=${daysBack}`);
   return data;
 }
 
 export async function disconnectBank(): Promise<void> {
-  await api.delete('/api/v1/budget/bank/connection');
+  await api.delete('/budget/bank/connection');
 }
 
 export async function listInstitutions(country = 'FR'): Promise<Institution[]> {
-  const { data } = await api.get(`/api/v1/budget/bank/institutions?country=${country}`);
+  const { data } = await api.get(`/budget/bank/institutions?country=${country}`);
   return data;
 }
 
@@ -168,7 +168,7 @@ export async function getBudgetDashboard(month?: number, year?: number): Promise
   const params = new URLSearchParams();
   if (month) params.set('month', month.toString());
   if (year) params.set('year', year.toString());
-  const { data } = await api.get(`/api/v1/budget/dashboard?${params}`);
+  const { data } = await api.get(`/budget/dashboard?${params}`);
   return data;
 }
 
@@ -187,7 +187,7 @@ export async function listTransactions(opts?: {
   if (opts?.category) params.set('category', opts.category);
   if (opts?.limit) params.set('limit', opts.limit.toString());
   if (opts?.offset) params.set('offset', opts.offset.toString());
-  const { data } = await api.get(`/api/v1/budget/transactions?${params}`);
+  const { data } = await api.get(`/budget/transactions?${params}`);
   return data;
 }
 
@@ -200,12 +200,12 @@ export async function createTransaction(tx: {
   is_recurring?: boolean;
   notes?: string;
 }): Promise<Transaction> {
-  const { data } = await api.post('/api/v1/budget/transactions', tx);
+  const { data } = await api.post('/budget/transactions', tx);
   return data;
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
-  await api.delete(`/api/v1/budget/transactions/${id}`);
+  await api.delete(`/budget/transactions/${id}`);
 }
 
 // ─── CSV Import ──────────────────────────────────────────────────────────────
@@ -213,7 +213,7 @@ export async function deleteTransaction(id: string): Promise<void> {
 export async function importCSV(file: File): Promise<ImportResult> {
   const formData = new FormData();
   formData.append('file', file);
-  const { data } = await api.post('/api/v1/budget/import/csv', formData, {
+  const { data } = await api.post('/budget/import/csv', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return data;
@@ -222,7 +222,7 @@ export async function importCSV(file: File): Promise<ImportResult> {
 // ─── Budget Goals ────────────────────────────────────────────────────────────
 
 export async function listGoals(): Promise<BudgetGoal[]> {
-  const { data } = await api.get('/api/v1/budget/goals');
+  const { data } = await api.get('/budget/goals');
   return data;
 }
 
@@ -231,10 +231,10 @@ export async function createGoal(goal: {
   monthly_limit: number;
   month: string;
 }): Promise<BudgetGoal> {
-  const { data } = await api.post('/api/v1/budget/goals', goal);
+  const { data } = await api.post('/budget/goals', goal);
   return data;
 }
 
 export async function deleteGoal(id: string): Promise<void> {
-  await api.delete(`/api/v1/budget/goals/${id}`);
+  await api.delete(`/budget/goals/${id}`);
 }
