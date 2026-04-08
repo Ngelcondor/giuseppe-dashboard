@@ -7,6 +7,7 @@ celery_app = Celery(
     "giuseppe-dashboard",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
+    include=["app.tasks.periodic"],
 )
 
 celery_app.conf.update(
