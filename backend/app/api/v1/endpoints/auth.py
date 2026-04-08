@@ -26,6 +26,8 @@ from app.schemas.user import (
     TOTPVerifyRequest,
     TOTPVerifyResponse,
     UserUpdate,
+    PasswordChangeRequest,
+    PasswordChangeResponse,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -170,6 +172,41 @@ async def verify_2fa(
     await db.commit()
 
     return TOTPVerifyResponse(success=True, message="2FA enabled successfully")
+
+
+@router.put("/change-password", response_model=PasswordChangeResponse)
+async def change_password(
+    request: PasswordChangeRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> PasswordChangeResponse:
+    """Change user password."""
+    user_id = current_user.get("sub")
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalars().first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    # Verify current password
+    if not verify_password(request.current_password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Password attuale non corretta",
+        )
+
+    # Update password
+    user.hashed_password = hash_password(request.new_password)
+    db.add(user)
+    await db.commit()
+
+    return PasswordChangeResponse(
+        success=True,
+        message="Password aggiornata con successo",
+    )
 
 
 @router.get("/me", response_model=UserResponse)

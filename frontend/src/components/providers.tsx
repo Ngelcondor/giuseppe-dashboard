@@ -13,6 +13,11 @@ const queryClient = new QueryClient({
   },
 });
 
+function getSystemTheme(): 'dark' | 'light' {
+  if (typeof window === 'undefined') return 'dark';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
 export function Providers({ children }: { children: ReactNode }) {
   const theme = useThemeStore((state) => state.theme);
   const lowStim = useThemeStore((state) => state.lowStim);
@@ -23,19 +28,33 @@ export function Providers({ children }: { children: ReactNode }) {
     // Remove old classes
     html.classList.remove('dark', 'light', 'low-stim');
 
-    // Apply theme
-    if (theme === 'dark') {
-      html.classList.add('dark');
-    } else if (theme === 'light') {
-      html.classList.add('light');
-    }
+    // Resolve effective theme
+    const effective = theme === 'system' ? getSystemTheme() : theme;
+
+    // Apply theme class
+    html.classList.add(effective);
 
     // Apply low-stim if enabled
     if (lowStim) {
       html.classList.add('low-stim');
     }
 
-    html.setAttribute('data-theme', lowStim ? 'low-stim' : theme);
+    // Set data-theme for CSS variable switching
+    html.setAttribute('data-theme', lowStim ? 'low-stim' : effective);
+
+    // Listen for system theme changes when set to 'system'
+    if (theme === 'system') {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      const handler = (e: MediaQueryListEvent) => {
+        html.classList.remove('dark', 'light');
+        html.classList.add(e.matches ? 'dark' : 'light');
+        if (!lowStim) {
+          html.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+        }
+      };
+      mq.addEventListener('change', handler);
+      return () => mq.removeEventListener('change', handler);
+    }
   }, [theme, lowStim]);
 
   return (

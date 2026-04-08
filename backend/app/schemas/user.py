@@ -78,6 +78,20 @@ class TokenRefreshResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class PasswordChangeRequest(BaseModel):
+    """Password change request."""
+
+    current_password: str
+    new_password: str = Field(..., min_length=8)
+
+
+class PasswordChangeResponse(BaseModel):
+    """Password change response."""
+
+    success: bool
+    message: str
+
+
 class TOTPSetupResponse(BaseModel):
     """TOTP setup response."""
 

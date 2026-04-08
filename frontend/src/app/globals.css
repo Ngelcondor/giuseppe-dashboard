@@ -4,7 +4,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Theme Variables ─────────────────────────────────────────────────────── */
+
 :root {
+  /* Dark mode (default) */
   --bg-primary: 15 23 42;
   --bg-secondary: 30 41 59;
   --bg-tertiary: 51 65 85;
@@ -13,6 +16,20 @@
   --text-tertiary: 148 163 184;
   --border-color: 71 85 105;
   --accent-color: 59 130 246;
+
+  /* Semantic tokens — dark defaults */
+  --color-page: 15 17 23;
+  --color-card: 255 255 255 / 0.02;
+  --color-card-solid: 22 27 38;
+  --color-card-inner: 255 255 255 / 0.03;
+  --color-input: 30 41 59;
+  --color-heading: 241 245 249;
+  --color-body: 203 213 225;
+  --color-tertiary: 148 163 184;
+  --color-muted: 100 116 139;
+  --color-border: 255 255 255 / 0.05;
+  --color-border-hover: 255 255 255 / 0.1;
+  --color-surface-hover: 255 255 255 / 0.05;
 }
 
 [data-theme='light'] {
@@ -24,6 +41,20 @@
   --text-tertiary: 148 163 184;
   --border-color: 203 213 225;
   --accent-color: 59 130 246;
+
+  /* Semantic tokens — light */
+  --color-page: 246 248 250;
+  --color-card: 255 255 255;
+  --color-card-solid: 255 255 255;
+  --color-card-inner: 248 250 252;
+  --color-input: 255 255 255;
+  --color-heading: 15 23 42;
+  --color-body: 51 65 85;
+  --color-tertiary: 100 116 139;
+  --color-muted: 148 163 184;
+  --color-border: 226 232 240;
+  --color-border-hover: 203 213 225;
+  --color-surface-hover: 241 245 249;
 }
 
 [data-theme='low-stim'] {
@@ -35,6 +66,19 @@
   --text-tertiary: 168 154 143;
   --border-color: 214 208 202;
   --accent-color: 142 124 111;
+
+  --color-page: 245 244 242;
+  --color-card: 255 255 255;
+  --color-card-solid: 255 255 255;
+  --color-card-inner: 245 244 242;
+  --color-input: 255 255 255;
+  --color-heading: 58 58 56;
+  --color-body: 100 95 90;
+  --color-tertiary: 140 135 130;
+  --color-muted: 168 154 143;
+  --color-border: 214 208 202;
+  --color-border-hover: 200 192 184;
+  --color-surface-hover: 235 232 229;
 }
 
 [data-theme='low-stim'].dark {
@@ -46,7 +90,22 @@
   --text-tertiary: 138 122 111;
   --border-color: 82 72 64;
   --accent-color: 138 124 111;
+
+  --color-page: 15 14 12;
+  --color-card: 255 255 255 / 0.02;
+  --color-card-solid: 22 20 16;
+  --color-card-inner: 255 255 255 / 0.03;
+  --color-input: 25 21 18;
+  --color-heading: 232 232 230;
+  --color-body: 180 170 160;
+  --color-tertiary: 138 122 111;
+  --color-muted: 100 90 80;
+  --color-border: 255 255 255 / 0.05;
+  --color-border-hover: 255 255 255 / 0.1;
+  --color-surface-hover: 255 255 255 / 0.05;
 }
+
+/* ─── Base Styles ─────────────────────────────────────────────────────────── */
 
 html {
   scroll-behavior: smooth;
@@ -54,61 +113,41 @@ html {
 }
 
 body {
-  @apply bg-slate-900 text-slate-100 transition-colors duration-300;
-  background-color: rgb(var(--bg-primary));
-  color: rgb(var(--text-primary));
+  @apply transition-colors duration-300;
+  background-color: rgb(var(--color-page));
+  color: rgb(var(--color-body));
   font-family: 'Inter', system-ui, sans-serif;
 }
 
-.light {
-  background-color: rgb(var(--bg-primary));
-  color: rgb(var(--text-primary));
+/* ─── Semantic Utility Classes ────────────────────────────────────────────── */
+
+@layer utilities {
+  /* Backgrounds */
+  .bg-page { background-color: rgb(var(--color-page)); }
+  .bg-card { background-color: rgb(var(--color-card)); }
+  .bg-card-solid { background-color: rgb(var(--color-card-solid)); }
+  .bg-card-inner { background-color: rgb(var(--color-card-inner)); }
+  .bg-input { background-color: rgb(var(--color-input)); }
+  .bg-surface-hover { background-color: rgb(var(--color-surface-hover)); }
+
+  /* Text */
+  .text-heading { color: rgb(var(--color-heading)); }
+  .text-body { color: rgb(var(--color-body)); }
+  .text-tertiary { color: rgb(var(--color-tertiary)); }
+  .text-muted { color: rgb(var(--color-muted)); }
+
+  /* Borders */
+  .border-border-default { border-color: rgb(var(--color-border)); }
+  .border-border-hover { border-color: rgb(var(--color-border-hover)); }
 }
 
-.low-stim {
-  --accent-color: 142 124 111;
-}
-
-/* Scrollbar Styling */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgb(var(--bg-secondary));
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgb(var(--border-color));
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgb(var(--text-tertiary));
-}
-
-/* Focus Styles */
-:focus-visible {
-  @apply outline-2 outline-offset-2;
-  outline-color: rgb(var(--accent-color));
-}
-
-/* Utility Classes */
-.transition-theme {
-  @apply transition-colors duration-300;
-}
-
+/* Legacy utility classes */
 .text-primary {
   color: rgb(var(--text-primary));
 }
 
 .text-secondary {
   color: rgb(var(--text-secondary));
-}
-
-.text-tertiary {
-  color: rgb(var(--text-tertiary));
 }
 
 .bg-primary {
@@ -127,16 +166,60 @@ body {
   border-color: rgb(var(--border-color));
 }
 
-/* Animations - Respect prefers-reduced-motion */
+.light {
+  background-color: rgb(var(--bg-primary));
+  color: rgb(var(--text-primary));
+}
+
+.low-stim {
+  --accent-color: 142 124 111;
+}
+
+/* ─── Scrollbar ───────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(var(--bg-secondary));
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--border-color));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--text-tertiary));
+}
+
+/* ─── Focus Styles ────────────────────────────────────────────────────────── */
+
+:focus-visible {
+  @apply outline-2 outline-offset-2;
+  outline-color: rgb(var(--accent-color));
+}
+
+/* ─── Smooth Theme Transitions ────────────────────────────────────────────── */
+
+.transition-theme {
+  @apply transition-colors duration-300;
+}
+
+/* ─── Animations ──────────────────────────────────────────────────────────── */
+
 @media (prefers-reduced-motion: reduce) {
   * {
     @apply !animate-none !transition-none;
   }
 }
 
-/* Widget Grid */
+/* ─── Widget Grid ─────────────────────────────────────────────────────────── */
+
 .react-grid-layout {
-  @apply bg-slate-900 dark:bg-slate-900;
+  background-color: rgb(var(--color-page));
 }
 
 .react-grid-item {
@@ -149,18 +232,20 @@ body {
 }
 
 .react-grid-item.static {
-  @apply bg-slate-800;
+  background-color: rgb(var(--color-card-solid));
 }
 
 .react-grid-item > .react-resizable-handle {
-  @apply bg-gradient-to-br from-slate-600 to-slate-700 opacity-0 hover:opacity-100 transition-opacity;
+  @apply opacity-0 hover:opacity-100 transition-opacity;
+  background: linear-gradient(to bottom right, rgb(var(--border-color)), rgb(var(--bg-tertiary)));
 }
 
 .react-grid-item > .react-resizable-handle::after {
-  @apply border-slate-300;
+  border-color: rgb(var(--text-tertiary));
 }
 
-/* Typography */
+/* ─── Typography ──────────────────────────────────────────────────────────── */
+
 h1, h2, h3, h4, h5, h6 {
   @apply font-semibold;
 }
@@ -177,18 +262,30 @@ h3 {
   @apply text-xl;
 }
 
-/* Form Elements */
+/* ─── Form Elements ───────────────────────────────────────────────────────── */
+
 input, textarea, select {
-  @apply rounded-md border border-slate-700 bg-slate-800 text-slate-100 placeholder-slate-500;
-  @apply focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20;
-  @apply transition-colors duration-200;
+  @apply rounded-md transition-colors duration-200;
+  background-color: rgb(var(--color-input));
+  border: 1px solid rgb(var(--color-border));
+  color: rgb(var(--color-body));
+}
+
+input::placeholder, textarea::placeholder {
+  color: rgb(var(--color-muted));
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: rgb(var(--accent-color));
+  box-shadow: 0 0 0 2px rgb(var(--accent-color) / 0.2);
 }
 
 input[type='checkbox'], input[type='radio'] {
   @apply rounded cursor-pointer;
 }
 
-/* Prevent animations in low-stim mode */
+/* ─── Low Stim Overrides ──────────────────────────────────────────────────── */
+
 .low-stim [class*='animate-'] {
   @apply !animate-none;
 }
@@ -197,24 +294,19 @@ input[type='checkbox'], input[type='radio'] {
   animation: none !important;
 }
 
-/* Smooth transitions for theme switching */
-.theme-transition * {
-  @apply transition-colors duration-300;
-}
-
-/* Modal backdrop */
-.modal-backdrop {
-  @apply fixed inset-0 bg-black/40 backdrop-blur-sm;
-}
-
-/* Loading spinner */
-.spinner {
-  @apply animate-spin inline-block;
-}
-
 .low-stim .spinner {
   @apply !animate-none;
   animation: spin 1s linear infinite;
+}
+
+.low-stim [class*='pulse'] {
+  @apply !animate-none opacity-100;
+}
+
+/* ─── Loading Spinner ─────────────────────────────────────────────────────── */
+
+.spinner {
+  @apply animate-spin inline-block;
 }
 
 @keyframes spin {
@@ -226,12 +318,14 @@ input[type='checkbox'], input[type='radio'] {
   }
 }
 
-/* Pulse animation alternative for low-stim */
-.low-stim [class*='pulse'] {
-  @apply !animate-none opacity-100;
+/* ─── Modal ───────────────────────────────────────────────────────────────── */
+
+.modal-backdrop {
+  @apply fixed inset-0 bg-black/40 backdrop-blur-sm;
 }
 
-/* Responsive Grid */
+/* ─── Responsive ──────────────────────────────────────────────────────────── */
+
 @media (max-width: 768px) {
   .react-grid-layout {
     @apply gap-2;
