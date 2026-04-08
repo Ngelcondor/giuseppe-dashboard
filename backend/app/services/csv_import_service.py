@@ -91,22 +91,41 @@ def parse_revolut_csv(
     reader = csv.DictReader(io.StringIO(csv_content))
     transactions = []
 
+    # Support both English and Italian Revolut CSV headers
+    HEADER_MAP = {
+        "amount": ["Amount", "Importo"],
+        "description": ["Description", "Descrizione"],
+        "state": ["State", "Stato"],
+        "completed_date": ["Completed Date", "Data di completamento"],
+        "started_date": ["Started Date", "Data di inizio"],
+        "type": ["Type", "Tipo"],
+        "currency": ["Currency", "Valuta"],
+        "balance": ["Balance", "Saldo"],
+    }
+
+    def _get(row: dict, field: str, default: str = "") -> str:
+        """Get a field value trying all known header variants."""
+        for key in HEADER_MAP.get(field, [field]):
+            if key in row:
+                return row[key].strip()
+        return default
+
     for row in reader:
         try:
             # Parse amount
-            amount_str = row.get("Amount", "0").strip()
+            amount_str = _get(row, "amount", "0").replace(",", ".")
             amount = float(amount_str)
 
             if amount == 0:
                 continue
 
             # Skip failed/reverted transactions
-            state = row.get("State", "").strip().lower()
-            if state in ("reverted", "failed", "declined"):
+            state = _get(row, "state").lower()
+            if state in ("reverted", "failed", "declined", "annullato", "rifiutato"):
                 continue
 
             # Parse date — Revolut uses "YYYY-MM-DD HH:MM:SS" or "DD MMM YYYY"
-            date_str = row.get("Completed Date", row.get("Started Date", "")).strip()
+            date_str = _get(row, "completed_date") or _get(row, "started_date")
             txn_date = _parse_revolut_date(date_str)
             if not txn_date:
                 logger.warning(f"Could not parse date: {date_str}, skipping row")
@@ -116,17 +135,17 @@ def parse_revolut_csv(
             txn_type = TransactionType.INCOME if amount > 0 else TransactionType.EXPENSE
 
             # Description
-            description = row.get("Description", "").strip()
-            raw_type = row.get("Type", "").strip()
+            description = _get(row, "description")
+            raw_type = _get(row, "type")
 
             # Category
             category = _guess_category(description)
 
             # Currency
-            currency = row.get("Currency", "EUR").strip()
+            currency = _get(row, "currency") or "EUR"
 
             # Balance after transaction (informational)
-            balance_str = row.get("Balance", "").strip()
+            balance_str = _get(row, "balance")
 
             transactions.append({
                 "user_id": user_id,
