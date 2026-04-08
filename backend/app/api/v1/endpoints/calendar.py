@@ -18,7 +18,12 @@ from app.schemas.calendar_event import (
 router = APIRouter(prefix="/calendar", tags=["calendar"])
 
 
-@router.post("/events", response_model=CalendarEventResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/events",
+    response_model=CalendarEventResponse,
+    response_model_by_alias=True,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_event(
     event: CalendarEventCreate,
     current_user: dict = Depends(get_current_user),
@@ -27,15 +32,19 @@ async def create_event(
     """Create a calendar event."""
     cal_event = CalendarEvent(
         user_id=current_user["sub"],
-        **event.dict(),
+        **event.model_dump(by_alias=False),
     )
     db.add(cal_event)
     await db.commit()
     await db.refresh(cal_event)
-    return CalendarEventResponse.from_orm(cal_event)
+    return CalendarEventResponse.model_validate(cal_event, from_attributes=True)
 
 
-@router.get("/events", response_model=List[CalendarEventResponse])
+@router.get(
+    "/events",
+    response_model=List[CalendarEventResponse],
+    response_model_by_alias=True,
+)
 async def list_events(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -47,10 +56,14 @@ async def list_events(
         .order_by(CalendarEvent.start_time)
     )
     events = result.scalars().all()
-    return [CalendarEventResponse.from_orm(e) for e in events]
+    return [CalendarEventResponse.model_validate(e, from_attributes=True) for e in events]
 
 
-@router.get("/events/{event_id}", response_model=CalendarEventResponse)
+@router.get(
+    "/events/{event_id}",
+    response_model=CalendarEventResponse,
+    response_model_by_alias=True,
+)
 async def get_event(
     event_id: str,
     current_user: dict = Depends(get_current_user),
@@ -66,10 +79,14 @@ async def get_event(
     event = result.scalars().first()
     if not event:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
-    return CalendarEventResponse.from_orm(event)
+    return CalendarEventResponse.model_validate(event, from_attributes=True)
 
 
-@router.put("/events/{event_id}", response_model=CalendarEventResponse)
+@router.put(
+    "/events/{event_id}",
+    response_model=CalendarEventResponse,
+    response_model_by_alias=True,
+)
 async def update_event(
     event_id: str,
     event_update: CalendarEventUpdate,
@@ -87,7 +104,7 @@ async def update_event(
     if not event:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
-    update_data = event_update.dict(exclude_unset=True)
+    update_data = event_update.model_dump(exclude_unset=True, by_alias=False)
     for field, value in update_data.items():
         if value is not None:
             setattr(event, field, value)
@@ -95,7 +112,7 @@ async def update_event(
     db.add(event)
     await db.commit()
     await db.refresh(event)
-    return CalendarEventResponse.from_orm(event)
+    return CalendarEventResponse.model_validate(event, from_attributes=True)
 
 
 @router.delete("/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -119,7 +136,11 @@ async def delete_event(
     await db.commit()
 
 
-@router.get("/upcoming", response_model=CalendarUpcomingResponse)
+@router.get(
+    "/upcoming",
+    response_model=CalendarUpcomingResponse,
+    response_model_by_alias=True,
+)
 async def get_upcoming_events(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -150,6 +171,6 @@ async def get_upcoming_events(
     events_30 = result.scalars().all()
 
     return CalendarUpcomingResponse(
-        next_7_days=[CalendarEventResponse.from_orm(e) for e in events_7],
-        next_30_days=[CalendarEventResponse.from_orm(e) for e in events_30],
+        next_7_days=[CalendarEventResponse.model_validate(e, from_attributes=True) for e in events_7],
+        next_30_days=[CalendarEventResponse.model_validate(e, from_attributes=True) for e in events_30],
     )
