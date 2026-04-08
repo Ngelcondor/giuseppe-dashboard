@@ -38,7 +38,7 @@ export const Modal: React.FC<ModalProps> = ({
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
           className={cn(
-            'bg-slate-800 border border-slate-700 rounded-lg',
+            'bg-card-solid border border-border-default rounded-lg',
             'max-h-[90vh] overflow-y-auto',
             'animation-fade-in',
             sizes[size]
@@ -46,12 +46,12 @@ export const Modal: React.FC<ModalProps> = ({
           onClick={(e) => e.stopPropagation()}
         >
           {(title || onClose) && (
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
-              {title && <h2 className="text-lg font-semibold text-slate-100">{title}</h2>}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border-default">
+              {title && <h2 className="text-lg font-semibold text-heading">{title}</h2>}
               {onClose && (
                 <button
                   onClick={onClose}
-                  className="ml-auto text-slate-400 hover:text-slate-200 transition-colors"
+                  className="ml-auto text-muted hover:text-heading transition-colors"
                   aria-label="Chiudi"
                 >
                   <X size={20} />
@@ -61,7 +61,7 @@ export const Modal: React.FC<ModalProps> = ({
           )}
           <div className="px-6 py-4">{children}</div>
           {footer && (
-            <div className="px-6 py-4 border-t border-slate-700 bg-slate-900/50 flex gap-2 justify-end">
+            <div className="px-6 py-4 border-t border-border-default bg-page flex gap-2 justify-end">
               {footer}
             </div>
           )}
@@ -115,7 +115,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         </>
       }
     >
-      <p className="text-slate-300">{message}</p>
+      <p className="text-body">{message}</p>
     </Modal>
   );
 };

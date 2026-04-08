@@ -43,7 +43,7 @@ const getWeatherIcon = (condition: string) => {
     case 'soleggiato':
       return <Sun size={32} className="text-yellow-400" />;
     case 'nuvoloso':
-      return <Cloud size={32} className="text-slate-400" />;
+      return <Cloud size={32} className="text-body" />;
     case 'pioggia':
       return <CloudRain size={32} className="text-blue-400" />;
     default:
@@ -59,8 +59,8 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({
     return (
       <CompactWidget title="🌤️ Meteo">
         <div className="space-y-3">
-          <div className="h-8 bg-slate-700 rounded animate-pulse" />
-          <div className="h-4 bg-slate-700 rounded animate-pulse" />
+          <div className="h-8 bg-input rounded animate-pulse" />
+          <div className="h-4 bg-input rounded animate-pulse" />
         </div>
       </CompactWidget>
     );
@@ -72,9 +72,9 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({
         {/* Current Weather */}
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-3xl font-bold text-slate-100">{data.temperature}°C</p>
-            <p className="text-sm text-slate-400">Percepito: {data.feelsLike}°C</p>
-            <p className="text-sm text-slate-300 mt-1">{data.condition}</p>
+            <p className="text-3xl font-bold text-heading">{data.temperature}°C</p>
+            <p className="text-sm text-body">Percepito: {data.feelsLike}°C</p>
+            <p className="text-sm text-body mt-1">{data.condition}</p>
           </div>
           <div className="flex-shrink-0">
             {getWeatherIcon(data.condition)}
@@ -82,32 +82,32 @@ export const WeatherWidget: React.FC<WeatherWidgetProps> = ({
         </div>
 
         {/* Weather Details */}
-        <div className="grid grid-cols-2 gap-2 pt-4 border-t border-slate-700">
+        <div className="grid grid-cols-2 gap-2 pt-4 border-t border-border-default">
           <div className="flex items-center gap-2">
             <Droplets size={16} className="text-blue-400" />
             <div>
-              <p className="text-xs text-slate-400">Umidità</p>
-              <p className="text-sm font-medium text-slate-100">{data.humidity}%</p>
+              <p className="text-xs text-body">Umidità</p>
+              <p className="text-sm font-medium text-heading">{data.humidity}%</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Wind size={16} className="text-cyan-400" />
             <div>
-              <p className="text-xs text-slate-400">Vento</p>
-              <p className="text-sm font-medium text-slate-100">{data.windSpeed} km/h</p>
+              <p className="text-xs text-body">Vento</p>
+              <p className="text-sm font-medium text-heading">{data.windSpeed} km/h</p>
             </div>
           </div>
         </div>
 
         {/* 5-Day Forecast */}
-        <div className="pt-4 border-t border-slate-700 space-y-2">
-          <p className="text-xs font-medium text-slate-400 uppercase">Previsione 5 giorni</p>
+        <div className="pt-4 border-t border-border-default space-y-2">
+          <p className="text-xs font-medium text-body uppercase">Previsione 5 giorni</p>
           <div className="space-y-1">
             {data.forecast.map((day, index) => (
               <div key={index} className="flex items-center justify-between text-xs">
-                <span className="text-slate-300 w-16">{day.day}</span>
-                <span className="text-slate-400">{day.condition}</span>
-                <span className="text-slate-100 font-medium w-12 text-right">
+                <span className="text-body w-16">{day.day}</span>
+                <span className="text-body">{day.condition}</span>
+                <span className="text-heading font-medium w-12 text-right">
                   {day.high}° / {day.low}°
                 </span>
               </div>

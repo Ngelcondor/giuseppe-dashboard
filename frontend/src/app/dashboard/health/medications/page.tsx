@@ -91,7 +91,7 @@ function MedCard({
           ? 'bg-emerald-900/15 border-emerald-700/30'
           : skipped
           ? 'bg-amber-900/15 border-amber-700/30 opacity-60'
-          : 'bg-white/[0.02] border-white/5 hover:border-white/10'
+          : 'bg-card border-border-default hover:border-border-hover'
       }`}
     >
       {/* Status icon */}
@@ -101,7 +101,7 @@ function MedCard({
         ) : skipped ? (
           <SkipForward size={22} className="text-amber-400" />
         ) : (
-          <Circle size={22} className="text-slate-600" />
+          <Circle size={22} className="text-muted" />
         )}
       </div>
 
@@ -115,12 +115,12 @@ function MedCard({
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <p className={`text-sm font-medium ${done ? 'text-emerald-300 line-through' : 'text-slate-200'}`}>
+        <p className={`text-sm font-medium ${done ? 'text-emerald-300 line-through' : 'text-heading'}`}>
           {med.name}
         </p>
-        <p className="text-xs text-slate-500 mt-0.5">
+        <p className="text-xs text-tertiary mt-0.5">
           {med.dosage}
-          {med.notes && <span className="ml-2 text-slate-600">— {med.notes}</span>}
+          {med.notes && <span className="ml-2 text-muted">— {med.notes}</span>}
         </p>
       </div>
 
@@ -148,14 +148,14 @@ function MedCard({
       <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex-shrink-0">
         <button
           onClick={onShowHistory}
-          className="p-1.5 rounded-lg bg-white/5 text-slate-400 hover:bg-white/10 transition-colors"
+          className="p-1.5 rounded-lg bg-card-inner text-body hover:bg-surface-hover transition-colors"
           title="Storico"
         >
           <History size={16} />
         </button>
         <button
           onClick={onEdit}
-          className="p-1.5 rounded-lg bg-white/5 text-slate-400 hover:bg-white/10 transition-colors"
+          className="p-1.5 rounded-lg bg-card-inner text-body hover:bg-surface-hover transition-colors"
           title="Modifica"
         >
           <Edit3 size={16} />
@@ -196,7 +196,7 @@ function PRNCard({
   const takenCount = item.taken_today ? 1 : 0; // simplified, could track multiple
 
   return (
-    <div className="flex items-center gap-4 px-4 py-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all">
+    <div className="flex items-center gap-4 px-4 py-3 rounded-xl bg-card border border-border-default hover:border-border-hover transition-all">
       <div
         className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
         style={{ backgroundColor: (med.color || '#EF4444') + '20' }}
@@ -205,8 +205,8 @@ function PRNCard({
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-200">{med.name}</p>
-        <p className="text-xs text-slate-500 mt-0.5">
+        <p className="text-sm font-medium text-heading">{med.name}</p>
+        <p className="text-xs text-tertiary mt-0.5">
           {med.dosage} — al bisogno
           {takenCount > 0 && (
             <span className="ml-2 text-amber-400">
@@ -226,7 +226,7 @@ function PRNCard({
         </button>
         <button
           onClick={onShowHistory}
-          className="p-1.5 rounded-lg bg-white/5 text-slate-400 hover:bg-white/10 transition-colors"
+          className="p-1.5 rounded-lg bg-card text-body hover:bg-surface-hover transition-colors"
           title="Storico"
         >
           <History size={16} />
@@ -315,30 +315,30 @@ function MedFormModal({
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Nome</label>
+          <label className="block text-xs text-body mb-1">Nome</label>
           <input
             type="text"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-sm focus:border-blue-500 focus:outline-none"
+            className="w-full px-3 py-2 rounded-lg bg-input border border-border-default text-heading text-sm focus:border-blue-500 focus:outline-none"
             required
           />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Dosaggio</label>
+            <label className="block text-xs text-body mb-1">Dosaggio</label>
             <input
               type="text"
               value={form.dosage}
               onChange={(e) => setForm({ ...form, dosage: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full px-3 py-2 rounded-lg bg-input border border-border-default text-heading text-sm focus:border-blue-500 focus:outline-none"
               placeholder="es. 60mg"
               required
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Frequenza</label>
+            <label className="block text-xs text-body mb-1">Frequenza</label>
             <select
               value={form.frequency}
               onChange={(e) => {
@@ -351,7 +351,7 @@ function MedFormModal({
                   time_of_day: freq === 'prn' ? 'al bisogno' : form.time_of_day,
                 });
               }}
-              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-sm focus:border-blue-500 focus:outline-none"
+              className="w-full px-3 py-2 rounded-lg bg-input border border-border-default text-heading text-sm focus:border-blue-500 focus:outline-none"
             >
               <option value="daily">Giornaliero</option>
               <option value="twice_daily">Due volte al giorno</option>
@@ -364,20 +364,20 @@ function MedFormModal({
         {!form.is_prn && (
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Orario</label>
+              <label className="block text-xs text-body mb-1">Orario</label>
               <input
                 type="time"
                 value={form.scheduled_time || '08:30'}
                 onChange={(e) => setForm({ ...form, scheduled_time: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-sm focus:border-blue-500 focus:outline-none"
+                className="w-full px-3 py-2 rounded-lg bg-input border border-border-default text-heading text-sm focus:border-blue-500 focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Momento</label>
+              <label className="block text-xs text-body mb-1">Momento</label>
               <select
                 value={form.time_of_day}
                 onChange={(e) => setForm({ ...form, time_of_day: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-sm focus:border-blue-500 focus:outline-none"
+                className="w-full px-3 py-2 rounded-lg bg-input border border-border-default text-heading text-sm focus:border-blue-500 focus:outline-none"
               >
                 <option value="mattina">Mattina</option>
                 <option value="pomeriggio">Pomeriggio</option>
@@ -390,21 +390,21 @@ function MedFormModal({
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Colore</label>
+            <label className="block text-xs text-body mb-1">Colore</label>
             <input
               type="color"
               value={form.color || '#6366F1'}
               onChange={(e) => setForm({ ...form, color: e.target.value })}
-              className="w-full h-9 rounded-lg bg-slate-900 border border-slate-700 cursor-pointer"
+              className="w-full h-9 rounded-lg bg-input border border-border-default cursor-pointer"
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-400 mb-1">Icona</label>
+            <label className="block text-xs text-body mb-1">Icona</label>
             <input
               type="text"
               value={form.icon || ''}
               onChange={(e) => setForm({ ...form, icon: e.target.value })}
-              className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-sm focus:border-blue-500 focus:outline-none text-center"
+              className="w-full px-3 py-2 rounded-lg bg-input border border-border-default text-heading text-sm focus:border-blue-500 focus:outline-none text-center"
               placeholder="💊"
               maxLength={4}
             />
@@ -412,11 +412,11 @@ function MedFormModal({
         </div>
 
         <div>
-          <label className="block text-xs text-slate-400 mb-1">Note</label>
+          <label className="block text-xs text-body mb-1">Note</label>
           <textarea
             value={form.notes || ''}
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-sm focus:border-blue-500 focus:outline-none resize-none"
+            className="w-full px-3 py-2 rounded-lg bg-input border border-border-default text-heading text-sm focus:border-blue-500 focus:outline-none resize-none"
             rows={2}
             placeholder="Note opzionali..."
           />
@@ -450,7 +450,7 @@ function HistoryModal({
           <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : logs.length === 0 ? (
-        <p className="text-sm text-slate-500 text-center py-8">Nessun log registrato.</p>
+        <p className="text-sm text-tertiary text-center py-8">Nessun log registrato.</p>
       ) : (
         <div className="space-y-2 max-h-80 overflow-y-auto">
           {logs.map((log) => (
@@ -466,7 +466,7 @@ function HistoryModal({
                 <CheckCircle2 size={16} className="text-emerald-400" />
               )}
               <div className="flex-1">
-                <p className="text-xs text-slate-300">
+                <p className="text-xs text-heading">
                   {new Date(log.taken_at).toLocaleDateString('it-IT', {
                     weekday: 'short',
                     day: 'numeric',
@@ -478,7 +478,7 @@ function HistoryModal({
                     minute: '2-digit',
                   })}
                 </p>
-                {log.notes && <p className="text-[11px] text-slate-500 mt-0.5">{log.notes}</p>}
+                {log.notes && <p className="text-[11px] text-tertiary mt-0.5">{log.notes}</p>}
               </div>
               <span className={`text-[10px] ${log.skipped ? 'text-amber-500' : 'text-emerald-500'}`}>
                 {log.skipped ? 'Saltato' : 'Preso'}
@@ -699,17 +699,17 @@ export default function MedicationsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0f1117] text-slate-100 flex items-center justify-center">
+      <div className="min-h-screen bg-page text-heading flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0f1117] text-slate-100">
+    <div className="min-h-screen bg-page text-heading">
       {/* Header */}
-      <header className="px-6 py-5 border-b border-white/5 flex items-center gap-3">
-        <Link href="/dashboard/health" className="text-slate-500 hover:text-slate-300 transition-colors">
+      <header className="px-6 py-5 border-b border-border-default flex items-center gap-3">
+        <Link href="/dashboard/health" className="text-tertiary hover:text-body transition-colors">
           <ArrowLeft size={18} />
         </Link>
         <Pill size={18} className="text-indigo-400" />
@@ -751,27 +751,27 @@ export default function MedicationsPage() {
               <Heart size={16} className="text-emerald-400" />
               <h3 className="text-sm font-semibold text-emerald-300">Sync con Apple Health</h3>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-body">
               Configura <strong>Health Auto Export</strong> per inviare automaticamente i dati farmaci alla dashboard.
               L'app sincronizza le assunzioni registrate in Apple Salute.
             </p>
             <div className="space-y-2">
-              <label className="block text-[11px] text-slate-500 uppercase tracking-wider">Webhook URL (Farmaci)</label>
+              <label className="block text-[11px] text-body uppercase tracking-wider">Webhook URL (Farmaci)</label>
               <div className="flex items-center gap-2">
-                <code className="flex-1 px-3 py-2 rounded-lg bg-slate-900/80 border border-slate-700 text-[11px] text-slate-300 font-mono truncate">
+                <code className="flex-1 px-3 py-2 rounded-lg bg-input border border-border-default text-[11px] text-heading font-mono truncate">
                   {appleHealthService.getMedicationSyncUrl()}
                 </code>
                 <button
                   onClick={handleCopySyncUrl}
-                  className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-colors flex-shrink-0"
+                  className="p-2 rounded-lg bg-card-solid text-body hover:text-heading hover:bg-surface-hover transition-colors flex-shrink-0"
                   title="Copia URL"
                 >
                   {syncUrlCopied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
                 </button>
               </div>
             </div>
-            <div className="pt-2 border-t border-white/5">
-              <p className="text-[11px] text-slate-500">
+            <div className="pt-2 border-t border-border-default">
+              <p className="text-[11px] text-body">
                 <strong>Setup:</strong> In Health Auto Export → Automations → REST API, incolla l'URL sopra.
                 Imposta il metodo su POST, aggiungi header{' '}
                 <code className="text-emerald-400/80">Authorization: Bearer &lt;token&gt;</code>{' '}
@@ -793,11 +793,11 @@ export default function MedicationsPage() {
         {/* Progress bar */}
         {totalScheduled > 0 && (
           <div className="px-1">
-            <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
+            <div className="flex items-center justify-between text-xs text-tertiary mb-2">
               <span>Progresso di oggi</span>
               <span>{takenCount}/{totalScheduled} presi · {progressPct}%</span>
             </div>
-            <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div className="h-2 bg-card-solid rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 rounded-full transition-all duration-500"
                 style={{ width: `${progressPct}%` }}
@@ -807,13 +807,13 @@ export default function MedicationsPage() {
         )}
 
         {/* Tabs */}
-        <div className="flex gap-1 p-1 bg-white/[0.03] rounded-xl border border-white/5">
+        <div className="flex gap-1 p-1 bg-card rounded-xl border border-border-default">
           {(['oggi', 'tutti'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${
-                tab === t ? 'bg-indigo-600/30 text-indigo-300' : 'text-slate-500 hover:text-slate-300'
+                tab === t ? 'bg-indigo-600/30 text-indigo-300' : 'text-tertiary hover:text-body'
               }`}
             >
               {t === 'oggi' ? 'Oggi' : 'Tutti i farmaci'}
@@ -827,7 +827,7 @@ export default function MedicationsPage() {
             <div className="w-14 h-14 rounded-2xl bg-indigo-600/10 border border-indigo-600/20 flex items-center justify-center mx-auto mb-4">
               <Pill size={24} className="text-indigo-400" />
             </div>
-            <p className="text-sm text-slate-400 mb-2">Nessun farmaco registrato</p>
+            <p className="text-sm text-body mb-2">Nessun farmaco registrato</p>
             {isOffline && (
               <p className="text-xs text-amber-400 mb-4">Sei offline — l'importazione richiede connessione al server</p>
             )}
@@ -852,7 +852,7 @@ export default function MedicationsPage() {
                   .sort(([a], [b]) => timeSortKey(a) - timeSortKey(b))
                   .map(([time, items]) => (
                     <div key={time}>
-                      <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">
+                      <h3 className="text-xs font-semibold text-body uppercase tracking-wider mb-3 px-1">
                         {timeLabel(time)}
                       </h3>
                       <div className="space-y-2">
@@ -908,7 +908,7 @@ export default function MedicationsPage() {
                   .sort(([a], [b]) => timeSortKey(a) - timeSortKey(b))
                   .map(([time, meds]) => (
                     <div key={time}>
-                      <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">
+                      <h3 className="text-xs font-semibold text-body uppercase tracking-wider mb-3 px-1">
                         {timeLabel(time)}
                       </h3>
                       <div className="space-y-2">
@@ -964,7 +964,7 @@ export default function MedicationsPage() {
             {allMeds.map((med) => (
               <div
                 key={med.id}
-                className="flex items-center gap-4 px-4 py-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all group"
+                className="flex items-center gap-4 px-4 py-3 rounded-xl bg-card border border-border-default hover:border-border-hover transition-all group"
               >
                 <div
                   className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
@@ -973,8 +973,8 @@ export default function MedicationsPage() {
                   {med.icon || '💊'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-200">{med.name}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-sm font-medium text-heading">{med.name}</p>
+                  <p className="text-xs text-tertiary mt-0.5">
                     {med.dosage} · {med.is_prn ? 'Al bisogno' : `${med.scheduled_time || med.time_of_day}`}
                     {!med.is_active && <span className="ml-2 text-red-400">(inattivo)</span>}
                   </p>
@@ -982,13 +982,13 @@ export default function MedicationsPage() {
                 <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={() => handleShowHistory(med)}
-                    className="p-1.5 rounded-lg bg-white/5 text-slate-400 hover:bg-white/10 transition-colors"
+                    className="p-1.5 rounded-lg bg-card text-body hover:bg-surface-hover transition-colors"
                   >
                     <History size={16} />
                   </button>
                   <button
                     onClick={() => setEditMed(med)}
-                    className="p-1.5 rounded-lg bg-white/5 text-slate-400 hover:bg-white/10 transition-colors"
+                    className="p-1.5 rounded-lg bg-card text-body hover:bg-surface-hover transition-colors"
                   >
                     <Edit3 size={16} />
                   </button>

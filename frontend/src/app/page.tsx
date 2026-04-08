@@ -11,10 +11,10 @@ export default function Home() {
   }, [router]);
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+    <div className="min-h-screen bg-page flex items-center justify-center">
       <div className="animate-pulse flex flex-col items-center gap-4">
-        <div className="w-12 h-12 bg-slate-700 rounded-full"></div>
-        <div className="text-slate-400">Caricamento in corso...</div>
+        <div className="w-12 h-12 bg-input rounded-full"></div>
+        <div className="text-body">Caricamento in corso...</div>
       </div>
     </div>
   );
