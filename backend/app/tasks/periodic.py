@@ -14,13 +14,11 @@ import logging
 from app.core.config import settings
 from app.models.user import User
 from app.models.deadline import Deadline
-from app.models.medication import Medication
 from app.models.routine import Routine
 from app.models.calendar_connection import CalendarConnection
 from app.models.calendar_event import CalendarEvent
 from app.services.notification_service import (
     send_reminder,
-    send_medication_reminder,
     send_routine_reminder,
 )
 from app.services.focus_calculator import calculate_daily_focus_score
@@ -28,6 +26,14 @@ from app.services.feed_service import fetch_cybersecurity_feed
 from app.services.weather_service import get_weather
 from app.services.caldav_service import sync_calendar_events
 from app.tasks.celery_app import celery_app
+
+# Optional: Medication model not yet created
+try:
+    from app.models.medication import Medication
+    from app.services.notification_service import send_medication_reminder
+    _HAS_MEDICATION = True
+except ImportError:
+    _HAS_MEDICATION = False
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +109,9 @@ def refresh_cybersecurity_feed():
 @celery_app.task
 def check_medication_reminders():
     """Check for medication reminders."""
+    if not _HAS_MEDICATION:
+        logger.debug("Medication model not available, skipping.")
+        return
 
     async def _inner():
         engine = create_async_engine(settings.DATABASE_URL)
