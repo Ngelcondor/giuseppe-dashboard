@@ -1,0 +1,279 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+docker/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+*.cover
+*.py,cover
+.env.test
+venv/
+ENV/
+env/
+.venv
+env.bak/
+venv.bak/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+.npm
+.eslintcache
+.next/
+out/
+.nuxt
+dist/
+.cache/
+.vuepress/dist/
+.serverless/
+.fusebox/
+.dynamodb/
+.env.test.local
+.env.production.local
+.cache
+.next
+.vuepress/dist
+.serverless
+.fusebox
+.dynamodb
+.tern-port
+.vercel
+.output
+.next
+.nuxt
+
+# IDE and editors
+.vscode/
+.vscode
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+*.pem
+*.key
+*.crt
+*.jks
+.project
+.pydevproject
+.settings/
+*.sublime-workspace
+*.sublime-project
+.history
+
+# Git
+.gitkeep
+
+# Docker
+docker-compose.override.yml
+Dockerfile.dev
+.dockerignore
+.docker/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+debug.log*
+.env.example.local
+firebase-debug.log*
+out/
+.cache/
+*.lcov
+dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+.directory
+.Spotlight-V100
+.Trashes
+._*
+.AppleDouble
+.LSOverride
+*.sublime-workspace
+
+# Backup files
+*.bak
+*.backup
+*~
+*.swp
+*.swo
+*#
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.postgres
+*.postgresql
+
+# Local development
+.localrc
+.env.development
+.env.local
+local.properties
+.gradletasknamecache
+
+# Build output
+target/
+build/
+.gradle
+*.apk
+*.ap_
+*.aab
+*.class
+*.jar
+*.rar
+.gradle
+local.properties
+
+# IDE specific files
+.classpath
+.factorypath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+.tern-port
+typings/
+.vscode-test
+.windows/
+.vscode-test/
+test-results/
+junit.xml
+
+# Temporary files
+*.tmp
+*.temp
+*.tempfile
+tmp/
+temp/
+
+# Mac
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+Session.vim
+.netrwhist
+
+# Testing
+.jest_cache/
+coverage/
+test-results/
+
+# Secrets and credentials
+secrets.yml
+secrets.json
+credentials.json
+*.pem
+*.key
+*.p12
+*.p8
+vault/
+
+# CI/CD
+.travis.yml.local
+.gitlab-ci.local.yml
+.github/workflows/*.local.yml
+
+# Misc
+.vscode_test
+*.orig
+*.rej
+
+# Media
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.m4v
+*.flv
+
+# Archives
+*.zip
+*.rar
+*.7z
+*.tar.gz
+*.tar
+
+# Databases
+*.db-journal
+
+# AWS
+.aws/
+.elasticbeanstalk/
+
+# Certificates
+*.crt
+*.key
+*.pem
+*.p7b
+*.pfx
+*.jks
+
+# Package manager lock files (optional - uncomment if you want to lock versions)
+# package-lock.json
+# yarn.lock
+# poetry.lock
+# Pipfile.lock
+
+# IDE language support
+.rubocop_cache
+.stylelintcache
+
+# Generated files
+generated/
+auto-generated/

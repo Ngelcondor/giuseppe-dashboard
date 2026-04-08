@@ -27,6 +27,9 @@ from app.schemas.health import (
     MedicationLogResponse,
     MedicationScheduleItem,
     MedicationTodayResponse,
+    MedicationStatsResponse,
+    MedicationStatItem,
+    PRNStatItem,
 )
 
 router = APIRouter(prefix="/health", tags=["health"])
@@ -294,6 +297,158 @@ async def get_today_medications(
     sorted_scheduled = dict(sorted(scheduled.items()))
 
     return MedicationTodayResponse(scheduled=sorted_scheduled, prn=prn)
+
+
+@router.get("/medications/stats", response_model=MedicationStatsResponse)
+async def get_medication_stats(
+    year: int = Query(None, description="Anno (default: anno corrente)"),
+    month: int = Query(None, description="Mese 1-12 (default: mese corrente)"),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> MedicationStatsResponse:
+    """Get medication adherence statistics for a given month.
+
+    Returns per-medication taken/skipped/missed counts for scheduled meds,
+    and intake counts for PRN (al bisogno) medications.
+    """
+    import calendar
+    from collections import defaultdict
+
+    tz_rome = ZoneInfo("Europe/Rome")
+    now_rome = datetime.now(tz_rome)
+
+    # Default to current month
+    y = year or now_rome.year
+    m = month or now_rome.month
+
+    # Period boundaries (Italian timezone)
+    first_day = date(y, m, 1)
+    last_day_num = calendar.monthrange(y, m)[1]
+    last_day = date(y, m, last_day_num)
+
+    # If we're in the current month, cap at today
+    today_rome = now_rome.date()
+    if last_day > today_rome:
+        last_day = today_rome
+
+    total_days = (last_day - first_day).days + 1
+
+    # Convert to UTC datetimes for DB queries
+    period_start_utc = datetime.combine(first_day, datetime.min.time(), tzinfo=tz_rome).astimezone(timezone.utc).replace(tzinfo=None)
+    period_end_utc = datetime.combine(last_day, datetime.max.time(), tzinfo=tz_rome).astimezone(timezone.utc).replace(tzinfo=None)
+
+    # Get all active medications
+    result = await db.execute(
+        select(Medication).where(
+            (Medication.user_id == current_user["sub"])
+            & (Medication.is_active == True)
+        )
+    )
+    medications = result.scalars().all()
+
+    # Get all logs in the period
+    logs_result = await db.execute(
+        select(MedicationLog).where(
+            (MedicationLog.user_id == current_user["sub"])
+            & (MedicationLog.taken_at >= period_start_utc)
+            & (MedicationLog.taken_at <= period_end_utc)
+        )
+    )
+    all_logs = logs_result.scalars().all()
+
+    # Index logs by medication_id
+    logs_by_med: dict[str, list] = defaultdict(list)
+    for log in all_logs:
+        logs_by_med[str(log.medication_id)].append(log)
+
+    scheduled_stats: list[MedicationStatItem] = []
+    prn_stats: list[PRNStatItem] = []
+    total_prn_intakes = 0
+
+    for med in medications:
+        med_id = str(med.id)
+        med_logs = logs_by_med.get(med_id, [])
+
+        if med.is_prn:
+            # PRN: count total intakes and unique days
+            taken_logs = [l for l in med_logs if not l.skipped]
+            unique_days = set()
+            for log in taken_logs:
+                log_local = log.taken_at.replace(tzinfo=timezone.utc).astimezone(tz_rome).date()
+                unique_days.add(log_local)
+
+            intakes = len(taken_logs)
+            days_used = len(unique_days)
+            total_prn_intakes += intakes
+
+            prn_stats.append(PRNStatItem(
+                medication_id=med.id,
+                name=med.name,
+                dosage=med.dosage,
+                color=med.color,
+                icon=med.icon,
+                total_intakes=intakes,
+                days_used=days_used,
+                avg_per_day_used=round(intakes / days_used, 1) if days_used > 0 else 0.0,
+            ))
+        else:
+            # Scheduled: count taken/skipped per unique day
+            # Expected = total_days (one dose per day for daily meds)
+            # For meds created after the period start, adjust expected
+            med_created = med.created_at.date() if med.created_at else first_day
+            effective_start = max(first_day, med_created)
+            expected = max(0, (last_day - effective_start).days + 1)
+
+            # Count unique days with taken/skipped logs
+            taken_days = set()
+            skipped_days = set()
+            for log in med_logs:
+                log_local = log.taken_at.replace(tzinfo=timezone.utc).astimezone(tz_rome).date()
+                if not log.skipped:
+                    taken_days.add(log_local)
+                else:
+                    skipped_days.add(log_local)
+
+            total_taken = len(taken_days)
+            total_skipped = len(skipped_days - taken_days)  # only days that were ONLY skipped
+            total_missed = max(0, expected - total_taken - total_skipped)
+
+            scheduled_stats.append(MedicationStatItem(
+                medication_id=med.id,
+                name=med.name,
+                dosage=med.dosage,
+                color=med.color,
+                icon=med.icon,
+                scheduled_time=med.scheduled_time,
+                total_expected=expected,
+                total_taken=total_taken,
+                total_skipped=total_skipped,
+                total_missed=total_missed,
+                adherence_pct=round((total_taken / expected) * 100, 1) if expected > 0 else 0.0,
+            ))
+
+    # Overall adherence
+    total_expected_all = sum(s.total_expected for s in scheduled_stats)
+    total_taken_all = sum(s.total_taken for s in scheduled_stats)
+    overall_adherence = round((total_taken_all / total_expected_all) * 100, 1) if total_expected_all > 0 else 0.0
+
+    # Period label in Italian
+    month_names_it = [
+        "", "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
+        "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre",
+    ]
+    period_label = f"{month_names_it[m]} {y}"
+
+    return MedicationStatsResponse(
+        period_start=first_day.isoformat(),
+        period_end=last_day.isoformat(),
+        period_label=period_label,
+        total_days=total_days,
+        scheduled_stats=scheduled_stats,
+        overall_adherence_pct=overall_adherence,
+        prn_stats=prn_stats,
+        total_prn_intakes=total_prn_intakes,
+    )
 
 
 async def _ensure_medication_columns(db: AsyncSession) -> None:

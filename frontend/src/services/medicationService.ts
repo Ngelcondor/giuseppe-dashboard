@@ -78,6 +78,44 @@ export interface MedicationTodayResponse {
   prn: MedicationScheduleItem[];
 }
 
+// ─── Statistics Types ────────────────────────────────────────────────────────
+
+export interface MedicationStatItem {
+  medication_id: string;
+  name: string;
+  dosage: string;
+  color: string | null;
+  icon: string | null;
+  scheduled_time: string | null;
+  total_expected: number;
+  total_taken: number;
+  total_skipped: number;
+  total_missed: number;
+  adherence_pct: number;
+}
+
+export interface PRNStatItem {
+  medication_id: string;
+  name: string;
+  dosage: string;
+  color: string | null;
+  icon: string | null;
+  total_intakes: number;
+  days_used: number;
+  avg_per_day_used: number;
+}
+
+export interface MedicationStatsResponse {
+  period_start: string;
+  period_end: string;
+  period_label: string;
+  total_days: number;
+  scheduled_stats: MedicationStatItem[];
+  overall_adherence_pct: number;
+  prn_stats: PRNStatItem[];
+  total_prn_intakes: number;
+}
+
 // ─── API Methods ─────────────────────────────────────────────────────────────
 
 const medicationService = {
@@ -121,6 +159,15 @@ const medicationService = {
     const { data } = await api.get(`/health/medications/${medicationId}/logs`, {
       params: { days },
     });
+    return data;
+  },
+
+  /** Statistiche mensili di aderenza */
+  async getStats(year?: number, month?: number): Promise<MedicationStatsResponse> {
+    const params: Record<string, number> = {};
+    if (year) params.year = year;
+    if (month) params.month = month;
+    const { data } = await api.get('/health/medications/stats', { params });
     return data;
   },
 

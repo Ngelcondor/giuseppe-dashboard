@@ -23,8 +23,15 @@ import {
   User,
   ChevronRight,
   KeyRound,
+  Webhook,
+  Plus,
+  Trash2,
+  Copy,
+  ToggleLeft,
+  ToggleRight,
 } from 'lucide-react';
 import notificationService from '@/services/notificationService';
+import apiTokenService, { APIToken, APITokenCreated, WebhookSecretInfo } from '@/services/apiTokenService';
 import { useThemeStore } from '@/stores/themeStore';
 import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api';
@@ -295,6 +302,429 @@ function PasswordChangeModal({
   );
 }
 
+// ─── Create Token Modal ────────────────────────────────────────────────────
+
+function CreateTokenModal({
+  isOpen,
+  onClose,
+  onCreated,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onCreated: (token: APITokenCreated) => void;
+}) {
+  const [name, setName] = useState('');
+  const [scope, setScope] = useState('webhook');
+  const [description, setDescription] = useState('');
+  const [expiresInDays, setExpiresInDays] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      setLoading(true);
+      const result = await apiTokenService.create({
+        name,
+        scope,
+        description: description || undefined,
+        expires_in_days: expiresInDays ? parseInt(expiresInDays) : undefined,
+      });
+      onCreated(result);
+      setName('');
+      setScope('webhook');
+      setDescription('');
+      setExpiresInDays('');
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Errore nella creazione del token');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md rounded-2xl bg-card border border-border-default p-6 shadow-xl">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center">
+              <KeyRound size={20} className="text-violet-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-heading">Nuovo Token API</h3>
+          </div>
+          <button onClick={onClose} className="text-muted hover:text-body transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="px-3 py-2 rounded-lg bg-red-900/20 border border-red-700/30 text-sm text-red-400">
+              {error}
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-tertiary">Nome</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-lg bg-input border border-border-default text-body text-sm focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 outline-none transition-colors"
+              placeholder="es. Health Auto Export"
+              required
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-tertiary">Tipo</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: 'webhook', label: 'Webhook' },
+                { value: 'api', label: 'API' },
+                { value: 'full', label: 'Completo' },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setScope(opt.value)}
+                  className={`px-3 py-2 rounded-lg border text-xs font-medium transition-all ${
+                    scope === opt.value
+                      ? 'border-violet-500 bg-violet-500/10 text-violet-400'
+                      : 'border-border-default bg-card-inner text-muted hover:text-body'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-tertiary">Scadenza (giorni, opzionale)</label>
+            <input
+              type="number"
+              value={expiresInDays}
+              onChange={(e) => setExpiresInDays(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-lg bg-input border border-border-default text-body text-sm focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 outline-none transition-colors"
+              placeholder="Lascia vuoto per nessuna scadenza"
+              min="1"
+              max="365"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-tertiary">Descrizione (opzionale)</label>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-lg bg-input border border-border-default text-body text-sm focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30 outline-none transition-colors"
+              placeholder="es. Token per sincronizzazione Apple Watch"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading || !name}
+            className="w-full py-2.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+          >
+            {loading ? 'Creazione...' : 'Genera Token'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Token Created Banner ──────────────────────────────────────────────────
+
+function TokenCreatedBanner({
+  token,
+  onDismiss,
+}: {
+  token: string;
+  onDismiss: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(token);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="px-4 py-3 rounded-xl bg-violet-900/20 border border-violet-700/30 space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium text-violet-300">Token creato! Copialo ora, non sara piu visibile.</p>
+        <button onClick={onDismiss} className="text-violet-400 hover:text-violet-300">
+          <X size={16} />
+        </button>
+      </div>
+      <div className="flex items-center gap-2">
+        <code className="flex-1 px-3 py-2 rounded-lg bg-black/30 text-xs text-violet-200 font-mono break-all select-all">
+          {token}
+        </code>
+        <button
+          onClick={handleCopy}
+          className="flex-shrink-0 px-3 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium transition-colors flex items-center gap-1.5"
+        >
+          {copied ? <Check size={14} /> : <Copy size={14} />}
+          {copied ? 'Copiato!' : 'Copia'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── API Token Section ─────────────────────────────────────────────────────
+
+function APITokenSection() {
+  const [tokens, setTokens] = useState<APIToken[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newlyCreatedToken, setNewlyCreatedToken] = useState<string | null>(null);
+  const [webhookSecret, setWebhookSecret] = useState<WebhookSecretInfo | null>(null);
+  const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
+  const [secretCopied, setSecretCopied] = useState(false);
+
+  useEffect(() => {
+    loadTokens();
+    loadWebhookSecret();
+  }, []);
+
+  const loadTokens = async () => {
+    try {
+      const data = await apiTokenService.list();
+      setTokens(data.tokens);
+    } catch (err) {
+      console.error('Error loading tokens:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadWebhookSecret = async () => {
+    try {
+      const data = await apiTokenService.getWebhookSecret();
+      setWebhookSecret(data);
+    } catch (err) {
+      console.error('Error loading webhook secret:', err);
+    }
+  };
+
+  const handleRevoke = async (tokenId: string) => {
+    if (!confirm('Sei sicuro di voler revocare questo token?')) return;
+    try {
+      await apiTokenService.revoke(tokenId);
+      setTokens((prev) => prev.filter((t) => t.id !== tokenId));
+    } catch (err) {
+      console.error('Error revoking token:', err);
+    }
+  };
+
+  const handleToggle = async (tokenId: string) => {
+    try {
+      const updated = await apiTokenService.toggle(tokenId);
+      setTokens((prev) => prev.map((t) => (t.id === tokenId ? updated : t)));
+    } catch (err) {
+      console.error('Error toggling token:', err);
+    }
+  };
+
+  const handleRevealSecret = async () => {
+    try {
+      const secret = await apiTokenService.revealWebhookSecret();
+      setRevealedSecret(secret);
+    } catch (err) {
+      console.error('Error revealing secret:', err);
+    }
+  };
+
+  const handleCopySecret = async () => {
+    if (!revealedSecret) return;
+    await navigator.clipboard.writeText(revealedSecret);
+    setSecretCopied(true);
+    setTimeout(() => setSecretCopied(false), 2000);
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('it-IT', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
+  return (
+    <>
+      <SettingSection
+        icon={<Webhook size={18} />}
+        title="API & Webhook"
+        description="Gestisci i token per integrazioni esterne e Health Auto Export"
+      >
+        {/* Webhook Secret (Apple Health) */}
+        <div className="px-4 py-3 rounded-xl bg-card-inner border border-border-default space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-body font-medium">Webhook Apple Health</p>
+              <p className="text-xs text-muted mt-0.5">
+                {webhookSecret?.is_configured
+                  ? `Token configurato: ${webhookSecret.secret_preview}`
+                  : 'Non configurato'}
+              </p>
+            </div>
+            <div className={`w-2 h-2 rounded-full ${webhookSecret?.is_configured ? 'bg-emerald-400' : 'bg-red-400'}`} />
+          </div>
+
+          {webhookSecret?.is_configured && (
+            <div className="flex items-center gap-2">
+              {revealedSecret ? (
+                <>
+                  <code className="flex-1 px-3 py-2 rounded-lg bg-black/30 text-xs text-body font-mono break-all select-all">
+                    {revealedSecret}
+                  </code>
+                  <button
+                    onClick={handleCopySecret}
+                    className="flex-shrink-0 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium transition-colors flex items-center gap-1.5"
+                  >
+                    {secretCopied ? <Check size={14} /> : <Copy size={14} />}
+                    {secretCopied ? 'Copiato!' : 'Copia'}
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={handleRevealSecret}
+                  className="px-3 py-2 rounded-lg bg-card border border-border-default hover:border-border-hover text-xs text-body font-medium transition-all flex items-center gap-1.5"
+                >
+                  <Eye size={14} />
+                  Mostra token completo
+                </button>
+              )}
+            </div>
+          )}
+
+          <p className="text-[10px] text-muted">
+            Usa questo token come Bearer in Health Auto Export su iPhone.
+            Endpoint: <code className="text-violet-400">/api/v1/health/apple/webhook</code>
+          </p>
+        </div>
+
+        {/* Newly Created Token Banner */}
+        {newlyCreatedToken && (
+          <TokenCreatedBanner
+            token={newlyCreatedToken}
+            onDismiss={() => setNewlyCreatedToken(null)}
+          />
+        )}
+
+        {/* Token List */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-body font-medium">Token API</p>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium transition-colors flex items-center gap-1.5"
+            >
+              <Plus size={14} />
+              Nuovo
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="py-6 text-center text-xs text-muted">Caricamento...</div>
+          ) : tokens.length === 0 ? (
+            <div className="py-6 text-center text-xs text-muted">
+              Nessun token API creato. Crea un token per integrazioni esterne.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {tokens.map((token) => (
+                <div
+                  key={token.id}
+                  className={`px-4 py-3 rounded-xl border transition-all ${
+                    token.is_active
+                      ? 'bg-card-inner border-border-default'
+                      : 'bg-card-inner/50 border-border-default/50 opacity-60'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-body font-medium truncate">{token.name}</p>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                          token.scope === 'webhook'
+                            ? 'bg-blue-500/10 text-blue-400'
+                            : token.scope === 'api'
+                            ? 'bg-amber-500/10 text-amber-400'
+                            : 'bg-red-500/10 text-red-400'
+                        }`}>
+                          {token.scope}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1">
+                        <code className="text-[10px] text-muted font-mono">{token.token_prefix}...</code>
+                        <span className="text-[10px] text-muted">
+                          Creato: {formatDate(token.created_at)}
+                        </span>
+                        {token.last_used_at && (
+                          <span className="text-[10px] text-muted">
+                            Ultimo uso: {formatDate(token.last_used_at)}
+                          </span>
+                        )}
+                        {token.expires_at && (
+                          <span className="text-[10px] text-amber-400">
+                            Scade: {formatDate(token.expires_at)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 ml-3">
+                      <button
+                        onClick={() => handleToggle(token.id)}
+                        className="p-1.5 rounded-lg hover:bg-card transition-colors"
+                        title={token.is_active ? 'Disattiva' : 'Attiva'}
+                      >
+                        {token.is_active ? (
+                          <ToggleRight size={18} className="text-emerald-400" />
+                        ) : (
+                          <ToggleLeft size={18} className="text-muted" />
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleRevoke(token.id)}
+                        className="p-1.5 rounded-lg hover:bg-red-900/20 transition-colors"
+                        title="Revoca token"
+                      >
+                        <Trash2 size={16} className="text-red-400" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </SettingSection>
+
+      <CreateTokenModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreated={(result) => {
+          setNewlyCreatedToken(result.token);
+          setTokens((prev) => [result, ...prev]);
+          setShowCreateModal(false);
+        }}
+      />
+    </>
+  );
+}
+
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
@@ -481,6 +911,9 @@ export default function SettingsPage() {
             <ChevronRight size={16} className="text-muted group-hover:text-body transition-colors" />
           </button>
         </SettingSection>
+
+        {/* API & Webhook */}
+        <APITokenSection />
 
         {/* Push Notifications */}
         <SettingSection

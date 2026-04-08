@@ -12,7 +12,7 @@ from app.core.database import init_db, close_db, AsyncSessionLocal
 from app.models import (  # noqa: F401
     user, budget, deadline, scadenza, habit, mood,
 )
-from app.models import health, notification  # noqa: F401
+from app.models import health, notification, api_token  # noqa: F401
 from app.core.redis import init_redis, close_redis
 from app.api.v1.router import router as api_v1_router
 
