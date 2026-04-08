@@ -298,14 +298,14 @@ export default function DeadlinesPage() {
                     <div>
                       <label className="text-[11px] text-muted mb-1.5 block uppercase tracking-widest">Tipo</label>
                       <select value={form.tipo} onChange={e => setForm(f => ({...f, tipo: e.target.value as Tipo}))}
-                        className="w-full bg-input border border-border-hover rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-border-hover transition-colors text-heading >
+                        className="w-full bg-input border border-border-hover rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-border-hover transition-colors text-heading">
                         {['Uscita','Entrata','Abbonamento','Rata','Ricorrente'].map(t => <option key={t}>{t}</option>)}
                       </select>
                     </div>
                     <div>
                       <label className="text-[11px] text-muted mb-1.5 block uppercase tracking-widest">Mese</label>
                       <select value={form.mese} onChange={e => setForm(f => ({...f, mese: e.target.value}))}
-                        className="w-full bg-input border border-border-hover rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-border-hover transition-colors text-heading >
+                        className="w-full bg-input border border-border-hover rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-border-hover transition-colors text-heading">
                         {MESI.map(m => <option key={m}>{m}</option>)}
                       </select>
                     </div>
