@@ -486,7 +486,7 @@ function ExerciseRow({
                 >
                   Set {setIdx + 1}
                 </span>
-                <span className={`text-sm ${set.completed ? 'text-tertiary line-through' : 'text-heading }`}>
+                <span className={`text-sm ${set.completed ? 'text-tertiary line-through' : 'text-heading'}`}>
                   {set.reps} rep
                 </span>
                 {set.note && (
