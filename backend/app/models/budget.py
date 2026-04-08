@@ -74,8 +74,9 @@ class BankConnection(Base):
 
     # Connection status
     status = Column(
-        SQLEnum(BankConnectionStatus),
-        default=BankConnectionStatus.PENDING,
+        String(20),
+        default="pending",
+        server_default="pending",
         nullable=False,
     )
     last_sync_at = Column(DateTime, nullable=True)
