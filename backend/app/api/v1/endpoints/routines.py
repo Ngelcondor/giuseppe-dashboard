@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 from datetime import datetime
 from typing import List
 
@@ -45,7 +46,7 @@ async def create_routine(
         db.add(routine_step)
 
     await db.commit()
-    await db.refresh(new_routine)
+    await db.refresh(new_routine, attribute_names=["steps"])
     return RoutineResponse.from_orm(new_routine)
 
 
@@ -57,6 +58,7 @@ async def list_routines(
     """List all routines."""
     result = await db.execute(
         select(Routine)
+        .options(selectinload(Routine.steps))
         .where(Routine.user_id == current_user["sub"])
         .order_by(Routine.order)
     )
@@ -72,7 +74,9 @@ async def get_routine(
 ) -> RoutineResponse:
     """Get a specific routine."""
     result = await db.execute(
-        select(Routine).where(
+        select(Routine)
+        .options(selectinload(Routine.steps))
+        .where(
             (Routine.id == routine_id)
             & (Routine.user_id == current_user["sub"])
         )
@@ -92,7 +96,9 @@ async def update_routine(
 ) -> RoutineResponse:
     """Update a routine."""
     result = await db.execute(
-        select(Routine).where(
+        select(Routine)
+        .options(selectinload(Routine.steps))
+        .where(
             (Routine.id == routine_id)
             & (Routine.user_id == current_user["sub"])
         )
@@ -108,7 +114,7 @@ async def update_routine(
 
     db.add(routine)
     await db.commit()
-    await db.refresh(routine)
+    await db.refresh(routine, attribute_names=["steps"])
     return RoutineResponse.from_orm(routine)
 
 
@@ -165,7 +171,9 @@ async def get_today_routines(
 ) -> RoutineTodayResponse:
     """Get routines for today."""
     result = await db.execute(
-        select(Routine).where(
+        select(Routine)
+        .options(selectinload(Routine.steps))
+        .where(
             (Routine.user_id == current_user["sub"])
             & (Routine.is_active == True)
         )
