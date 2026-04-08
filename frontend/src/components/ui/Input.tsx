@@ -26,7 +26,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-body mb-2"
+            className="block text-sm font-medium text-slate-300 mb-2"
           >
             {label}
           </label>
@@ -36,8 +36,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           id={inputId}
           className={cn(
             'w-full px-4 py-2 rounded-md',
-            'bg-input border border-border-default',
-            'text-heading placeholder-slate-400',
+            'bg-slate-700 border border-slate-600',
+            'text-slate-100 placeholder-slate-500',
             'focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
             'transition-colors duration-200',
             'disabled:opacity-50 disabled:cursor-not-allowed',
@@ -51,7 +51,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           <p className="mt-1 text-sm text-red-400">{error}</p>
         )}
         {helperText && !error && (
-          <p className="mt-1 text-sm text-muted">{helperText}</p>
+          <p className="mt-1 text-sm text-slate-400">{helperText}</p>
         )}
       </div>
     );
@@ -85,7 +85,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         {label && (
           <label
             htmlFor={textareaId}
-            className="block text-sm font-medium text-body mb-2"
+            className="block text-sm font-medium text-slate-300 mb-2"
           >
             {label}
           </label>
@@ -95,8 +95,8 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           id={textareaId}
           className={cn(
             'w-full px-4 py-2 rounded-md min-h-[100px]',
-            'bg-input border border-border-default',
-            'text-heading placeholder-slate-400',
+            'bg-slate-700 border border-slate-600',
+            'text-slate-100 placeholder-slate-500',
             'focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
             'transition-colors duration-200 resize-none',
             'disabled:opacity-50 disabled:cursor-not-allowed',
@@ -110,7 +110,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           <p className="mt-1 text-sm text-red-400">{error}</p>
         )}
         {helperText && !error && (
-          <p className="mt-1 text-sm text-muted">{helperText}</p>
+          <p className="mt-1 text-sm text-slate-400">{helperText}</p>
         )}
       </div>
     );
@@ -146,7 +146,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         {label && (
           <label
             htmlFor={selectId}
-            className="block text-sm font-medium text-body mb-2"
+            className="block text-sm font-medium text-slate-300 mb-2"
           >
             {label}
           </label>
@@ -156,8 +156,8 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
           id={selectId}
           className={cn(
             'w-full px-4 py-2 rounded-md',
-            'bg-input border border-border-default',
-            'text-heading',
+            'bg-slate-700 border border-slate-600',
+            'text-slate-100',
             'focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20',
             'transition-colors duration-200',
             'disabled:opacity-50 disabled:cursor-not-allowed',
@@ -177,7 +177,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
           <p className="mt-1 text-sm text-red-400">{error}</p>
         )}
         {helperText && !error && (
-          <p className="mt-1 text-sm text-muted">{helperText}</p>
+          <p className="mt-1 text-sm text-slate-400">{helperText}</p>
         )}
       </div>
     );

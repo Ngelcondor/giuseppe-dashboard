@@ -58,7 +58,7 @@ function ScalePicker({
 }) {
   return (
     <div>
-      <p className="text-[11px] text-muted uppercase tracking-widest mb-2.5">{label}</p>
+      <p className="text-[11px] text-slate-600 uppercase tracking-widest mb-2.5">{label}</p>
       <div className="flex gap-2">
         {emojis.map((e, i) => {
           const v = i + 1;
@@ -74,7 +74,7 @@ function ScalePicker({
               }}
             >
               <span className={`text-xl leading-none transition-all ${active ? 'scale-110' : 'opacity-35 scale-90'}`}>{e}</span>
-              <span className={`text-[10px] tabular-nums transition-colors ${active ? 'text-body' : 'text-muted'}`}>{v}</span>
+              <span className={`text-[10px] tabular-nums transition-colors ${active ? 'text-slate-300' : 'text-slate-700'}`}>{v}</span>
             </button>
           );
         })}
@@ -116,7 +116,7 @@ function LineChart({ data }: { data: HistoryPoint[] }) {
         {series.map(s => (
           <div key={s.key} className="flex items-center gap-1.5">
             <div className="w-4 h-0.5 rounded-full" style={{ backgroundColor: s.color }} />
-            <span className="text-[11px] text-tertiary">{s.label}</span>
+            <span className="text-[11px] text-slate-500">{s.label}</span>
           </div>
         ))}
       </div>
@@ -183,17 +183,17 @@ function LogRow({ log, onDelete }: { log: MoodLog; onDelete: (id: string) => voi
         {log.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {log.tags.map(t => (
-              <span key={t} className="px-2 py-0.5 rounded-full text-[10px] bg-card-inner border border-white/[0.06] text-tertiary">{t}</span>
+              <span key={t} className="px-2 py-0.5 rounded-full text-[10px] bg-white/[0.04] border border-white/[0.06] text-slate-500">{t}</span>
             ))}
           </div>
         )}
         {log.notes && (
-          <p className="text-xs text-tertiary italic truncate">"{log.notes}"</p>
+          <p className="text-xs text-slate-500 italic truncate">"{log.notes}"</p>
         )}
       </div>
       <div className="flex items-center gap-2 shrink-0 mt-0.5">
-        <span className="text-[11px] text-muted">{time}</span>
-        <button onClick={() => onDelete(log.id)} className="text-muted hover:text-red-500 transition-colors">
+        <span className="text-[11px] text-slate-700">{time}</span>
+        <button onClick={() => onDelete(log.id)} className="text-slate-700 hover:text-red-500 transition-colors">
           <X size={13} />
         </button>
       </div>
@@ -280,23 +280,23 @@ export default function MoodPage() {
   const hasHistory = history.some(p => p.mood > 0);
 
   return (
-    <div className="min-h-screen bg-page text-heading">
+    <div className="min-h-screen bg-[#0f1117] text-slate-100">
 
       {/* Header */}
-      <header className="px-6 py-5 border-b border-border-default flex items-center justify-between sticky top-0 bg-page/90 backdrop-blur-sm z-10">
+      <header className="px-6 py-5 border-b border-white/5 flex items-center justify-between sticky top-0 bg-[#0f1117]/90 backdrop-blur-sm z-10">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="text-tertiary hover:text-body transition-colors">
+          <Link href="/dashboard" className="text-slate-500 hover:text-slate-300 transition-colors">
             <ArrowLeft size={18} />
           </Link>
           <h1 className="text-base font-semibold">Umore</h1>
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={load} className="p-2 text-muted hover:text-body rounded-lg hover:bg-card transition-colors">
+          <button onClick={load} className="p-2 text-slate-600 hover:text-slate-400 rounded-lg hover:bg-white/5 transition-colors">
             <RefreshCw size={14} />
           </button>
           <button
             onClick={() => setShowForm(v => !v)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-card hover:bg-surface-hover transition-colors text-body"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-slate-300"
           >
             <Plus size={14} />
             {showForm ? 'Annulla' : 'Nuovo log'}
@@ -308,14 +308,14 @@ export default function MoodPage() {
 
         {loading && (
           <div className="flex justify-center py-16">
-            <div className="w-5 h-5 border-2 border-border-default border-t-slate-400 rounded-full animate-spin" />
+            <div className="w-5 h-5 border-2 border-slate-700 border-t-slate-400 rounded-full animate-spin" />
           </div>
         )}
 
         {/* Today summary */}
         {!loading && todayLogs.length > 0 && !showForm && (
-          <div className="p-5 rounded-2xl bg-card border border-border-default">
-            <p className="text-[11px] text-muted uppercase tracking-widest mb-4">Oggi · media</p>
+          <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/5">
+            <p className="text-[11px] text-slate-600 uppercase tracking-widest mb-4">Oggi · media</p>
             <div className="grid grid-cols-4 gap-3 text-center">
               {[
                 { label: 'Umore',    val: avgMood,     emoji: MOOD_EMOJIS[Math.round((avgMood??3)-1)],         color: MOOD_COLOR },
@@ -328,20 +328,20 @@ export default function MoodPage() {
                   <p className="text-lg font-semibold mt-1.5 tabular-nums" style={{ color: s.color }}>
                     {s.val?.toFixed(1) ?? '—'}
                   </p>
-                  <p className="text-[10px] text-muted mt-0.5">{s.label}</p>
+                  <p className="text-[10px] text-slate-600 mt-0.5">{s.label}</p>
                 </div>
               ))}
             </div>
             {todayLogs.length > 1 && (
-              <p className="text-[11px] text-muted mt-3 text-right">{todayLogs.length} log oggi</p>
+              <p className="text-[11px] text-slate-700 mt-3 text-right">{todayLogs.length} log oggi</p>
             )}
           </div>
         )}
 
         {/* Form */}
         {showForm && (
-          <div className="rounded-2xl bg-card border border-border-default p-5 space-y-5">
-            <p className="text-[11px] text-tertiary uppercase tracking-widest">Come stai adesso?</p>
+          <div className="rounded-2xl bg-white/[0.03] border border-white/5 p-5 space-y-5">
+            <p className="text-[11px] text-slate-500 uppercase tracking-widest">Come stai adesso?</p>
 
             <ScalePicker label="Umore"    value={mood}     onChange={setMood}     emojis={MOOD_EMOJIS}    color={MOOD_COLOR} />
             <ScalePicker label="Energia"  value={energy}   onChange={setEnergy}   emojis={ENERGY_EMOJIS}  color={ENERGY_COLOR} />
@@ -349,7 +349,7 @@ export default function MoodPage() {
             <ScalePicker label="Stimming" value={stimming} onChange={setStimming} emojis={STIMMING_EMOJIS} color={STIMMING_COLOR} />
 
             <div>
-              <p className="text-[11px] text-muted uppercase tracking-widest mb-2.5">Fattori</p>
+              <p className="text-[11px] text-slate-600 uppercase tracking-widest mb-2.5">Fattori</p>
               <div className="flex flex-wrap gap-1.5">
                 {AVAILABLE_TAGS.map(t => {
                   const active = selTags.includes(t);
@@ -372,20 +372,20 @@ export default function MoodPage() {
             </div>
 
             <div>
-              <p className="text-[11px] text-muted uppercase tracking-widest mb-2">Note</p>
+              <p className="text-[11px] text-slate-600 uppercase tracking-widest mb-2">Note</p>
               <textarea
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 placeholder="Cosa è successo oggi? (opzionale)"
                 rows={2}
-                className="w-full bg-transparent border border-border-hover rounded-xl px-4 py-2.5 text-sm placeholder-muted text-body focus:outline-none focus:border-white/20 transition-colors resize-none"
+                className="w-full bg-transparent border border-white/10 rounded-xl px-4 py-2.5 text-sm placeholder-slate-700 text-slate-300 focus:outline-none focus:border-white/20 transition-colors resize-none"
               />
             </div>
 
             <button
               onClick={submit}
               disabled={saving}
-              className="w-full py-2.5 rounded-xl bg-card hover:bg-surface-hover border border-border-hover text-heading text-sm font-medium transition-colors disabled:opacity-40"
+              className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 text-sm font-medium transition-colors disabled:opacity-40"
             >
               {saving ? 'Salvataggio…' : 'Salva'}
             </button>
@@ -394,18 +394,18 @@ export default function MoodPage() {
 
         {/* History chart */}
         {!loading && hasHistory && (
-          <div className="rounded-2xl bg-card border border-border-default overflow-hidden">
+          <div className="rounded-2xl bg-white/[0.03] border border-white/5 overflow-hidden">
             <button
               onClick={() => setShowHistory(v => !v)}
               className="w-full flex items-center justify-between px-5 py-4"
             >
-              <p className="text-[11px] text-tertiary uppercase tracking-widest">Ultimi 14 giorni</p>
+              <p className="text-[11px] text-slate-500 uppercase tracking-widest">Ultimi 14 giorni</p>
               {showHistory
-                ? <ChevronUp size={14} className="text-muted" />
-                : <ChevronDown size={14} className="text-muted" />}
+                ? <ChevronUp size={14} className="text-slate-600" />
+                : <ChevronDown size={14} className="text-slate-600" />}
             </button>
             {showHistory && (
-              <div className="px-5 pb-5 border-t border-border-default pt-4">
+              <div className="px-5 pb-5 border-t border-white/5 pt-4">
                 <LineChart data={history} />
               </div>
             )}
@@ -414,9 +414,9 @@ export default function MoodPage() {
 
         {/* Log list */}
         {!loading && logs.length > 0 && (
-          <div className="rounded-2xl bg-card border border-border-default overflow-hidden">
-            <div className="px-5 py-4 border-b border-border-default">
-              <p className="text-[11px] text-tertiary uppercase tracking-widest">Log recenti</p>
+          <div className="rounded-2xl bg-white/[0.03] border border-white/5 overflow-hidden">
+            <div className="px-5 py-4 border-b border-white/5">
+              <p className="text-[11px] text-slate-500 uppercase tracking-widest">Log recenti</p>
             </div>
             <div className="divide-y divide-white/5">
               {logs.slice(0, 20).map(l => (
@@ -429,7 +429,7 @@ export default function MoodPage() {
         {/* Empty */}
         {!loading && logs.length === 0 && !showForm && (
           <div className="text-center py-12">
-            <p className="text-tertiary text-sm mb-3">Nessun log registrato.</p>
+            <p className="text-slate-500 text-sm mb-3">Nessun log registrato.</p>
           </div>
         )}
 

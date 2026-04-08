@@ -284,131 +284,23 @@ input[type='checkbox'], input[type='radio'] {
   @apply rounded cursor-pointer;
 }
 
-/* ─── Low Stimulation Mode — ASD / ADHD friendly ─────────────────────────── */
-/*
- * Design principles:
- *  1. ZERO motion — all animations, transitions, transforms disabled
- *  2. Muted, warm palette — no saturated accent colors
- *  3. Uniform visual weight — no glows, gradients, or shadows
- *  4. Reduced border contrast — softer edges
- *  5. Consistent spacing — no visual surprises
- *  6. No blinking cursors, no backdrop-blur (can cause visual fatigue)
- */
+/* ─── Low Stim Overrides ──────────────────────────────────────────────────── */
 
-/* Kill every animation and transition globally */
-.low-stim,
-.low-stim *,
-.low-stim *::before,
-.low-stim *::after {
+.low-stim [class*='animate-'] {
+  @apply !animate-none;
+}
+
+.low-stim {
   animation: none !important;
-  animation-delay: 0s !important;
-  animation-duration: 0s !important;
-  transition: none !important;
-  transition-delay: 0s !important;
-  transition-duration: 0s !important;
-  scroll-behavior: auto !important;
 }
 
-/* Remove backdrop blur (can shimmer / cause visual fatigue) */
-.low-stim [class*='backdrop-blur'] {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-
-/* Remove all box shadows and glows */
-.low-stim [class*='shadow'],
-.low-stim [class*='ring'] {
-  box-shadow: none !important;
-}
-
-/* Desaturate accent colors into warm neutral tones */
-.low-stim .text-blue-400,
-.low-stim .text-indigo-400,
-.low-stim .text-purple-400,
-.low-stim .text-cyan-400 {
-  color: rgb(var(--color-tertiary)) !important;
-}
-
-.low-stim .text-red-400,
-.low-stim .text-rose-400,
-.low-stim .text-pink-400 {
-  color: rgb(var(--color-tertiary)) !important;
-}
-
-.low-stim .text-green-400,
-.low-stim .text-emerald-400,
-.low-stim .text-yellow-400,
-.low-stim .text-amber-400,
-.low-stim .text-orange-400 {
-  color: rgb(var(--color-tertiary)) !important;
-}
-
-/* Mute colored backgrounds (badges, indicators) */
-.low-stim [class*='bg-blue-'],
-.low-stim [class*='bg-indigo-'],
-.low-stim [class*='bg-purple-'],
-.low-stim [class*='bg-violet-'],
-.low-stim [class*='bg-emerald-'],
-.low-stim [class*='bg-green-'],
-.low-stim [class*='bg-amber-'],
-.low-stim [class*='bg-orange-'] {
-  opacity: 0.6;
-}
-
-/* Tone down red danger elements but keep them recognizable */
-.low-stim [class*='bg-red-'] {
-  opacity: 0.5;
-}
-
-/* Remove hover scale/transform effects */
-.low-stim [class*='hover:scale'],
-.low-stim [class*='hover:-translate'],
-.low-stim [class*='hover:translate'] {
-  transform: none !important;
-}
-
-/* Soften notification badges */
-.low-stim .bg-red-500 {
-  background-color: rgb(var(--color-muted)) !important;
-}
-
-/* Reduce emoji visual weight */
-.low-stim span:has(> .lucide),
-.low-stim .text-3xl {
-  filter: grayscale(0.4);
-}
-
-/* Keep the loading spinner functional but slow and subtle */
 .low-stim .spinner {
-  animation: spin-slow 2s linear infinite !important;
+  @apply !animate-none;
+  animation: spin 1s linear infinite;
 }
 
-@keyframes spin-slow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* Remove blinking cursor in low-stim mode */
-.low-stim input,
-.low-stim textarea {
-  caret-color: rgb(var(--color-body));
-}
-
-/* Simplify focus outlines — solid, no ring spread */
-.low-stim :focus-visible {
-  outline: 2px solid rgb(var(--accent-color)) !important;
-  outline-offset: 2px !important;
-  box-shadow: none !important;
-}
-
-/* Make scrollbars thinner and less visible */
-.low-stim ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
-
-.low-stim ::-webkit-scrollbar-thumb {
-  background: rgb(var(--color-muted));
+.low-stim [class*='pulse'] {
+  @apply !animate-none opacity-100;
 }
 
 /* ─── Loading Spinner ─────────────────────────────────────────────────────── */

@@ -110,11 +110,11 @@ export default function AuthPage() {
 
   if (twoFA.enabled) {
     return (
-      <div className="min-h-screen bg-page flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <h1 className="text-2xl font-bold text-heading">Verifica a due fattori</h1>
-            <p className="text-sm text-tertiary mt-2">Inserisci il codice dalla tua app authenticator</p>
+            <h1 className="text-2xl font-bold text-slate-100">Verifica a due fattori</h1>
+            <p className="text-sm text-slate-400 mt-2">Inserisci il codice dalla tua app authenticator</p>
           </CardHeader>
           <form onSubmit={handleTwoFASubmit}>
             <CardBody className="space-y-4">
@@ -156,11 +156,11 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-page flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <h1 className="text-2xl font-bold text-heading">Bentornato</h1>
-          <p className="text-sm text-tertiary mt-2">Accedi al tuo dashboard</p>
+          <h1 className="text-2xl font-bold text-slate-100">Bentornato</h1>
+          <p className="text-sm text-slate-400 mt-2">Accedi al tuo dashboard</p>
         </CardHeader>
 
         <form onSubmit={handleSubmit}>

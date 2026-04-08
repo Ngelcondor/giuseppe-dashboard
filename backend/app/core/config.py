@@ -80,6 +80,20 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = "giuseppe.diansr@hotmail.it"
     ADMIN_PASSWORD: str = ""  # plain password, read at startup to seed DB
 
+    # Open Banking — Provider-agnostic (configure one of the two)
+    # Option 1: Enable Banking (recommended — free for personal use)
+    # Register at https://enablebanking.com/
+    ENABLE_BANKING_APP_ID: str = ""
+    ENABLE_BANKING_APP_SECRET: str = ""
+    ENABLE_BANKING_REDIRECT_URL: str = "http://localhost:3000/dashboard/budget?bank=callback"
+
+    # Option 2: GoCardless Bank Account Data (legacy — not accepting new signups)
+    GOCARDLESS_SECRET_ID: str = ""
+    GOCARDLESS_SECRET_KEY: str = ""
+    GOCARDLESS_BASE_URL: str = "https://bankaccountdata.gocardless.com/api/v2"
+    GOCARDLESS_REDIRECT_URL: str = "http://localhost:3000/dashboard/budget?bank=callback"
+    GOCARDLESS_INSTITUTION_ID: str = "REVOLUT_REVOGB21"
+
     # Feature Flags
     ENABLE_NOTIFICATIONS: bool = True
     ENABLE_FEED: bool = True

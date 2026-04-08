@@ -30,8 +30,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variants = {
       primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
-      secondary: 'bg-input text-heading hover:bg-card-solid focus:ring-slate-500',
-      ghost: 'text-body hover:bg-card-inner focus:ring-slate-500',
+      secondary: 'bg-slate-700 text-slate-100 hover:bg-slate-600 focus:ring-slate-500',
+      ghost: 'text-slate-300 hover:bg-slate-800 focus:ring-slate-500',
       danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
       success: 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500',
     };
