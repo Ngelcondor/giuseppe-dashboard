@@ -42,8 +42,8 @@ export const NextTaskWidget: React.FC<NextTaskWidgetProps> = ({
     return (
       <CompactWidget title="Prossimo compito">
         <div className="space-y-3">
-          <div className="h-4 bg-slate-700 rounded animate-pulse" />
-          <div className="h-12 bg-slate-700 rounded animate-pulse" />
+          <div className="h-4 bg-input rounded animate-pulse" />
+          <div className="h-12 bg-input rounded animate-pulse" />
         </div>
       </CompactWidget>
     );
@@ -54,7 +54,7 @@ export const NextTaskWidget: React.FC<NextTaskWidgetProps> = ({
       <CompactWidget title="Prossimo compito">
         <div className="flex flex-col items-center justify-center py-8 text-center">
           <Check size={32} className="text-green-500 mb-2" />
-          <p className="text-slate-300 text-sm">Tutti i compiti completati!</p>
+          <p className="text-body text-sm">Tutti i compiti completati!</p>
         </div>
       </CompactWidget>
     );
@@ -76,7 +76,7 @@ export const NextTaskWidget: React.FC<NextTaskWidgetProps> = ({
       >
         <div className="text-left">
           <div className="flex items-start justify-between mb-2">
-            <h4 className="text-lg font-bold text-slate-100 flex-1">
+            <h4 className="text-lg font-bold text-heading flex-1">
               {task.title}
             </h4>
             {task.priority === 'critical' && (
@@ -84,7 +84,7 @@ export const NextTaskWidget: React.FC<NextTaskWidgetProps> = ({
             )}
           </div>
           {task.description && (
-            <p className="text-sm text-slate-300 mb-3">
+            <p className="text-sm text-body mb-3">
               {task.description}
             </p>
           )}
@@ -96,7 +96,7 @@ export const NextTaskWidget: React.FC<NextTaskWidgetProps> = ({
               Priorità: {priorityLabels[task.priority]}
             </span>
             {task.dueDate && (
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-body">
                 Scadenza: {new Date(task.dueDate).toLocaleDateString('it-IT')}
               </span>
             )}

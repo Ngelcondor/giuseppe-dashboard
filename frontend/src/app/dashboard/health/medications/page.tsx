@@ -91,7 +91,7 @@ function MedCard({
           ? 'bg-emerald-900/15 border-emerald-700/30'
           : skipped
           ? 'bg-amber-900/15 border-amber-700/30 opacity-60'
-          : 'bg-white/[0.02] border-white/5 hover:border-white/10'
+          : 'bg-card border-border-default hover:border-border-hover'
       }`}
     >
       {/* Status icon */}
@@ -226,7 +226,7 @@ function PRNCard({
         </button>
         <button
           onClick={onShowHistory}
-          className="p-1.5 rounded-lg bg-white/5 text-slate-400 hover:bg-white/10 transition-colors"
+          className="p-1.5 rounded-lg bg-card text-body hover:bg-surface-hover transition-colors"
           title="Storico"
         >
           <History size={16} />
@@ -450,7 +450,7 @@ function HistoryModal({
           <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : logs.length === 0 ? (
-        <p className="text-sm text-slate-500 text-center py-8">Nessun log registrato.</p>
+        <p className="text-sm text-tertiary text-center py-8">Nessun log registrato.</p>
       ) : (
         <div className="space-y-2 max-h-80 overflow-y-auto">
           {logs.map((log) => (
@@ -751,7 +751,7 @@ export default function MedicationsPage() {
               <Heart size={16} className="text-emerald-400" />
               <h3 className="text-sm font-semibold text-emerald-300">Sync con Apple Health</h3>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-body">
               Configura <strong>Health Auto Export</strong> per inviare automaticamente i dati farmaci alla dashboard.
               L'app sincronizza le assunzioni registrate in Apple Salute.
             </p>
@@ -908,7 +908,7 @@ export default function MedicationsPage() {
                   .sort(([a], [b]) => timeSortKey(a) - timeSortKey(b))
                   .map(([time, meds]) => (
                     <div key={time}>
-                      <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-1">
+                      <h3 className="text-xs font-semibold text-body uppercase tracking-wider mb-3 px-1">
                         {timeLabel(time)}
                       </h3>
                       <div className="space-y-2">
@@ -964,7 +964,7 @@ export default function MedicationsPage() {
             {allMeds.map((med) => (
               <div
                 key={med.id}
-                className="flex items-center gap-4 px-4 py-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-all group"
+                className="flex items-center gap-4 px-4 py-3 rounded-xl bg-card border border-border-default hover:border-border-hover transition-all group"
               >
                 <div
                   className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
@@ -973,8 +973,8 @@ export default function MedicationsPage() {
                   {med.icon || '💊'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-200">{med.name}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-sm font-medium text-heading">{med.name}</p>
+                  <p className="text-xs text-tertiary mt-0.5">
                     {med.dosage} · {med.is_prn ? 'Al bisogno' : `${med.scheduled_time || med.time_of_day}`}
                     {!med.is_active && <span className="ml-2 text-red-400">(inattivo)</span>}
                   </p>
@@ -982,13 +982,13 @@ export default function MedicationsPage() {
                 <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={() => handleShowHistory(med)}
-                    className="p-1.5 rounded-lg bg-white/5 text-slate-400 hover:bg-white/10 transition-colors"
+                    className="p-1.5 rounded-lg bg-card text-body hover:bg-surface-hover transition-colors"
                   >
                     <History size={16} />
                   </button>
                   <button
                     onClick={() => setEditMed(med)}
-                    className="p-1.5 rounded-lg bg-white/5 text-slate-400 hover:bg-white/10 transition-colors"
+                    className="p-1.5 rounded-lg bg-card text-body hover:bg-surface-hover transition-colors"
                   >
                     <Edit3 size={16} />
                   </button>

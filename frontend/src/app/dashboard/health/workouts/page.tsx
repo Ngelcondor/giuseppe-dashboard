@@ -449,15 +449,15 @@ function ExerciseRow({
             <div
               key={i}
               className={`w-2 h-2 rounded-full transition-colors ${
-                s.completed ? 'bg-emerald-400' : 'bg-slate-700'
+                s.completed ? 'bg-emerald-400' : 'bg-input'
               }`}
             />
           ))}
         </div>
         {expanded ? (
-          <ChevronUp size={16} className="text-slate-500" />
+          <ChevronUp size={16} className="text-tertiary" />
         ) : (
-          <ChevronDown size={16} className="text-slate-500" />
+          <ChevronDown size={16} className="text-tertiary" />
         )}
       </button>
 
@@ -472,7 +472,7 @@ function ExerciseRow({
                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all flex-shrink-0 ${
                   set.completed
                     ? 'bg-emerald-600/30 border border-emerald-500/40'
-                    : 'bg-white/[0.03] border border-white/10 hover:border-white/20'
+                    : 'bg-card border border-border-hover hover:border-border-hover'
                 }`}
               >
                 {set.completed && <Check size={14} className="text-emerald-400" />}
@@ -486,7 +486,7 @@ function ExerciseRow({
                 >
                   Set {setIdx + 1}
                 </span>
-                <span className={`text-sm ${set.completed ? 'text-slate-500 line-through' : 'text-heading }`}>
+                <span className={`text-sm ${set.completed ? 'text-tertiary line-through' : 'text-heading }`}>
                   {set.reps} rep
                 </span>
                 {set.note && (
@@ -550,7 +550,7 @@ function HistoryPanel({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" onClick={onClose} />
+      <div className="fixed inset-0 bg-card-inner backdrop-blur-sm z-40" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
           className="bg-card-solid border border-border-default rounded-xl max-h-[85vh] overflow-y-auto w-full max-w-lg"
@@ -799,7 +799,7 @@ export default function WorkoutsPage() {
         <h1 className="text-base font-semibold flex-1">Scheda Allenamento</h1>
         <button
           onClick={() => setShowHistory(true)}
-          className="p-2 rounded-lg bg-white/[0.04] text-slate-400 hover:text-slate-200 transition-colors"
+          className="p-2 rounded-lg bg-card text-body hover:text-heading transition-colors"
           title="Storico"
         >
           <History size={18} />
@@ -814,19 +814,19 @@ export default function WorkoutsPage() {
               <Trophy size={16} className="text-amber-400" />
               <span className="text-xs font-semibold text-heading >Questa settimana</span>
             </div>
-            <span className="text-xs text-slate-500">Split: Upper / Lower / Upper</span>
+            <span className="text-xs text-tertiary">Split: Upper / Lower / Upper</span>
           </div>
           <div className="flex gap-2">
             {[1, 2, 3].map((n) => (
               <div
                 key={n}
                 className={`flex-1 h-2.5 rounded-full transition-colors ${
-                  n <= sessionsThisWeek ? 'bg-emerald-500' : 'bg-slate-700/50'
+                  n <= sessionsThisWeek ? 'bg-emerald-500' : 'bg-input/50'
                 }`}
               />
             ))}
           </div>
-          <p className="text-[11px] text-slate-500 mt-2">
+          <p className="text-[11px] text-tertiary mt-2">
             {sessionsThisWeek}/3 sessioni completate
             {sessionsThisWeek >= 3 && ' — Settimana completata! 🎉'}
           </p>
@@ -843,8 +843,8 @@ export default function WorkoutsPage() {
                 idx === activeDay
                   ? 'border-2'
                   : sessionActive
-                  ? 'bg-white/[0.01] border border-white/5 opacity-40 cursor-not-allowed'
-                  : 'bg-white/[0.02] border border-white/5 hover:border-white/10'
+                  ? 'bg-card border border-border-default opacity-40 cursor-not-allowed'
+                  : 'bg-card border border-border-default hover:border-border-hover'
               }`}
               style={
                 idx === activeDay
@@ -858,9 +858,9 @@ export default function WorkoutsPage() {
               >
                 {day.name}
               </p>
-              <p className="text-xs text-slate-400 mt-0.5">{day.label}</p>
+              <p className="text-xs text-body mt-0.5">{day.label}</p>
               {day.id === 2 && (
-                <p className="text-[9px] text-slate-600 mt-0.5">Focus glutei</p>
+                <p className="text-[9px] text-muted mt-0.5">Focus glutei</p>
               )}
             </button>
           ))}
@@ -881,7 +881,7 @@ export default function WorkoutsPage() {
             {/* Progress bar */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] text-slate-500">Progresso sessione</span>
+                <span className="text-[10px] text-tertiary">Progresso sessione</span>
                 <span
                   className="text-xs font-bold"
                   style={{ color: currentDay.color }}
@@ -915,7 +915,7 @@ export default function WorkoutsPage() {
 
         {/* Exercises */}
         <div className="space-y-3">
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider px-1">
+          <h3 className="text-xs font-semibold text-body uppercase tracking-wider px-1">
             Esercizi — {currentDay.label}
           </h3>
           {exercises.map((ex, i) => (
@@ -935,7 +935,7 @@ export default function WorkoutsPage() {
           <div className="flex gap-3 pt-2">
             <button
               onClick={discardSession}
-              className="flex-1 py-3 rounded-xl bg-white/[0.03] border border-white/5 text-slate-500 text-sm hover:text-body transition-colors"
+              className="flex-1 py-3 rounded-xl bg-card border border-border-default text-body text-sm hover:text-heading transition-colors"
             >
               Annulla sessione
             </button>
@@ -950,7 +950,7 @@ export default function WorkoutsPage() {
         )}
 
         {/* Rules / Info */}
-        <div className="rounded-2xl bg-white/[0.015] border border-white/5 overflow-hidden">
+        <div className="rounded-2xl bg-card border border-border-default overflow-hidden">
           <button
             onClick={() => setShowRules(!showRules)}
             className="w-full flex items-center gap-3 px-5 py-4"
@@ -960,14 +960,14 @@ export default function WorkoutsPage() {
               Regolamento & Consigli
             </span>
             {showRules ? (
-              <ChevronUp size={16} className="text-slate-500" />
+              <ChevronUp size={16} className="text-tertiary" />
             ) : (
-              <ChevronDown size={16} className="text-slate-500" />
+              <ChevronDown size={16} className="text-tertiary" />
             )}
           </button>
 
           {showRules && (
-            <div className="px-5 pb-5 space-y-4 text-xs text-slate-400 leading-relaxed">
+            <div className="px-5 pb-5 space-y-4 text-xs text-body leading-relaxed">
               <div>
                 <p className="text-heading font-semibold mb-1">Recuperi</p>
                 <p>
@@ -996,7 +996,7 @@ export default function WorkoutsPage() {
                   <span className="text-violet-400">Flexibility</span> — migliorare flessibilità e
                   postura.
                 </p>
-                <p className="text-slate-500 mt-1">
+                <p className="text-tertiary mt-1">
                   Video &quot;Mobility&quot; (30 min stretching) disponibile in app nei giorni liberi.
                 </p>
               </div>
@@ -1005,7 +1005,7 @@ export default function WorkoutsPage() {
         </div>
 
         {/* Program info footer */}
-        <div className="text-center text-[10px] text-slate-600 pb-6 space-y-0.5">
+        <div className="text-center text-[10px] text-muted pb-6 space-y-0.5">
           <p>Scheda: Upper / Lower / Upper — 4 settimane</p>
           <p>Obiettivo: reclutamento fibre, adattamento muscolare, gesto motorio</p>
         </div>

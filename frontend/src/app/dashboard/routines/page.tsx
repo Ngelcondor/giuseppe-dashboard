@@ -111,17 +111,17 @@ function StepTimer({ durationMinutes, onComplete }: { durationMinutes: number; o
       </div>
       <div className="flex gap-1">
         {!isRunning && !isFinished && (
-          <button onClick={start} className="p-1 rounded-md hover:bg-white/[0.06] text-body hover:text-heading transition-colors">
+          <button onClick={start} className="p-1 rounded-md hover:bg-surface-hover text-body hover:text-heading transition-colors">
             <Play size={14} />
           </button>
         )}
         {isRunning && (
-          <button onClick={pause} className="p-1 rounded-md hover:bg-white/[0.06] text-body hover:text-heading transition-colors">
+          <button onClick={pause} className="p-1 rounded-md hover:bg-surface-hover text-body hover:text-heading transition-colors">
             <Pause size={14} />
           </button>
         )}
         {(isRunning || secondsLeft < durationMinutes * 60) && !isFinished && (
-          <button onClick={() => reset()} className="p-1 rounded-md hover:bg-white/[0.06] text-body hover:text-heading transition-colors">
+          <button onClick={() => reset()} className="p-1 rounded-md hover:bg-surface-hover text-body hover:text-heading transition-colors">
             <RotateCcw size={14} />
           </button>
         )}
@@ -149,7 +149,7 @@ function StepFormInline({
   onRemove: (i: number) => void;
 }) {
   return (
-    <div className="flex items-start gap-3 p-3 rounded-xl bg-card border border-white/[0.04]">
+    <div className="flex items-start gap-3 p-3 rounded-xl bg-card border border-border-default">
       <div className="pt-2 text-muted cursor-grab">
         <GripVertical size={14} />
       </div>
@@ -159,7 +159,7 @@ function StepFormInline({
           <select
             value={step.icon || '🎯'}
             onChange={e => onChange(index, { ...step, icon: e.target.value })}
-            className="w-12 h-9 bg-card-inner border border-white/[0.06] rounded-lg text-center text-base cursor-pointer"
+            className="w-12 h-9 bg-card-inner border border-border-default rounded-lg text-center text-base cursor-pointer"
           >
             {EMOJI_OPTIONS.map(e => (
               <option key={e} value={e}>{e}</option>
@@ -169,7 +169,7 @@ function StepFormInline({
             value={step.title}
             onChange={e => onChange(index, { ...step, title: e.target.value })}
             placeholder={`Step ${index + 1}`}
-            className="flex-1 px-3 py-1.5 text-sm bg-card-inner border border-white/[0.06] rounded-lg text-heading placeholder-slate-600 focus:border-white/20 focus:outline-none transition-colors"
+            className="flex-1 px-3 py-1.5 text-sm bg-card-inner border border-border-default rounded-lg text-heading placeholder-muted focus:border-border-hover focus:outline-none transition-colors"
           />
           <input
             type="number"
@@ -178,7 +178,7 @@ function StepFormInline({
             value={step.duration_minutes ?? ''}
             onChange={e => onChange(index, { ...step, duration_minutes: e.target.value ? parseInt(e.target.value) : undefined })}
             placeholder="min"
-            className="w-16 px-2 py-1.5 text-sm text-center bg-card-inner border border-white/[0.06] rounded-lg text-heading placeholder-slate-600 focus:border-white/20 focus:outline-none transition-colors"
+            className="w-16 px-2 py-1.5 text-sm text-center bg-card-inner border border-border-default rounded-lg text-heading placeholder-muted focus:border-border-hover focus:outline-none transition-colors"
           />
         </div>
         <div className="flex items-center gap-3">
@@ -187,7 +187,7 @@ function StepFormInline({
               type="checkbox"
               checked={step.is_optional ?? false}
               onChange={e => onChange(index, { ...step, is_optional: e.target.checked })}
-              className="w-3 h-3 rounded border-border-default bg-slate-700 text-blue-600"
+              className="w-3 h-3 rounded border-border-default bg-input text-blue-600"
             />
             Opzionale
           </label>
@@ -308,10 +308,10 @@ function RoutineCard({
           </div>
 
           <div className="flex items-center gap-1.5">
-            <button onClick={() => onEdit(routine)} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-muted hover:text-body transition-colors">
+            <button onClick={() => onEdit(routine)} className="p-1.5 rounded-lg hover:bg-surface-hover text-muted hover:text-body transition-colors">
               <Edit3 size={14} />
             </button>
-            <button onClick={() => onDelete(routine)} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-muted hover:text-red-400 transition-colors">
+            <button onClick={() => onDelete(routine)} className="p-1.5 rounded-lg hover:bg-surface-hover text-muted hover:text-red-400 transition-colors">
               <Trash2 size={14} />
             </button>
           </div>
@@ -367,7 +367,7 @@ function RoutineCard({
 
       {/* Steps */}
       {expanded && isStarted && (
-        <div className="border-t border-white/[0.04] px-5 py-4 space-y-1">
+        <div className="border-t border-border-default px-5 py-4 space-y-1">
           {sortedSteps.map((step) => {
             const done = completedSteps.has(step.id);
             return (
@@ -557,8 +557,8 @@ function RoutineFormModal({
                   onClick={() => setTimeOfDay(opt.value as TimeOfDay)}
                   className={`p-2.5 rounded-xl border text-center text-xs font-medium transition-all duration-200 ${
                     selected
-                      ? 'border-white/20 bg-white/[0.06]'
-                      : 'border-white/[0.04] bg-card hover:bg-card-inner text-tertiary'
+                      ? 'border-border-hover bg-surface-hover'
+                      : 'border-border-default bg-card hover:bg-card-inner text-tertiary'
                   }`}
                   style={selected ? { color: c.color } : {}}
                 >
@@ -589,7 +589,7 @@ function RoutineFormModal({
           </div>
           <button
             onClick={addStep}
-            className="mt-3 w-full py-2.5 rounded-xl border border-dashed border-border-hover text-xs text-tertiary hover:text-body hover:border-white/20 transition-all duration-200 flex items-center justify-center gap-1.5"
+            className="mt-3 w-full py-2.5 rounded-xl border border-dashed border-border-hover text-xs text-tertiary hover:text-body hover:border-border-hover transition-all duration-200 flex items-center justify-center gap-1.5"
           >
             <Plus size={13} /> Aggiungi step
           </button>
@@ -641,7 +641,7 @@ function AllRoutinesList({
                   className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-200 ${
                     r.is_active
                       ? 'bg-card border-border-default'
-                      : 'bg-white/[0.01] border-white/[0.03] opacity-50'
+                      : 'bg-card border-border-default opacity-50'
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -664,10 +664,10 @@ function AllRoutinesList({
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => onEdit(r)} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-muted hover:text-body transition-colors">
+                    <button onClick={() => onEdit(r)} className="p-1.5 rounded-lg hover:bg-surface-hover text-muted hover:text-body transition-colors">
                       <Edit3 size={14} />
                     </button>
-                    <button onClick={() => onDelete(r)} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-muted hover:text-red-400 transition-colors">
+                    <button onClick={() => onDelete(r)} className="p-1.5 rounded-lg hover:bg-surface-hover text-muted hover:text-red-400 transition-colors">
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -885,7 +885,7 @@ export default function RoutinesPage() {
         </div>
         <button
           onClick={() => { setEditingRoutine(null); setShowForm(true); }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] border border-white/[0.08] text-xs font-medium text-body hover:bg-surface-hover transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-hover border border-border-default text-xs font-medium text-body hover:bg-surface-hover transition-colors"
         >
           <Plus size={14} /> Nuova
         </button>
@@ -900,7 +900,7 @@ export default function RoutinesPage() {
               onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
                 activeTab === tab.key
-                  ? 'bg-white/[0.07] text-heading'
+                  ? 'bg-surface-hover text-heading'
                   : 'text-tertiary hover:text-body'
               }`}
             >
@@ -967,7 +967,7 @@ export default function RoutinesPage() {
                       {config.label}
                     </span>
                     {isCurrent && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.06] text-body ml-1">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-hover text-body ml-1">
                         ora
                       </span>
                     )}
