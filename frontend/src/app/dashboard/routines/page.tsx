@@ -105,23 +105,23 @@ function StepTimer({ durationMinutes, onComplete }: { durationMinutes: number; o
             className="transition-all duration-1000"
           />
         </svg>
-        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-mono font-semibold text-slate-300">
+        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-mono font-semibold text-body">
           {formatTime(secondsLeft)}
         </span>
       </div>
       <div className="flex gap-1">
         {!isRunning && !isFinished && (
-          <button onClick={start} className="p-1 rounded-md hover:bg-white/[0.06] text-slate-400 hover:text-slate-200 transition-colors">
+          <button onClick={start} className="p-1 rounded-md hover:bg-white/[0.06] text-body hover:text-heading transition-colors">
             <Play size={14} />
           </button>
         )}
         {isRunning && (
-          <button onClick={pause} className="p-1 rounded-md hover:bg-white/[0.06] text-slate-400 hover:text-slate-200 transition-colors">
+          <button onClick={pause} className="p-1 rounded-md hover:bg-white/[0.06] text-body hover:text-heading transition-colors">
             <Pause size={14} />
           </button>
         )}
         {(isRunning || secondsLeft < durationMinutes * 60) && !isFinished && (
-          <button onClick={() => reset()} className="p-1 rounded-md hover:bg-white/[0.06] text-slate-400 hover:text-slate-200 transition-colors">
+          <button onClick={() => reset()} className="p-1 rounded-md hover:bg-white/[0.06] text-body hover:text-heading transition-colors">
             <RotateCcw size={14} />
           </button>
         )}
@@ -149,8 +149,8 @@ function StepFormInline({
   onRemove: (i: number) => void;
 }) {
   return (
-    <div className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
-      <div className="pt-2 text-slate-600 cursor-grab">
+    <div className="flex items-start gap-3 p-3 rounded-xl bg-card border border-white/[0.04]">
+      <div className="pt-2 text-muted cursor-grab">
         <GripVertical size={14} />
       </div>
       <div className="flex-1 space-y-2">
@@ -159,7 +159,7 @@ function StepFormInline({
           <select
             value={step.icon || '🎯'}
             onChange={e => onChange(index, { ...step, icon: e.target.value })}
-            className="w-12 h-9 bg-white/[0.04] border border-white/[0.06] rounded-lg text-center text-base cursor-pointer"
+            className="w-12 h-9 bg-card-inner border border-white/[0.06] rounded-lg text-center text-base cursor-pointer"
           >
             {EMOJI_OPTIONS.map(e => (
               <option key={e} value={e}>{e}</option>
@@ -169,7 +169,7 @@ function StepFormInline({
             value={step.title}
             onChange={e => onChange(index, { ...step, title: e.target.value })}
             placeholder={`Step ${index + 1}`}
-            className="flex-1 px-3 py-1.5 text-sm bg-white/[0.04] border border-white/[0.06] rounded-lg text-slate-200 placeholder-slate-600 focus:border-white/20 focus:outline-none transition-colors"
+            className="flex-1 px-3 py-1.5 text-sm bg-card-inner border border-white/[0.06] rounded-lg text-heading placeholder-slate-600 focus:border-white/20 focus:outline-none transition-colors"
           />
           <input
             type="number"
@@ -178,22 +178,22 @@ function StepFormInline({
             value={step.duration_minutes ?? ''}
             onChange={e => onChange(index, { ...step, duration_minutes: e.target.value ? parseInt(e.target.value) : undefined })}
             placeholder="min"
-            className="w-16 px-2 py-1.5 text-sm text-center bg-white/[0.04] border border-white/[0.06] rounded-lg text-slate-200 placeholder-slate-600 focus:border-white/20 focus:outline-none transition-colors"
+            className="w-16 px-2 py-1.5 text-sm text-center bg-card-inner border border-white/[0.06] rounded-lg text-heading placeholder-slate-600 focus:border-white/20 focus:outline-none transition-colors"
           />
         </div>
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-1.5 text-[11px] text-slate-500 cursor-pointer">
+          <label className="flex items-center gap-1.5 text-[11px] text-tertiary cursor-pointer">
             <input
               type="checkbox"
               checked={step.is_optional ?? false}
               onChange={e => onChange(index, { ...step, is_optional: e.target.checked })}
-              className="w-3 h-3 rounded border-slate-600 bg-slate-700 text-blue-600"
+              className="w-3 h-3 rounded border-border-default bg-slate-700 text-blue-600"
             />
             Opzionale
           </label>
         </div>
       </div>
-      <button onClick={() => onRemove(index)} className="pt-2 text-slate-600 hover:text-red-400 transition-colors">
+      <button onClick={() => onRemove(index)} className="pt-2 text-muted hover:text-red-400 transition-colors">
         <X size={14} />
       </button>
     </div>
@@ -278,7 +278,7 @@ function RoutineCard({
   }
 
   return (
-    <div className={`rounded-2xl bg-white/[0.03] border border-white/5 overflow-hidden transition-all duration-200 ${expanded ? 'ring-1 ring-white/[0.08]' : ''}`}>
+    <div className={`rounded-2xl bg-card border border-border-default overflow-hidden transition-all duration-200 ${expanded ? 'ring-1 ring-white/[0.08]' : ''}`}>
       {/* Header */}
       <div className="p-5">
         <div className="flex items-start justify-between">
@@ -290,15 +290,15 @@ function RoutineCard({
               <config.icon size={18} style={{ color: config.color }} />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-slate-200">{routine.name}</h3>
+              <h3 className="text-sm font-semibold text-heading">{routine.name}</h3>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[11px] text-slate-600">{config.label}</span>
-                <span className="text-[11px] text-slate-700">·</span>
-                <span className="text-[11px] text-slate-600">{sortedSteps.length} step</span>
+                <span className="text-[11px] text-muted">{config.label}</span>
+                <span className="text-[11px] text-muted">·</span>
+                <span className="text-[11px] text-muted">{sortedSteps.length} step</span>
                 {totalDuration(sortedSteps) > 0 && (
                   <>
-                    <span className="text-[11px] text-slate-700">·</span>
-                    <span className="text-[11px] text-slate-600 flex items-center gap-0.5">
+                    <span className="text-[11px] text-muted">·</span>
+                    <span className="text-[11px] text-muted flex items-center gap-0.5">
                       <Clock size={10} /> {totalDuration(sortedSteps)} min
                     </span>
                   </>
@@ -308,10 +308,10 @@ function RoutineCard({
           </div>
 
           <div className="flex items-center gap-1.5">
-            <button onClick={() => onEdit(routine)} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-slate-600 hover:text-slate-300 transition-colors">
+            <button onClick={() => onEdit(routine)} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-muted hover:text-body transition-colors">
               <Edit3 size={14} />
             </button>
-            <button onClick={() => onDelete(routine)} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-slate-600 hover:text-red-400 transition-colors">
+            <button onClick={() => onDelete(routine)} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-muted hover:text-red-400 transition-colors">
               <Trash2 size={14} />
             </button>
           </div>
@@ -321,12 +321,12 @@ function RoutineCard({
         {isStarted && (
           <div className="mt-4">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[11px] text-slate-500">Progresso</span>
+              <span className="text-[11px] text-tertiary">Progresso</span>
               <span className="text-[11px] font-medium" style={{ color: allDone ? '#4ade80' : config.color }}>
                 {completionPct}%
               </span>
             </div>
-            <div className="w-full h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
+            <div className="w-full h-1.5 rounded-full bg-card-inner overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-500"
                 style={{ width: `${completionPct}%`, backgroundColor: allDone ? '#4ade80' : config.color }}
@@ -356,7 +356,7 @@ function RoutineCard({
           ) : (
             <button
               onClick={() => setExpanded(!expanded)}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.04] text-slate-400 text-xs font-medium transition-colors hover:bg-white/[0.07]"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-card-inner text-body text-xs font-medium transition-colors hover:bg-card-inner"
             >
               {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
               {expanded ? 'Nascondi step' : 'Mostra step'}
@@ -373,7 +373,7 @@ function RoutineCard({
             return (
               <div
                 key={step.id}
-                className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-200 ${done ? 'bg-emerald-500/[0.04]' : 'hover:bg-white/[0.03]'}`}
+                className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-200 ${done ? 'bg-emerald-500/[0.04]' : 'hover:bg-card'}`}
               >
                 <button
                   onClick={() => handleToggleStep(step.id)}
@@ -382,22 +382,22 @@ function RoutineCard({
                   {done ? (
                     <CheckCircle2 size={18} className="text-emerald-400" />
                   ) : (
-                    <Circle size={18} className="text-slate-600 hover:text-slate-400" />
+                    <Circle size={18} className="text-muted hover:text-body" />
                   )}
                 </button>
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     {step.icon && <span className="text-sm">{step.icon}</span>}
-                    <span className={`text-sm ${done ? 'text-slate-500 line-through' : 'text-slate-200'}`}>
+                    <span className={`text-sm ${done ? 'text-tertiary line-through' : 'text-heading'}`}>
                       {step.title}
                     </span>
                     {step.is_optional && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/[0.04] text-slate-600">opz.</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-card-inner text-muted">opz.</span>
                     )}
                   </div>
                   {step.description && (
-                    <p className="text-[11px] text-slate-600 mt-0.5">{step.description}</p>
+                    <p className="text-[11px] text-muted mt-0.5">{step.description}</p>
                   )}
                 </div>
 
@@ -409,7 +409,7 @@ function RoutineCard({
                   />
                 )}
                 {step.duration_minutes && step.duration_minutes > 0 && done && (
-                  <span className="text-[11px] text-slate-600 flex items-center gap-1">
+                  <span className="text-[11px] text-muted flex items-center gap-1">
                     <Timer size={10} /> {step.duration_minutes}m
                   </span>
                 )}
@@ -439,8 +439,8 @@ function StatsPanel({ routines }: { routines: RoutineResponse[] }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       {stats.map(s => (
-        <div key={s.label} className="p-4 rounded-2xl bg-white/[0.03] border border-white/5">
-          <p className="text-[11px] text-slate-600 mb-1">{s.label}</p>
+        <div key={s.label} className="p-4 rounded-2xl bg-card border border-border-default">
+          <p className="text-[11px] text-muted mb-1">{s.label}</p>
           <p className="text-xl font-bold" style={{ color: s.color }}>{s.value}</p>
         </div>
       ))}
@@ -546,7 +546,7 @@ function RoutineFormModal({
 
         {/* Fascia oraria */}
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">Fascia oraria</label>
+          <label className="block text-sm font-medium text-body mb-2">Fascia oraria</label>
           <div className="grid grid-cols-4 gap-2">
             {TIME_OPTIONS.map(opt => {
               const c = TIME_OF_DAY_CONFIG[opt.value as TimeOfDay];
@@ -558,7 +558,7 @@ function RoutineFormModal({
                   className={`p-2.5 rounded-xl border text-center text-xs font-medium transition-all duration-200 ${
                     selected
                       ? 'border-white/20 bg-white/[0.06]'
-                      : 'border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.04] text-slate-500'
+                      : 'border-white/[0.04] bg-card hover:bg-card-inner text-tertiary'
                   }`}
                   style={selected ? { color: c.color } : {}}
                 >
@@ -573,8 +573,8 @@ function RoutineFormModal({
         {/* Steps */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <label className="text-sm font-medium text-slate-300">Step</label>
-            <span className="text-[11px] text-slate-600">{steps.length} step</span>
+            <label className="text-sm font-medium text-body">Step</label>
+            <span className="text-[11px] text-muted">{steps.length} step</span>
           </div>
           <div className="space-y-2">
             {steps.map((step, i) => (
@@ -589,7 +589,7 @@ function RoutineFormModal({
           </div>
           <button
             onClick={addStep}
-            className="mt-3 w-full py-2.5 rounded-xl border border-dashed border-white/10 text-xs text-slate-500 hover:text-slate-300 hover:border-white/20 transition-all duration-200 flex items-center justify-center gap-1.5"
+            className="mt-3 w-full py-2.5 rounded-xl border border-dashed border-border-hover text-xs text-tertiary hover:text-body hover:border-white/20 transition-all duration-200 flex items-center justify-center gap-1.5"
           >
             <Plus size={13} /> Aggiungi step
           </button>
@@ -640,7 +640,7 @@ function AllRoutinesList({
                   key={r.id}
                   className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-200 ${
                     r.is_active
-                      ? 'bg-white/[0.03] border-white/5'
+                      ? 'bg-card border-border-default'
                       : 'bg-white/[0.01] border-white/[0.03] opacity-50'
                   }`}
                 >
@@ -652,22 +652,22 @@ function AllRoutinesList({
                       {r.is_active ? (
                         <CheckCircle2 size={18} style={{ color: config.color }} />
                       ) : (
-                        <Circle size={18} className="text-slate-700" />
+                        <Circle size={18} className="text-muted" />
                       )}
                     </button>
                     <div>
-                      <p className="text-sm font-medium text-slate-200">{r.name}</p>
-                      <p className="text-[11px] text-slate-600 mt-0.5">
+                      <p className="text-sm font-medium text-heading">{r.name}</p>
+                      <p className="text-[11px] text-muted mt-0.5">
                         {r.steps.length} step · {totalDuration(r.steps)}m
                         {!r.is_active && ' · disattivata'}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => onEdit(r)} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-slate-600 hover:text-slate-300 transition-colors">
+                    <button onClick={() => onEdit(r)} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-muted hover:text-body transition-colors">
                       <Edit3 size={14} />
                     </button>
-                    <button onClick={() => onDelete(r)} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-slate-600 hover:text-red-400 transition-colors">
+                    <button onClick={() => onDelete(r)} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-muted hover:text-red-400 transition-colors">
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -874,18 +874,18 @@ export default function RoutinesPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0f1117] text-slate-100">
+    <div className="min-h-screen bg-page text-heading">
       {/* Header */}
-      <header className="px-6 py-5 border-b border-white/5 flex items-center justify-between sticky top-0 bg-[#0f1117]/90 backdrop-blur-sm z-20">
+      <header className="px-6 py-5 border-b border-border-default flex items-center justify-between sticky top-0 bg-page/90 backdrop-blur-sm z-20">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="text-slate-500 hover:text-slate-300 transition-colors">
+          <Link href="/dashboard" className="text-tertiary hover:text-body transition-colors">
             <ArrowLeft size={18} />
           </Link>
           <h1 className="text-base font-semibold">Routine</h1>
         </div>
         <button
           onClick={() => { setEditingRoutine(null); setShowForm(true); }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] border border-white/[0.08] text-xs font-medium text-slate-300 hover:bg-white/[0.10] transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] border border-white/[0.08] text-xs font-medium text-body hover:bg-surface-hover transition-colors"
         >
           <Plus size={14} /> Nuova
         </button>
@@ -893,15 +893,15 @@ export default function RoutinesPage() {
 
       <main className="max-w-3xl mx-auto px-6 py-8">
         {/* Tabs */}
-        <div className="flex items-center gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/5 mb-8 w-fit">
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-card border border-border-default mb-8 w-fit">
           {tabs.map(tab => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
                 activeTab === tab.key
-                  ? 'bg-white/[0.07] text-slate-100'
-                  : 'text-slate-500 hover:text-slate-300'
+                  ? 'bg-white/[0.07] text-heading'
+                  : 'text-tertiary hover:text-body'
               }`}
             >
               <tab.icon size={13} />
@@ -928,19 +928,19 @@ export default function RoutinesPage() {
         {/* Loading */}
         {loading && (
           <div className="text-center py-16">
-            <div className="w-6 h-6 border-2 border-white/10 border-t-white/40 rounded-full animate-spin mx-auto" />
-            <p className="text-xs text-slate-600 mt-3">Caricamento routine...</p>
+            <div className="w-6 h-6 border-2 border-border-hover border-t-white/40 rounded-full animate-spin mx-auto" />
+            <p className="text-xs text-muted mt-3">Caricamento routine...</p>
           </div>
         )}
 
         {/* Empty state */}
         {!loading && routines.length === 0 && (
           <div className="text-center py-16">
-            <div className="w-14 h-14 rounded-2xl bg-white/[0.04] border border-white/5 flex items-center justify-center mx-auto mb-5">
-              <Clock size={24} className="text-slate-500" />
+            <div className="w-14 h-14 rounded-2xl bg-card-inner border border-border-default flex items-center justify-center mx-auto mb-5">
+              <Clock size={24} className="text-tertiary" />
             </div>
-            <p className="text-sm font-medium text-slate-300 mb-1">Nessuna routine</p>
-            <p className="text-xs text-slate-600 mb-5">Crea la tua prima routine per organizzare la giornata.</p>
+            <p className="text-sm font-medium text-body mb-1">Nessuna routine</p>
+            <p className="text-xs text-muted mb-5">Crea la tua prima routine per organizzare la giornata.</p>
             <button
               onClick={() => { setEditingRoutine(null); setShowForm(true); }}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors"
@@ -967,7 +967,7 @@ export default function RoutinesPage() {
                       {config.label}
                     </span>
                     {isCurrent && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.06] text-slate-400 ml-1">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/[0.06] text-body ml-1">
                         ora
                       </span>
                     )}
@@ -1004,8 +1004,8 @@ export default function RoutinesPage() {
             <StatsPanel routines={routines} />
 
             {/* Distribuzione per fascia */}
-            <div className="rounded-2xl bg-white/[0.03] border border-white/5 p-5">
-              <h3 className="text-xs font-medium text-slate-500 uppercase tracking-widest mb-4">
+            <div className="rounded-2xl bg-card border border-border-default p-5">
+              <h3 className="text-xs font-medium text-tertiary uppercase tracking-widest mb-4">
                 Distribuzione per fascia oraria
               </h3>
               <div className="space-y-3">
@@ -1016,14 +1016,14 @@ export default function RoutinesPage() {
                   return (
                     <div key={time} className="flex items-center gap-3">
                       <config.icon size={14} style={{ color: config.color }} />
-                      <span className="text-xs text-slate-400 w-24">{config.label}</span>
-                      <div className="flex-1 h-2 rounded-full bg-white/[0.04] overflow-hidden">
+                      <span className="text-xs text-body w-24">{config.label}</span>
+                      <div className="flex-1 h-2 rounded-full bg-card-inner overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all duration-500"
                           style={{ width: `${pct}%`, backgroundColor: config.color }}
                         />
                       </div>
-                      <span className="text-xs text-slate-500 w-6 text-right">{count}</span>
+                      <span className="text-xs text-tertiary w-6 text-right">{count}</span>
                     </div>
                   );
                 })}
@@ -1031,8 +1031,8 @@ export default function RoutinesPage() {
             </div>
 
             {/* Dettaglio step per routine */}
-            <div className="rounded-2xl bg-white/[0.03] border border-white/5 p-5">
-              <h3 className="text-xs font-medium text-slate-500 uppercase tracking-widest mb-4">
+            <div className="rounded-2xl bg-card border border-border-default p-5">
+              <h3 className="text-xs font-medium text-tertiary uppercase tracking-widest mb-4">
                 Dettaglio routine
               </h3>
               <div className="space-y-3">
@@ -1040,15 +1040,15 @@ export default function RoutinesPage() {
                   const config = TIME_OF_DAY_CONFIG[r.time_of_day];
                   const dur = totalDuration(r.steps);
                   return (
-                    <div key={r.id} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02]">
+                    <div key={r.id} className="flex items-center justify-between p-3 rounded-xl bg-card">
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: config.color }} />
-                        <span className="text-sm text-slate-300">{r.name}</span>
+                        <span className="text-sm text-body">{r.name}</span>
                       </div>
-                      <div className="flex items-center gap-4 text-[11px] text-slate-600">
+                      <div className="flex items-center gap-4 text-[11px] text-muted">
                         <span>{r.steps.length} step</span>
                         <span>{dur}m</span>
-                        <span className={r.is_active ? 'text-emerald-500' : 'text-slate-700'}>
+                        <span className={r.is_active ? 'text-emerald-500' : 'text-muted'}>
                           {r.is_active ? 'attiva' : 'off'}
                         </span>
                       </div>

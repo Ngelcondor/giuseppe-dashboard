@@ -133,19 +133,19 @@ export default function FocusPage() {
   const color = MODE_COLORS[mode];
 
   return (
-    <div className="min-h-screen bg-[#0f1117] text-slate-100">
+    <div className="min-h-screen bg-page text-heading">
 
       {/* Header */}
-      <header className="px-6 py-5 border-b border-white/5 flex items-center justify-between">
+      <header className="px-6 py-5 border-b border-border-default flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="text-slate-500 hover:text-slate-300 transition-colors">
+          <Link href="/dashboard" className="text-tertiary hover:text-body transition-colors">
             <ArrowLeft size={18} />
           </Link>
           <h1 className="text-base font-semibold">Focus</h1>
         </div>
         <button
           onClick={() => { setDraftConfig(config); setShowConfig(true); }}
-          className="text-slate-600 hover:text-slate-400 transition-colors"
+          className="text-muted hover:text-body transition-colors"
         >
           <Settings size={16} />
         </button>
@@ -155,13 +155,13 @@ export default function FocusPage() {
 
         {/* Mode selector */}
         <div className="flex justify-center mb-10">
-          <div className="flex gap-1 p-1 rounded-xl bg-white/[0.03] border border-white/5">
+          <div className="flex gap-1 p-1 rounded-xl bg-card border border-border-default">
             {(['work', 'short', 'long'] as Mode[]).map(m => (
               <button
                 key={m}
                 onClick={() => switchMode(m)}
                 className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                  mode === m ? 'bg-white/10 text-slate-200' : 'text-slate-500 hover:text-slate-300'
+                  mode === m ? 'bg-surface-hover text-heading' : 'text-tertiary hover:text-body'
                 }`}
               >
                 {m === 'work' ? 'Focus' : m === 'short' ? 'Pausa' : 'Lunga'}
@@ -188,7 +188,7 @@ export default function FocusPage() {
               <span className="text-5xl font-mono font-semibold tracking-tight" style={{ color }}>
                 {mm}:{ss}
               </span>
-              <span className="text-xs text-slate-600 mt-2 uppercase tracking-widest">{MODE_LABELS[mode]}</span>
+              <span className="text-xs text-muted mt-2 uppercase tracking-widest">{MODE_LABELS[mode]}</span>
             </div>
           </div>
 
@@ -198,14 +198,14 @@ export default function FocusPage() {
             placeholder="Su cosa stai lavorando?"
             value={taskLabel}
             onChange={e => setTaskLabel(e.target.value)}
-            className="w-full text-center bg-transparent border-b border-white/5 text-slate-400 placeholder-slate-700 text-sm py-2 mb-8 focus:outline-none focus:border-white/15 transition-colors"
+            className="w-full text-center bg-transparent border-b border-border-default text-body placeholder-muted text-sm py-2 mb-8 focus:outline-none focus:border-white/15 transition-colors"
           />
 
           {/* Controls */}
           <div className="flex items-center gap-5">
             <button
               onClick={() => { setRunning(false); setSeconds(config[mode] * 60); }}
-              className="p-3 rounded-xl bg-white/[0.04] border border-white/5 text-slate-500 hover:text-slate-300 transition-all"
+              className="p-3 rounded-xl bg-card-inner border border-border-default text-tertiary hover:text-body transition-all"
             >
               <RotateCcw size={18} />
             </button>
@@ -221,7 +221,7 @@ export default function FocusPage() {
             </button>
             <button
               onClick={() => completeSession()}
-              className="p-3 rounded-xl bg-white/[0.04] border border-white/5 text-slate-500 hover:text-slate-300 transition-all"
+              className="p-3 rounded-xl bg-card-inner border border-border-default text-tertiary hover:text-body transition-all"
             >
               <SkipForward size={18} />
             </button>
@@ -235,28 +235,28 @@ export default function FocusPage() {
             { label: 'Minuti focus', value: String(todayMinutes) },
             { label: 'Al lungo', value: `${pomodoroCount % config.longAfter}/${config.longAfter}` },
           ].map(s => (
-            <div key={s.label} className="p-3 rounded-xl bg-white/[0.03] border border-white/5 text-center">
-              <p className="text-xl font-semibold text-slate-200">{s.value}</p>
-              <p className="text-[11px] text-slate-600 mt-0.5">{s.label}</p>
+            <div key={s.label} className="p-3 rounded-xl bg-card border border-border-default text-center">
+              <p className="text-xl font-semibold text-heading">{s.value}</p>
+              <p className="text-[11px] text-muted mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>
 
         {/* History */}
         {sessions.length > 0 && (
-          <div className="rounded-2xl bg-white/[0.03] border border-white/5 overflow-hidden">
-            <div className="px-5 py-4 border-b border-white/5">
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-widest">Sessioni recenti</p>
+          <div className="rounded-2xl bg-card border border-border-default overflow-hidden">
+            <div className="px-5 py-4 border-b border-border-default">
+              <p className="text-xs font-medium text-tertiary uppercase tracking-widest">Sessioni recenti</p>
             </div>
             <div className="divide-y divide-white/5 max-h-52 overflow-y-auto">
               {sessions.slice(0, 15).map(s => (
                 <div key={s.id} className="flex items-center justify-between px-5 py-3">
                   <div className="flex items-center gap-2.5">
                     <span className="text-sm">{s.type === 'work' ? '🍅' : s.type === 'short' ? '☕' : '🌙'}</span>
-                    <span className="text-xs text-slate-400">{MODE_LABELS[s.type]}</span>
-                    <span className="text-[11px] text-slate-700">{s.duration} min</span>
+                    <span className="text-xs text-body">{MODE_LABELS[s.type]}</span>
+                    <span className="text-[11px] text-muted">{s.duration} min</span>
                   </div>
-                  <span className="text-[11px] text-slate-600">
+                  <span className="text-[11px] text-muted">
                     {new Date(s.completedAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
@@ -269,10 +269,10 @@ export default function FocusPage() {
       {/* Config modal */}
       {showConfig && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-          <div className="bg-[#141720] rounded-2xl border border-white/10 p-6 w-full max-w-xs">
+          <div className="bg-input rounded-2xl border border-border-hover p-6 w-full max-w-xs">
             <div className="flex items-center justify-between mb-6">
               <p className="text-sm font-semibold">Configura timer</p>
-              <button onClick={() => setShowConfig(false)} className="text-slate-500 hover:text-slate-300">
+              <button onClick={() => setShowConfig(false)} className="text-tertiary hover:text-body">
                 <X size={18} />
               </button>
             </div>
@@ -284,23 +284,23 @@ export default function FocusPage() {
                 ['longAfter', 'Pausa lunga ogni N pomodori'],
               ] as [keyof Config, string][]).map(([key, label]) => (
                 <div key={key}>
-                  <label className="text-xs text-slate-500 mb-1.5 block">{label}</label>
+                  <label className="text-xs text-tertiary mb-1.5 block">{label}</label>
                   <input
                     type="number" min={1} max={60}
                     value={draftConfig[key]}
                     onChange={e => setDraftConfig(d => ({ ...d, [key]: Number(e.target.value) }))}
-                    className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-white/20 transition-colors"
+                    className="w-full bg-card-inner border border-border-hover rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-white/20 transition-colors"
                   />
                 </div>
               ))}
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={() => setShowConfig(false)}
-                className="flex-1 py-2 rounded-xl border border-white/10 text-slate-500 text-sm hover:bg-white/[0.04] transition-colors">
+                className="flex-1 py-2 rounded-xl border border-border-hover text-tertiary text-sm hover:bg-card-inner transition-colors">
                 Annulla
               </button>
               <button onClick={saveConfig}
-                className="flex-1 py-2 rounded-xl bg-white/10 text-slate-200 text-sm font-medium hover:bg-white/15 transition-colors">
+                className="flex-1 py-2 rounded-xl bg-surface-hover text-heading text-sm font-medium hover:bg-white/15 transition-colors">
                 Salva
               </button>
             </div>
