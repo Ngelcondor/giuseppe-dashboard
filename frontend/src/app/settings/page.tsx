@@ -47,7 +47,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-page flex flex-col">
+    <div className="min-h-screen bg-slate-900 flex flex-col">
       <Header onMenuToggle={() => setMenuOpen(!menuOpen)} isMenuOpen={menuOpen} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar isOpen={menuOpen} onClose={() => setMenuOpen(false)} />
@@ -56,14 +56,14 @@ export default function SettingsPage() {
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-4xl mx-auto p-6 space-y-6">
             <div>
-              <h1 className="text-3xl font-bold text-heading">Impostazioni</h1>
-              <p className="text-body mt-2">Gestisci il tuo profilo e le preferenze</p>
+              <h1 className="text-3xl font-bold text-slate-100">Impostazioni</h1>
+              <p className="text-slate-400 mt-2">Gestisci il tuo profilo e le preferenze</p>
             </div>
 
             {/* Profile Section */}
             <Card>
               <CardHeader>
-                <h2 className="text-xl font-semibold text-heading flex items-center gap-2">
+                <h2 className="text-xl font-semibold text-slate-100 flex items-center gap-2">
                   👤 Profilo
                 </h2>
               </CardHeader>
@@ -91,14 +91,14 @@ export default function SettingsPage() {
             {/* Security Section */}
             <Card>
               <CardHeader>
-                <h2 className="text-xl font-semibold text-heading flex items-center gap-2">
+                <h2 className="text-xl font-semibold text-slate-100 flex items-center gap-2">
                   <Lock size={20} /> Sicurezza
                 </h2>
               </CardHeader>
               <CardBody className="space-y-4">
                 {/* Password Change */}
                 <div>
-                  <h3 className="font-medium text-heading mb-2">Password</h3>
+                  <h3 className="font-medium text-slate-100 mb-2">Password</h3>
                   {!showPasswordChange ? (
                     <Button
                       variant="secondary"
@@ -108,7 +108,7 @@ export default function SettingsPage() {
                       Cambia password
                     </Button>
                   ) : (
-                    <div className="space-y-3 p-4 bg-card-inner rounded-lg">
+                    <div className="space-y-3 p-4 bg-slate-700/30 rounded-lg">
                       <Input
                         label="Password attuale"
                         type="password"
@@ -154,11 +154,11 @@ export default function SettingsPage() {
                 </div>
 
                 {/* 2FA */}
-                <div className="border-t border-border-default pt-4">
+                <div className="border-t border-slate-700 pt-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-medium text-heading">Autenticazione a due fattori</h3>
-                      <p className="text-sm text-body mt-1">
+                      <h3 className="font-medium text-slate-100">Autenticazione a due fattori</h3>
+                      <p className="text-sm text-slate-400 mt-1">
                         Proteggi il tuo account con 2FA
                       </p>
                     </div>
@@ -181,14 +181,14 @@ export default function SettingsPage() {
             {/* Appearance Section */}
             <Card>
               <CardHeader>
-                <h2 className="text-xl font-semibold text-heading flex items-center gap-2">
+                <h2 className="text-xl font-semibold text-slate-100 flex items-center gap-2">
                   <Palette size={20} /> Aspetto
                 </h2>
               </CardHeader>
               <CardBody className="space-y-4">
                 {/* Theme */}
                 <div>
-                  <label className="block text-sm font-medium text-body mb-3">
+                  <label className="block text-sm font-medium text-slate-300 mb-3">
                     Tema
                   </label>
                   <Select
@@ -203,13 +203,13 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Low Stim Mode */}
-                <div className="border-t border-border-default pt-4">
+                <div className="border-t border-slate-700 pt-4">
                   <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="font-medium text-heading">
+                      <h3 className="font-medium text-slate-100">
                         Modalità a bassa stimolazione
                       </h3>
-                      <p className="text-sm text-body mt-1">
+                      <p className="text-sm text-slate-400 mt-1">
                         Disabilita animazioni, colori morbidi, e interfaccia semplificata
                       </p>
                     </div>
@@ -225,7 +225,7 @@ export default function SettingsPage() {
             {/* Notifications Section */}
             <Card>
               <CardHeader>
-                <h2 className="text-xl font-semibold text-heading flex items-center gap-2">
+                <h2 className="text-xl font-semibold text-slate-100 flex items-center gap-2">
                   <Bell size={20} /> Notifiche
                 </h2>
               </CardHeader>
@@ -255,14 +255,14 @@ export default function SettingsPage() {
             {/* Data Section */}
             <Card>
               <CardHeader>
-                <h2 className="text-xl font-semibold text-heading flex items-center gap-2">
+                <h2 className="text-xl font-semibold text-slate-100 flex items-center gap-2">
                   💾 Dati
                 </h2>
               </CardHeader>
               <CardBody className="space-y-4">
                 <div>
-                  <h3 className="font-medium text-heading mb-2">Esporta dati</h3>
-                  <p className="text-sm text-body mb-3">
+                  <h3 className="font-medium text-slate-100 mb-2">Esporta dati</h3>
+                  <p className="text-sm text-slate-400 mb-3">
                     Scarica una copia di tutti i tuoi dati in formato JSON
                   </p>
                   <Button variant="secondary" size="sm">
@@ -272,9 +272,9 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Reset Layout */}
-                <div className="border-t border-border-default pt-4">
-                  <h3 className="font-medium text-heading mb-2">Layout dashboard</h3>
-                  <p className="text-sm text-body mb-3">
+                <div className="border-t border-slate-700 pt-4">
+                  <h3 className="font-medium text-slate-100 mb-2">Layout dashboard</h3>
+                  <p className="text-sm text-slate-400 mb-3">
                     Ripristina il layout predefinito della dashboard
                   </p>
                   <Button
@@ -297,7 +297,7 @@ export default function SettingsPage() {
                 </h2>
               </CardHeader>
               <CardBody className="space-y-4">
-                <p className="text-sm text-body">
+                <p className="text-sm text-slate-400">
                   Queste azioni sono irreversibili. Procedere con cautela.
                 </p>
                 <Button variant="danger" size="sm">
@@ -317,19 +317,19 @@ export default function SettingsPage() {
         size="sm"
       >
         <div className="space-y-4">
-          <p className="text-body">
+          <p className="text-slate-300">
             Scansiona il codice QR con un'app di autenticazione come Google Authenticator,
             Authy o Microsoft Authenticator.
           </p>
-          <div className="bg-input p-4 rounded-lg flex items-center justify-center h-40">
-            <p className="text-body">Codice QR placeholder</p>
+          <div className="bg-slate-700 p-4 rounded-lg flex items-center justify-center h-40">
+            <p className="text-slate-400">Codice QR placeholder</p>
           </div>
           <Input
             label="Codice di backup"
             value="1234-5678-9012-3456"
             disabled
           />
-          <p className="text-xs text-body">
+          <p className="text-xs text-slate-400">
             Salva questo codice in un luogo sicuro. Potrai usarlo per accedere se perdi
             l'accesso al tuo dispositivo di autenticazione.
           </p>

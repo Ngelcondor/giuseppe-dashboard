@@ -103,8 +103,8 @@ function QualityRing({ score, size = 96 }: { score: number; size?: number }) {
           className="transition-all duration-1000 ease-out" />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-bold text-heading">{score}</span>
-        <span className="text-[10px] text-tertiary -mt-0.5">Qualità</span>
+        <span className="text-2xl font-bold text-slate-100">{score}</span>
+        <span className="text-[10px] text-slate-500 -mt-0.5">Qualità</span>
       </div>
     </div>
   );
@@ -236,9 +236,9 @@ function PhaseLegend({ phase, minutes, totalMinutes }: {
     <div className="flex items-center gap-2.5 min-w-[140px]">
       <div className="w-2 h-2 rounded-full shrink-0"
         style={{ backgroundColor: PHASE_COLORS[phase as keyof typeof PHASE_COLORS] }} />
-      <span className="text-xs text-body">{PHASE_LABELS[phase]}</span>
-      <span className="text-xs font-medium text-body ml-auto">{fmtDuration(minutes)}</span>
-      <span className="text-[10px] text-muted w-8 text-right">{pct}%</span>
+      <span className="text-xs text-slate-400">{PHASE_LABELS[phase]}</span>
+      <span className="text-xs font-medium text-slate-300 ml-auto">{fmtDuration(minutes)}</span>
+      <span className="text-[10px] text-slate-600 w-8 text-right">{pct}%</span>
     </div>
   );
 }
@@ -260,13 +260,13 @@ export function SleepWidget() {
   /* Loading state */
   if (loading) {
     return (
-      <div className="p-7 rounded-2xl bg-card border border-border-default">
+      <div className="p-7 rounded-2xl bg-white/[0.03] border border-white/5">
         <div className="flex items-center gap-3 mb-6">
           <Moon size={18} className="text-indigo-400" />
-          <span className="text-sm font-medium text-tertiary uppercase tracking-widest">Sonno</span>
+          <span className="text-sm font-medium text-slate-500 uppercase tracking-widest">Sonno</span>
         </div>
         <div className="flex justify-center py-8">
-          <div className="w-6 h-6 border-2 border-border-hover border-t-indigo-400/60 rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-white/10 border-t-indigo-400/60 rounded-full animate-spin" />
         </div>
       </div>
     );
@@ -275,13 +275,13 @@ export function SleepWidget() {
   /* No data / error */
   if (error || !report?.session) {
     return (
-      <div className="p-7 rounded-2xl bg-card border border-border-default">
+      <div className="p-7 rounded-2xl bg-white/[0.03] border border-white/5">
         <div className="flex items-center gap-3 mb-6">
           <Moon size={18} className="text-indigo-400" />
-          <span className="text-sm font-medium text-tertiary uppercase tracking-widest">Sonno</span>
+          <span className="text-sm font-medium text-slate-500 uppercase tracking-widest">Sonno</span>
         </div>
-        <p className="text-sm text-muted">Nessun dato sul sonno disponibile.</p>
-        <p className="text-xs text-muted mt-1.5">I dati verranno sincronizzati da Health Auto Export.</p>
+        <p className="text-sm text-slate-600">Nessun dato sul sonno disponibile.</p>
+        <p className="text-xs text-slate-700 mt-1.5">I dati verranno sincronizzati da Health Auto Export.</p>
       </div>
     );
   }
@@ -293,13 +293,13 @@ export function SleepWidget() {
   const inBed = s.time_in_bed_minutes ?? s.duration_minutes;
 
   return (
-    <div className="p-7 rounded-2xl bg-card border border-border-default hover:bg-surface-hover hover:border-border-hover transition-all duration-200">
+    <div className="p-7 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.055] hover:border-white/10 transition-all duration-200">
 
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <Moon size={18} className="text-indigo-400" />
         <span className="text-sm font-medium text-indigo-400/80 uppercase tracking-widest">Sonno</span>
-        <span className="text-xs text-muted ml-auto capitalize">{s.source.replace(/_/g, ' ')}</span>
+        <span className="text-xs text-slate-700 ml-auto capitalize">{s.source.replace(/_/g, ' ')}</span>
       </div>
 
       {/* Top section: Ring + Stats */}
@@ -307,16 +307,16 @@ export function SleepWidget() {
         <QualityRing score={s.quality_score ?? 0} size={110} />
         <div className="flex-1 space-y-3">
           <div>
-            <p className="text-2xl font-semibold text-heading leading-none">
+            <p className="text-2xl font-semibold text-slate-100 leading-none">
               {fmtDuration(inBed)}
             </p>
-            <p className="text-xs text-tertiary mt-1">A letto</p>
+            <p className="text-xs text-slate-500 mt-1">A letto</p>
           </div>
           <div>
-            <p className="text-xl font-semibold text-heading leading-none">
+            <p className="text-xl font-semibold text-slate-200 leading-none">
               {fmtDuration(s.duration_minutes)}
             </p>
-            <p className="text-xs text-tertiary mt-1">Addormentato</p>
+            <p className="text-xs text-slate-500 mt-1">Addormentato</p>
           </div>
           {s.sleep_efficiency != null && (
             <div className="flex items-center gap-1.5">
@@ -336,7 +336,7 @@ export function SleepWidget() {
       {s.phases && s.phases.length > 0 && (
         <div className="mb-4 -mx-1">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] text-tertiary font-medium">Fasi del sonno</span>
+            <span className="text-[11px] text-slate-500 font-medium">Fasi del sonno</span>
           </div>
           <Hypnogram phases={s.phases} sleepStart={sleepStart} sleepEnd={sleepEnd} />
         </div>
@@ -351,20 +351,20 @@ export function SleepWidget() {
       </div>
 
       {/* Separator */}
-      <div className="border-t border-border-default pt-5">
+      <div className="border-t border-white/[0.04] pt-5">
         {/* Bedtime / wake time */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <BedDouble size={15} className="text-indigo-400/60" />
             <div>
-              <p className="text-xs text-tertiary">Coricato</p>
-              <p className="text-base font-semibold text-heading">{fmt(sleepStart)}</p>
+              <p className="text-xs text-slate-500">Coricato</p>
+              <p className="text-base font-semibold text-slate-200">{fmt(sleepStart)}</p>
             </div>
           </div>
           <div className="flex items-center gap-2.5 text-right">
             <div>
-              <p className="text-xs text-tertiary">Svegliato</p>
-              <p className="text-base font-semibold text-heading">{fmt(sleepEnd)}</p>
+              <p className="text-xs text-slate-500">Svegliato</p>
+              <p className="text-base font-semibold text-slate-200">{fmt(sleepEnd)}</p>
             </div>
             <AlarmClock size={15} className="text-amber-400/60" />
           </div>
@@ -372,7 +372,7 @@ export function SleepWidget() {
 
         {/* Morning tip */}
         {report.tip && (
-          <p className="text-xs text-muted mt-4 italic leading-relaxed">
+          <p className="text-xs text-slate-600 mt-4 italic leading-relaxed">
             💡 {report.tip}
           </p>
         )}

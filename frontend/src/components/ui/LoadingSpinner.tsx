@@ -21,7 +21,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   const spinner = (
     <div
       className={cn(
-        'animate-spin rounded-full border-4 border-input border-t-blue-500',
+        'animate-spin rounded-full border-4 border-slate-700 border-t-blue-500',
         'prefers-reduced-motion:!animate-none',
         sizes[size],
         className
@@ -31,7 +31,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 
   if (fullScreen) {
     return (
-      <div className="fixed inset-0 bg-page/80 flex items-center justify-center z-50">
+      <div className="fixed inset-0 bg-slate-900/80 flex items-center justify-center z-50">
         {spinner}
       </div>
     );
@@ -55,7 +55,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({
         <div
           key={i}
           className={cn(
-            'bg-gradient-to-r from-input to-surface-hover rounded',
+            'bg-gradient-to-r from-slate-700 to-slate-600 rounded',
             'animate-pulse',
             'prefers-reduced-motion:!animate-none opacity-50',
             className

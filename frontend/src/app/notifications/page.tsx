@@ -27,7 +27,7 @@ function typeIcon(type: string) {
     case 'deadline': return <Calendar size={16} className="text-orange-400" />;
     case 'warning': return <AlertTriangle size={16} className="text-amber-400" />;
     case 'success': return <Check size={16} className="text-emerald-400" />;
-    default: return <Info size={16} className="text-body" />;
+    default: return <Info size={16} className="text-slate-400" />;
   }
 }
 
@@ -86,9 +86,9 @@ export default function NotificationsPage() {
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   return (
-    <div className="min-h-screen bg-page text-heading">
-      <header className="px-6 py-5 border-b border-border-default flex items-center gap-3">
-        <Link href="/dashboard" className="text-tertiary hover:text-body transition-colors">
+    <div className="min-h-screen bg-[#0f1117] text-slate-100">
+      <header className="px-6 py-5 border-b border-white/5 flex items-center gap-3">
+        <Link href="/dashboard" className="text-slate-500 hover:text-slate-300 transition-colors">
           <ArrowLeft size={18} />
         </Link>
         <Bell size={18} className="text-blue-400" />
@@ -113,13 +113,13 @@ export default function NotificationsPage() {
         )}
 
         {/* Filter */}
-        <div className="flex gap-1 p-1 bg-card rounded-xl border border-border-default">
+        <div className="flex gap-1 p-1 bg-white/[0.03] rounded-xl border border-white/5">
           {(['all', 'unread'] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${
-                filter === f ? 'bg-blue-600/30 text-blue-300' : 'text-tertiary hover:text-body'
+                filter === f ? 'bg-blue-600/30 text-blue-300' : 'text-slate-500 hover:text-slate-300'
               }`}
             >
               {f === 'all' ? 'Tutte' : `Non lette (${unreadCount})`}
@@ -133,8 +133,8 @@ export default function NotificationsPage() {
           </div>
         ) : notifications.length === 0 ? (
           <div className="text-center py-16">
-            <BellOff size={28} className="text-muted mx-auto mb-3" />
-            <p className="text-sm text-tertiary">
+            <BellOff size={28} className="text-slate-700 mx-auto mb-3" />
+            <p className="text-sm text-slate-500">
               {filter === 'unread' ? 'Nessuna notifica non letta' : 'Nessuna notifica'}
             </p>
           </div>
@@ -145,8 +145,8 @@ export default function NotificationsPage() {
                 key={notif.id}
                 className={`flex items-start gap-3 px-4 py-3 rounded-xl border transition-all ${
                   notif.is_read
-                    ? 'bg-card border-border-default opacity-60'
-                    : 'bg-card border-border-default'
+                    ? 'bg-white/[0.01] border-white/[0.03] opacity-60'
+                    : 'bg-white/[0.03] border-white/5'
                 }`}
               >
                 <div className="mt-0.5 flex-shrink-0">
@@ -158,19 +158,19 @@ export default function NotificationsPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-heading">{notif.title}</p>
+                    <p className="text-sm font-medium text-slate-200">{notif.title}</p>
                     {!notif.is_read && (
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
                     )}
                   </div>
-                  <p className="text-xs text-body mt-0.5">{notif.message}</p>
-                  <p className="text-[10px] text-muted mt-1">{timeAgo(notif.created_at)}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{notif.message}</p>
+                  <p className="text-[10px] text-slate-600 mt-1">{timeAgo(notif.created_at)}</p>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {!notif.is_read && (
                     <button
                       onClick={() => handleMarkRead(notif.id)}
-                      className="p-1 rounded-lg hover:bg-surface-hover text-tertiary hover:text-emerald-400 transition-colors"
+                      className="p-1 rounded-lg hover:bg-white/5 text-slate-500 hover:text-emerald-400 transition-colors"
                       title="Segna come letta"
                     >
                       <Check size={14} />
@@ -178,7 +178,7 @@ export default function NotificationsPage() {
                   )}
                   <button
                     onClick={() => handleDelete(notif.id)}
-                    className="p-1 rounded-lg hover:bg-red-600/10 text-muted hover:text-red-400 transition-colors"
+                    className="p-1 rounded-lg hover:bg-red-600/10 text-slate-600 hover:text-red-400 transition-colors"
                     title="Elimina"
                   >
                     <Trash2 size={14} />

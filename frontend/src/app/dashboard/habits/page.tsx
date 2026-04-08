@@ -65,7 +65,7 @@ function Heatmap({ habitId, color }: { habitId: string; color: string }) {
       .catch(() => setLoading(false));
   }, [habitId]);
 
-  if (loading) return <div className="h-12 rounded-lg bg-card-solid animate-pulse" />;
+  if (loading) return <div className="h-12 rounded-lg bg-slate-800 animate-pulse" />;
   if (!days.length) return null;
 
   const weeks: HeatmapDay[][] = [];
@@ -101,7 +101,7 @@ function Heatmap({ habitId, color }: { habitId: string; color: string }) {
           </div>
         ))}
       </div>
-      <p className="text-[11px] text-muted mt-2">{doneCount} completamenti negli ultimi 365 giorni</p>
+      <p className="text-[11px] text-slate-600 mt-2">{doneCount} completamenti negli ultimi 365 giorni</p>
     </div>
   );
 }
@@ -176,13 +176,13 @@ export default function HabitsPage() {
   const todayTotal = habits.length;
 
   return (
-    <div className="min-h-screen bg-page text-heading">
+    <div className="min-h-screen bg-[#0f1117] text-slate-100">
 
       {/* Header */}
-      <header className="px-6 py-5 border-b border-border-default">
+      <header className="px-6 py-5 border-b border-white/5">
         <div className="max-w-xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="text-tertiary hover:text-body transition-colors">
+            <Link href="/dashboard" className="text-slate-500 hover:text-slate-300 transition-colors">
               <ArrowLeft size={18} />
             </Link>
             <h1 className="text-base font-semibold tracking-tight">Abitudini</h1>
@@ -190,13 +190,13 @@ export default function HabitsPage() {
           <div className="flex items-center gap-1">
             <button
               onClick={fetchHabits}
-              className="p-2 text-tertiary hover:text-body transition-colors rounded-lg hover:bg-card"
+              className="p-2 text-slate-500 hover:text-slate-300 transition-colors rounded-lg hover:bg-white/5"
             >
               <RefreshCw size={15} />
             </button>
             <button
               onClick={() => setShowAdd(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-card hover:bg-surface-hover transition-colors text-body"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-slate-300"
             >
               <Plus size={14} />
               {showAdd ? 'Annulla' : 'Aggiungi'}
@@ -213,7 +213,7 @@ export default function HabitsPage() {
             <span>{error}</span>
             <button
               onClick={seed}
-              className="ml-4 text-xs px-3 py-1.5 rounded-lg bg-card hover:bg-surface-hover text-body transition-colors whitespace-nowrap"
+              className="ml-4 text-xs px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 transition-colors whitespace-nowrap"
             >
               Carica default
             </button>
@@ -223,17 +223,17 @@ export default function HabitsPage() {
         {/* Loading */}
         {loading && (
           <div className="flex justify-center py-16">
-            <div className="w-5 h-5 border-2 border-border-default border-t-slate-400 rounded-full animate-spin" />
+            <div className="w-5 h-5 border-2 border-slate-700 border-t-slate-400 rounded-full animate-spin" />
           </div>
         )}
 
         {/* Empty */}
         {!loading && !error && habits.length === 0 && (
           <div className="text-center py-16">
-            <p className="text-tertiary text-sm mb-5">Nessuna abitudine configurata.</p>
+            <p className="text-slate-500 text-sm mb-5">Nessuna abitudine configurata.</p>
             <button
               onClick={seed}
-              className="px-4 py-2 rounded-xl text-sm bg-card hover:bg-surface-hover text-body border border-border-hover transition-colors"
+              className="px-4 py-2 rounded-xl text-sm bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-colors"
             >
               Carica abitudini di default
             </button>
@@ -242,15 +242,15 @@ export default function HabitsPage() {
 
         {/* Summary */}
         {!loading && habits.length > 0 && (
-          <div className="flex items-center gap-6 p-5 rounded-2xl bg-card border border-border-default">
+          <div className="flex items-center gap-6 p-5 rounded-2xl bg-white/[0.03] border border-white/5">
             <ProgressRing done={todayDone} total={todayTotal} />
             <div>
-              <p className="text-sm font-medium text-heading">
+              <p className="text-sm font-medium text-slate-200">
                 {todayDone === todayTotal && todayTotal > 0
                   ? 'Tutto completato 🎉'
                   : `${todayTotal - todayDone} rimaste oggi`}
               </p>
-              <p className="text-xs text-tertiary mt-0.5">
+              <p className="text-xs text-slate-500 mt-0.5">
                 {new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
               </p>
             </div>
@@ -259,22 +259,22 @@ export default function HabitsPage() {
 
         {/* Add form */}
         {showAdd && (
-          <div className="p-5 rounded-2xl bg-card border border-border-default space-y-4">
-            <p className="text-xs font-medium text-body uppercase tracking-widest">Nuova abitudine</p>
+          <div className="p-5 rounded-2xl bg-white/[0.03] border border-white/5 space-y-4">
+            <p className="text-xs font-medium text-slate-400 uppercase tracking-widest">Nuova abitudine</p>
             <input
               value={form.name}
               onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
               placeholder="Nome..."
-              className="w-full bg-transparent border border-border-hover rounded-xl px-4 py-2.5 text-sm placeholder-slate-600 focus:outline-none focus:border-white/25 transition-colors"
+              className="w-full bg-transparent border border-white/10 rounded-xl px-4 py-2.5 text-sm placeholder-slate-600 focus:outline-none focus:border-white/25 transition-colors"
             />
             <div>
-              <p className="text-[11px] text-muted mb-2 uppercase tracking-widest">Icona</p>
+              <p className="text-[11px] text-slate-600 mb-2 uppercase tracking-widest">Icona</p>
               <div className="flex flex-wrap gap-1.5">
                 {EMOJI_OPTIONS.map(e => (
                   <button
                     key={e}
                     onClick={() => setForm(f => ({ ...f, icon: e }))}
-                    className={`text-lg p-1.5 rounded-lg transition-all ${form.icon === e ? 'bg-surface-hover ring-1 ring-white/20' : 'hover:bg-card'}`}
+                    className={`text-lg p-1.5 rounded-lg transition-all ${form.icon === e ? 'bg-white/10 ring-1 ring-white/20' : 'hover:bg-white/5'}`}
                   >
                     {e}
                   </button>
@@ -282,7 +282,7 @@ export default function HabitsPage() {
               </div>
             </div>
             <div>
-              <p className="text-[11px] text-muted mb-2 uppercase tracking-widest">Colore</p>
+              <p className="text-[11px] text-slate-600 mb-2 uppercase tracking-widest">Colore</p>
               <div className="flex gap-2">
                 {COLOR_OPTIONS.map(c => (
                   <button
@@ -299,7 +299,7 @@ export default function HabitsPage() {
             </div>
             <button
               onClick={addHabit}
-              className="w-full py-2.5 rounded-xl text-sm font-medium bg-card hover:bg-surface-hover border border-border-hover text-heading transition-colors"
+              className="w-full py-2.5 rounded-xl text-sm font-medium bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 transition-colors"
             >
               Aggiungi
             </button>
@@ -308,7 +308,7 @@ export default function HabitsPage() {
 
         {/* Habit list */}
         {!loading && habits.length > 0 && (
-          <div className="rounded-2xl bg-card border border-border-default divide-y divide-white/5 overflow-hidden">
+          <div className="rounded-2xl bg-white/[0.03] border border-white/5 divide-y divide-white/5 overflow-hidden">
             {habits.map(h => (
               <div key={h.id}>
                 <div className="flex items-center gap-4 px-5 py-4">
@@ -342,20 +342,20 @@ export default function HabitsPage() {
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-base leading-none">{h.icon}</span>
-                      <span className={`text-sm font-medium truncate transition-colors ${h.done_today ? 'text-muted line-through' : 'text-heading'}`}>
+                      <span className={`text-sm font-medium truncate transition-colors ${h.done_today ? 'text-slate-600 line-through' : 'text-slate-200'}`}>
                         {h.name}
                       </span>
                     </div>
                     {(h.current_streak > 0 || h.longest_streak > 0) && (
                       <div className="flex items-center gap-3 mt-1 ml-[26px]">
                         {h.current_streak > 0 && (
-                          <span className="flex items-center gap-1 text-[11px] text-tertiary">
+                          <span className="flex items-center gap-1 text-[11px] text-slate-500">
                             <Flame size={11} className="text-orange-500/70" />
                             {h.current_streak}d
                           </span>
                         )}
                         {h.longest_streak > 0 && (
-                          <span className="flex items-center gap-1 text-[11px] text-muted">
+                          <span className="flex items-center gap-1 text-[11px] text-slate-600">
                             <Trophy size={11} />
                             {h.longest_streak}d
                           </span>
@@ -368,13 +368,13 @@ export default function HabitsPage() {
                   <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => setExpandedId(expandedId === h.id ? null : h.id)}
-                      className="p-1.5 text-muted hover:text-body transition-colors rounded-lg hover:bg-card"
+                      className="p-1.5 text-slate-600 hover:text-slate-400 transition-colors rounded-lg hover:bg-white/5"
                     >
                       {expandedId === h.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                     </button>
                     <button
                       onClick={() => deleteHabit(h.id)}
-                      className="p-1.5 text-muted hover:text-red-500 transition-colors rounded-lg hover:bg-card"
+                      className="p-1.5 text-slate-700 hover:text-red-500 transition-colors rounded-lg hover:bg-white/5"
                     >
                       <X size={14} />
                     </button>
@@ -383,7 +383,7 @@ export default function HabitsPage() {
 
                 {/* Heatmap expanded */}
                 {expandedId === h.id && (
-                  <div className="px-5 pb-5 border-t border-border-default pt-4">
+                  <div className="px-5 pb-5 border-t border-white/5 pt-4">
                     <Heatmap habitId={h.id} color={h.color} />
                   </div>
                 )}

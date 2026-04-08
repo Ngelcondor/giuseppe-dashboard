@@ -30,12 +30,12 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   return (
     <div className={cn('w-full', className)}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium text-body">Progresso</span>
+        <span className="text-sm font-medium text-slate-300">Progresso</span>
         {showLabel && (
-          <span className="text-sm text-body">{Math.round(percentage)}%</span>
+          <span className="text-sm text-slate-400">{Math.round(percentage)}%</span>
         )}
       </div>
-      <div className="w-full h-2 bg-input rounded-full overflow-hidden">
+      <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden">
         <div
           className={cn(
             'h-full rounded-full transition-all duration-300',
@@ -112,7 +112,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
       </svg>
       {showLabel && (
         <div className="absolute flex flex-col items-center justify-center">
-          <span className={cn('font-semibold text-heading', sizeConfig.text)}>
+          <span className={cn('font-semibold text-slate-100', sizeConfig.text)}>
             {Math.round(percentage)}%
           </span>
         </div>
@@ -165,7 +165,7 @@ export const Stepper: React.FC<StepperProps> = ({
                 'prefers-reduced-motion:!transition-none',
                 isCompleted && 'bg-green-600 text-white',
                 isCurrent && 'bg-blue-600 text-white ring-2 ring-blue-400',
-                isUpcoming && 'bg-input text-body'
+                isUpcoming && 'bg-slate-700 text-slate-400'
               )}
             >
               {isCompleted ? '✓' : index + 1}
@@ -173,7 +173,7 @@ export const Stepper: React.FC<StepperProps> = ({
             <span
               className={cn(
                 'text-sm font-medium',
-                isCompleted || isCurrent ? 'text-heading' : 'text-body'
+                isCompleted || isCurrent ? 'text-slate-100' : 'text-slate-400'
               )}
             >
               {step.label}
@@ -182,7 +182,7 @@ export const Stepper: React.FC<StepperProps> = ({
               <div
                 className={cn(
                   'w-0.5 h-6 ml-4',
-                  isCompleted ? 'bg-green-600' : 'bg-input'
+                  isCompleted ? 'bg-green-600' : 'bg-slate-700'
                 )}
               />
             )}

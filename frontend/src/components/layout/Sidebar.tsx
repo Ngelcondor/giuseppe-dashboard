@@ -78,7 +78,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
       <aside
         className={cn(
           'fixed md:sticky top-0 left-0 h-screen z-40 transition-all duration-300',
-          'bg-card-solid border-r border-border-default',
+          'bg-slate-800 border-r border-slate-700',
           'prefers-reduced-motion:!transition-none',
           isCollapsed ? 'w-20' : 'w-64',
           !isOpen && '-translate-x-full md:translate-x-0'
@@ -86,7 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
       >
         <div className="h-full flex flex-col">
           {/* Header */}
-          <div className="p-4 border-b border-border-default flex items-center justify-between">
+          <div className="p-4 border-b border-slate-700 flex items-center justify-between">
             {!isCollapsed && (
               <Link href="/dashboard" className="font-semibold text-lg text-blue-400">
                 GD
@@ -94,7 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
             )}
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="p-1 hover:bg-surface-hover rounded transition-colors hidden md:block"
+              className="p-1 hover:bg-slate-700 rounded transition-colors hidden md:block"
               title={isCollapsed ? 'Espandi' : 'Collassa'}
             >
               {isCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
@@ -113,8 +113,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
                   'prefers-reduced-motion:!transition-none',
                   'group relative',
                   isActive(item.href)
-                    ? 'bg-surface-hover text-heading'
-                    : 'text-tertiary hover:bg-surface-hover hover:text-heading'
+                    ? 'bg-slate-700 text-slate-100'
+                    : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-100'
                 )}
               >
                 <span className={cn('flex-shrink-0', item.color)}>
@@ -126,7 +126,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
                   </span>
                 )}
                 {isCollapsed && (
-                  <span className="absolute left-full ml-2 bg-card-solid px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                  <span className="absolute left-full ml-2 bg-slate-700 px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                     {item.label}
                   </span>
                 )}
@@ -135,12 +135,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
           </nav>
 
           {/* Footer */}
-          <div className="p-4 border-t border-border-default space-y-2">
+          <div className="p-4 border-t border-slate-700 space-y-2">
             <Link
               href="/dashboard/settings"
               className={cn(
                 'flex items-center gap-3 px-3 py-2 rounded-lg',
-                'text-tertiary hover:bg-surface-hover hover:text-heading',
+                'text-slate-400 hover:bg-slate-700/50 hover:text-slate-100',
                 'transition-colors duration-200',
                 'prefers-reduced-motion:!transition-none',
                 'group relative'
@@ -149,7 +149,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
               <Settings size={20} />
               {!isCollapsed && <span className="text-sm font-medium">Impostazioni</span>}
               {isCollapsed && (
-                <span className="absolute left-full ml-2 bg-card-solid px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                <span className="absolute left-full ml-2 bg-slate-700 px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                   Impostazioni
                 </span>
               )}
@@ -167,7 +167,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
               <LogOut size={20} />
               {!isCollapsed && <span className="text-sm font-medium">Esci</span>}
               {isCollapsed && (
-                <span className="absolute left-full ml-2 bg-card-solid px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                <span className="absolute left-full ml-2 bg-slate-700 px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                   Esci
                 </span>
               )}

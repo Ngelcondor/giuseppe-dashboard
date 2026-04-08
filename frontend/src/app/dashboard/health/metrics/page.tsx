@@ -81,21 +81,21 @@ function MetricCard({
   const trend = getTrend(metrics);
 
   return (
-    <div className="rounded-xl bg-card border border-border-default hover:border-border-hover p-4 transition-all">
+    <div className="rounded-xl bg-white/[0.03] border border-white/5 hover:border-white/10 p-4 transition-all">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className="p-2 rounded-lg" style={{ backgroundColor: `${config.color}15` }}>
             <span style={{ color: config.color }}>{iconMap[config.icon]}</span>
           </div>
           <div>
-            <p className="text-xs text-body">{config.label}</p>
+            <p className="text-xs text-slate-400">{config.label}</p>
             {latest ? (
-              <p className="text-lg font-bold text-heading">
+              <p className="text-lg font-bold text-slate-200">
                 {formatValue(latest.value, type)}
-                <span className="text-xs text-tertiary ml-1">{config.unit}</span>
+                <span className="text-xs text-slate-500 ml-1">{config.unit}</span>
               </p>
             ) : (
-              <p className="text-sm text-muted">—</p>
+              <p className="text-sm text-slate-600">—</p>
             )}
           </div>
         </div>
@@ -110,7 +110,7 @@ function MetricCard({
           )}
           <button
             onClick={() => onAdd(type)}
-            className="p-1.5 rounded-lg bg-card text-body hover:text-heading hover:bg-surface-hover transition-colors"
+            className="p-1.5 rounded-lg bg-white/[0.03] text-slate-400 hover:text-slate-200 hover:bg-white/[0.06] transition-colors"
           >
             <Plus size={14} />
           </button>
@@ -146,10 +146,10 @@ function MetricCard({
       )}
 
       {latest && (
-        <p className="text-[10px] text-muted mt-2">
+        <p className="text-[10px] text-slate-600 mt-2">
           Ultimo: {new Date(latest.recorded_at).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
           {latest.source !== 'manual' && (
-            <span className="ml-1 text-muted">· {latest.source}</span>
+            <span className="ml-1 text-slate-700">· {latest.source}</span>
           )}
         </p>
       )}
@@ -209,7 +209,7 @@ function AddMetricModal({
     }>
       <div className="space-y-4">
         <div>
-          <label className="block text-xs text-body mb-1">Valore ({config.unit})</label>
+          <label className="block text-xs text-slate-400 mb-1">Valore ({config.unit})</label>
           <input
             type="number"
             min={config.min}
@@ -217,7 +217,7 @@ function AddMetricModal({
             step={config.step}
             value={value}
             onChange={(e) => setValue(Number(e.target.value))}
-            className="w-full px-3 py-2 rounded-lg bg-input border border-border-default text-heading text-lg font-semibold focus:border-blue-500 focus:outline-none text-center"
+            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-lg font-semibold focus:border-blue-500 focus:outline-none text-center"
           />
           <input
             type="range"
@@ -231,12 +231,12 @@ function AddMetricModal({
           />
         </div>
         <div>
-          <label className="block text-xs text-body mb-1">Data e ora</label>
+          <label className="block text-xs text-slate-400 mb-1">Data e ora</label>
           <input
             type="datetime-local"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg bg-input border border-border-default text-heading text-sm focus:border-blue-500 focus:outline-none"
+            className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-sm focus:border-blue-500 focus:outline-none"
           />
         </div>
       </div>
@@ -268,7 +268,7 @@ function HistorySection({
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-semibold text-body uppercase tracking-wider">Storico</h3>
+        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Storico</h3>
       </div>
 
       {/* Filter chips */}
@@ -276,7 +276,7 @@ function HistorySection({
         <button
           onClick={() => setFilter('all')}
           className={`px-2.5 py-1 rounded-full text-[10px] font-medium whitespace-nowrap transition-colors ${
-            filter === 'all' ? 'bg-surface-hover text-heading' : 'bg-card text-tertiary hover:text-body'
+            filter === 'all' ? 'bg-slate-600 text-white' : 'bg-white/[0.03] text-slate-500 hover:text-slate-300'
           }`}
         >
           Tutti
@@ -290,7 +290,7 @@ function HistorySection({
               key={t}
               onClick={() => setFilter(t)}
               className={`px-2.5 py-1 rounded-full text-[10px] font-medium whitespace-nowrap transition-colors ${
-                filter === t ? 'text-heading' : 'text-tertiary hover:text-body'
+                filter === t ? 'text-white' : 'text-slate-500 hover:text-slate-300'
               }`}
               style={filter === t ? { backgroundColor: cfg.color } : { backgroundColor: 'rgba(255,255,255,0.03)' }}
             >
@@ -302,8 +302,8 @@ function HistorySection({
 
       {sorted.length === 0 ? (
         <div className="text-center py-8">
-          <Activity size={24} className="text-muted mx-auto mb-2" />
-          <p className="text-sm text-tertiary">Nessuna metrica registrata</p>
+          <Activity size={24} className="text-slate-700 mx-auto mb-2" />
+          <p className="text-sm text-slate-500">Nessuna metrica registrata</p>
         </div>
       ) : (
         <div className="space-y-1.5">
@@ -312,15 +312,15 @@ function HistorySection({
             return (
               <div
                 key={m.id}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg bg-card border border-border-default group"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white/[0.02] border border-white/5 group"
               >
                 <div className="w-1.5 h-8 rounded-full" style={{ backgroundColor: cfg?.color || '#64748b' }} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-heading">
+                  <p className="text-sm text-slate-200">
                     <span className="font-semibold">{formatValue(m.value, m.metric_type as MetricType)}</span>
-                    <span className="text-tertiary ml-1 text-xs">{m.unit}</span>
+                    <span className="text-slate-500 ml-1 text-xs">{m.unit}</span>
                   </p>
-                  <p className="text-[10px] text-muted">
+                  <p className="text-[10px] text-slate-600">
                     {cfg?.label} · {new Date(m.recorded_at).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     {m.source !== 'manual' && ` · ${m.source}`}
                   </p>
@@ -410,16 +410,16 @@ export default function MetricsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-page text-heading flex items-center justify-center">
+      <div className="min-h-screen bg-[#0f1117] text-slate-100 flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-page text-heading">
-      <header className="px-6 py-5 border-b border-border-default flex items-center gap-3">
-        <Link href="/dashboard/health" className="text-tertiary hover:text-body transition-colors">
+    <div className="min-h-screen bg-[#0f1117] text-slate-100">
+      <header className="px-6 py-5 border-b border-white/5 flex items-center gap-3">
+        <Link href="/dashboard/health" className="text-slate-500 hover:text-slate-300 transition-colors">
           <ArrowLeft size={18} />
         </Link>
         <Activity size={18} className="text-emerald-400" />
