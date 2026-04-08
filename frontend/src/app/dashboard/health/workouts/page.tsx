@@ -812,7 +812,7 @@ export default function WorkoutsPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Trophy size={16} className="text-amber-400" />
-              <span className="text-xs font-semibold text-heading >Questa settimana</span>
+              <span className="text-xs font-semibold text-heading">Questa settimana</span>
             </div>
             <span className="text-xs text-tertiary">Split: Upper / Lower / Upper</span>
           </div>
