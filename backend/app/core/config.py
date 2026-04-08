@@ -57,8 +57,29 @@ class Settings(BaseSettings):
         return [h.strip() for h in self.CORS_HEADERS.split(",")]
 
     # Celery Configuration
-    CELERY_BROKER_URL: str = "redis://localhost:6379/1"
-    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
+    # Derived from REDIS_URL by default — override via env vars if needed.
+    CELERY_BROKER_URL: str = ""
+    CELERY_RESULT_BACKEND: str = ""
+
+    @field_validator("CELERY_BROKER_URL", mode="before")
+    @classmethod
+    def _default_celery_broker(cls, v: str, info) -> str:
+        if v:
+            return v
+        redis_url = info.data.get("REDIS_URL", "redis://localhost:6379/0")
+        # Use DB 1 for broker (strip trailing /N and append /1)
+        base = redis_url.rsplit("/", 1)[0]
+        return f"{base}/1"
+
+    @field_validator("CELERY_RESULT_BACKEND", mode="before")
+    @classmethod
+    def _default_celery_backend(cls, v: str, info) -> str:
+        if v:
+            return v
+        redis_url = info.data.get("REDIS_URL", "redis://localhost:6379/0")
+        # Use DB 2 for result backend
+        base = redis_url.rsplit("/", 1)[0]
+        return f"{base}/2"
 
     # Apple Health Configuration
     APPLE_HEALTH_IMPORT_ENABLED: bool = True
