@@ -1,9 +1,18 @@
 """Health and medication schemas."""
-from pydantic import BaseModel, Field, field_validator
-from datetime import datetime
+from pydantic import BaseModel, Field, field_validator, field_serializer
+from datetime import datetime, timezone
 from typing import Optional, List
 import uuid
 from app.models.health import MetricType, WorkoutType, WorkoutIntensity
+
+
+def _ensure_utc_suffix(dt: datetime) -> str:
+    """Serialize a naive (UTC) datetime with 'Z' suffix so JS interprets correctly."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.isoformat() + "Z"
+    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 class HealthMetricBase(BaseModel):
@@ -293,6 +302,11 @@ class SleepPhaseEntryResponse(SleepPhaseEntryBase):
     class Config:
         from_attributes = True
 
+    @field_serializer("start_time", "end_time", "created_at")
+    @classmethod
+    def serialize_dt(cls, v: datetime) -> str:
+        return _ensure_utc_suffix(v)
+
 
 class SleepSessionBase(BaseModel):
     """Base sleep session."""
@@ -343,6 +357,11 @@ class SleepSessionResponse(SleepSessionBase):
 
     class Config:
         from_attributes = True
+
+    @field_serializer("sleep_start", "sleep_end", "created_at", "updated_at")
+    @classmethod
+    def serialize_dt(cls, v: datetime) -> str:
+        return _ensure_utc_suffix(v)
 
 
 class SleepMorningReport(BaseModel):

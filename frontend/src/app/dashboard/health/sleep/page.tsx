@@ -151,6 +151,9 @@ function MorningReportCard({ report }: { report: SleepMorningReport }) {
               </p>
               <p className="text-xs text-slate-500 mt-0.5">
                 Qualità del sonno
+                {report.session?.sc_quality_score != null && (
+                  <span className="text-cyan-400/70 ml-1">(SC: {report.session.sc_quality_score}%)</span>
+                )}
               </p>
             </div>
             <div className="h-10 w-px bg-slate-700" />
@@ -207,8 +210,8 @@ function MorningReportCard({ report }: { report: SleepMorningReport }) {
             </div>
           </div>
 
-          {/* Sleep Cycle extras in morning report */}
-          {report.session?.source === 'sleep_cycle' && (
+          {/* Sleep Cycle extras — shown for ANY source that has SC data */}
+          {report.session && (report.session.sc_quality_score != null || report.session.snoring_minutes != null || report.session.heart_rate_lowest != null || report.session.regularity_score != null) && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {report.session.sc_quality_score != null && (
                 <div className="bg-cyan-900/10 border border-cyan-800/20 rounded-xl p-2.5 text-center">
@@ -290,6 +293,7 @@ function SessionCard({
   else if (score > 0) label = 'Scarso';
 
   const isSleepCycle = session.source === 'sleep_cycle';
+  const hasSCData = session.sc_quality_score != null || session.snoring_minutes != null || session.heart_rate_lowest != null;
 
   return (
     <div className="rounded-xl bg-card border border-border-default hover:border-border-hover p-4 transition-all group">
@@ -311,10 +315,17 @@ function SessionCard({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {session.quality_score && (
-            <span className={`text-xs font-semibold ${qualityColor(label)}`}>
-              {session.quality_score}/100
-            </span>
+          {session.quality_score != null && session.quality_score > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className={`text-xs font-semibold ${qualityColor(label)}`}>
+                {session.quality_score}
+              </span>
+              {session.sc_quality_score != null && (
+                <span className="text-[10px] text-cyan-400/70" title="Sleep Cycle score">
+                  / SC {session.sc_quality_score}
+                </span>
+              )}
+            </div>
           )}
           <button
             onClick={onDelete}
@@ -335,8 +346,8 @@ function SessionCard({
         />
       )}
 
-      {/* Sleep Cycle extra data */}
-      {isSleepCycle && (session.sc_quality_score || session.snoring_minutes !== null || session.heart_rate_lowest) && (
+      {/* Sleep Cycle extra data — shown for any source with SC data */}
+      {hasSCData && (
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
           {session.sc_quality_score != null && (
             <div className="bg-cyan-900/10 border border-cyan-800/20 rounded-lg px-2.5 py-1.5 text-center">

@@ -302,9 +302,18 @@ export function SleepWidget() {
         <span className="text-xs text-muted ml-auto capitalize">{s.source.replace(/_/g, ' ')}</span>
       </div>
 
-      {/* Top section: Ring + Stats */}
+      {/* Top section: Rings + Stats */}
       <div className="flex items-center gap-6 mb-6">
-        <QualityRing score={s.quality_score ?? 0} size={110} />
+        <div className="flex flex-col items-center gap-1">
+          <QualityRing score={s.quality_score ?? 0} size={110} />
+          <span className="text-[9px] text-muted">Dashboard</span>
+        </div>
+        {s.sc_quality_score != null && (
+          <div className="flex flex-col items-center gap-1">
+            <QualityRing score={s.sc_quality_score} size={80} />
+            <span className="text-[9px] text-cyan-400/70">Sleep Cycle</span>
+          </div>
+        )}
         <div className="flex-1 space-y-3">
           <div>
             <p className="text-2xl font-semibold text-heading leading-none">
