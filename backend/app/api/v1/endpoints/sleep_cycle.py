@@ -170,7 +170,7 @@ async def sleep_cycle_webhook(
     if sleep_start > sleep_end:
         logger.info("Timestamps invertiti (start=%s > end=%s), scambio automatico", sleep_start, sleep_end)
         sleep_start, sleep_end = sleep_end, sleep_start
-    window = timedelta(minutes=5)
+    window = timedelta(minutes=2)  # Finestra stretta per evitare match errati
 
     # --- Deduplication check ---
     dup_result = await db.execute(
@@ -365,56 +365,82 @@ async def health_auto_export_webhook(
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=400, detail=f"JSON non valido: {e}")
 
-    # Estrai il record sleep dal formato Health Auto Export
-    sleep_record = None
+    # Estrai record sleep dal formato Health Auto Export
+    sleep_records = []
     if "data" in raw and "metrics" in raw["data"]:
         # Formato wrapper: { data: { metrics: [{ name, data: [...] }] } }
         for metric in raw["data"]["metrics"]:
             if metric.get("name") in ("sleep_analysis", "sleep"):
-                records = metric.get("data", [])
-                if records:
-                    sleep_record = records[-1]  # Prendi il più recente
-                    break
+                sleep_records = metric.get("data", [])
+                break
     elif "sleepStart" in raw or "sleep_start" in raw:
-        # Formato flat
-        sleep_record = raw
+        # Formato flat (singolo record)
+        sleep_records = [raw]
 
-    if not sleep_record:
+    if not sleep_records:
         raise HTTPException(status_code=422, detail="Nessun dato sleep trovato nel payload")
 
-    # Parse campi (Health Auto Export usa camelCase)
-    sleep_start_str = sleep_record.get("sleepStart") or sleep_record.get("sleep_start", "")
-    sleep_end_str = sleep_record.get("sleepEnd") or sleep_record.get("sleep_end", "")
+    # ── Aggrega TUTTI i segmenti di sonno della stessa notte ──
+    # Health Auto Export può mandare più record (sonno frammentato, pisolini, ecc.)
+    # Li uniamo per avere un quadro completo come fa Sleep Cycle.
 
-    if not sleep_start_str or not sleep_end_str:
-        raise HTTPException(status_code=422, detail="sleepStart e sleepEnd sono obbligatori")
-
-    sleep_start = _parse_date(sleep_start_str)
-    sleep_end = _parse_date(sleep_end_str)
-
-    if sleep_start > sleep_end:
-        sleep_start, sleep_end = sleep_end, sleep_start
-
-    # Fasi del sonno — Health Auto Export invia valori in ORE, convertiamo in minuti
     def _hrs_to_min(val) -> int:
         """Converti ore (float) in minuti (int)."""
         return round((float(val) if val else 0) * 60)
 
-    deep_min = _hrs_to_min(sleep_record.get("deep"))
-    rem_min = _hrs_to_min(sleep_record.get("rem"))
-    light_min = _hrs_to_min(sleep_record.get("core"))  # HealthKit "core" = light
-    awake_min = _hrs_to_min(sleep_record.get("awake"))
-    asleep_min = _hrs_to_min(sleep_record.get("asleep"))
-    in_bed_min = _hrs_to_min(sleep_record.get("inBed"))
+    # Accumula dati da tutti i record
+    all_starts = []
+    all_ends = []
+    total_deep = 0
+    total_rem = 0
+    total_light = 0
+    total_awake = 0
+    total_asleep = 0
+    total_in_bed = 0
+    total_sleep_explicit = 0
 
-    # Calcola duration
-    total_sleep = _hrs_to_min(sleep_record.get("totalSleep"))
-    duration = total_sleep or asleep_min or max(0, int((sleep_end - sleep_start).total_seconds() / 60))
-    time_in_bed = in_bed_min or duration
+    for rec in sleep_records:
+        start_str = rec.get("sleepStart") or rec.get("sleep_start", "")
+        end_str = rec.get("sleepEnd") or rec.get("sleep_end", "")
+        if start_str and end_str:
+            s = _parse_date(start_str)
+            e = _parse_date(end_str)
+            if s > e:
+                s, e = e, s
+            all_starts.append(s)
+            all_ends.append(e)
 
-    # In Bed timestamps
-    in_bed_start_str = sleep_record.get("inBedStart", "")
-    in_bed_end_str = sleep_record.get("inBedEnd", "")
+        total_deep += _hrs_to_min(rec.get("deep"))
+        total_rem += _hrs_to_min(rec.get("rem"))
+        total_light += _hrs_to_min(rec.get("core"))  # HealthKit "core" = light
+        total_awake += _hrs_to_min(rec.get("awake"))
+        total_asleep += _hrs_to_min(rec.get("asleep"))
+        total_in_bed += _hrs_to_min(rec.get("inBed"))
+        total_sleep_explicit += _hrs_to_min(rec.get("totalSleep"))
+
+    if not all_starts or not all_ends:
+        raise HTTPException(status_code=422, detail="sleepStart e sleepEnd sono obbligatori")
+
+    # Usa il primo addormentamento e l'ultimo risveglio
+    sleep_start = min(all_starts)
+    sleep_end = max(all_ends)
+
+    deep_min = total_deep
+    rem_min = total_rem
+    light_min = total_light
+    awake_min = total_awake
+    asleep_min = total_asleep
+    in_bed_min = total_in_bed
+
+    # Calcola duration: preferisci dati espliciti, poi somma fasi, poi fallback su timestamps
+    phase_sum = deep_min + rem_min + light_min
+    duration = total_sleep_explicit or asleep_min or phase_sum or max(0, int((sleep_end - sleep_start).total_seconds() / 60))
+    time_in_bed = in_bed_min or max(0, int((sleep_end - sleep_start).total_seconds() / 60))
+
+    logger.info(
+        "Health Auto Export: aggregati %d record → start=%s, end=%s, dur=%dm, deep=%dm, rem=%dm, light=%dm, awake=%dm",
+        len(sleep_records), sleep_start, sleep_end, duration, deep_min, rem_min, light_min, awake_min,
+    )
 
     # Resolve user
     result = await db.execute(sa_select(User).limit(1))
@@ -423,9 +449,9 @@ async def health_auto_export_webhook(
         raise HTTPException(status_code=503, detail="Nessun utente trovato.")
 
     user_id = user.id
-    window = timedelta(minutes=5)
+    window = timedelta(minutes=2)  # Finestra più stretta per evitare match errati
 
-    # Deduplication
+    # Deduplication: match sia su sleep_start che sleep_end per maggiore precisione
     dup_result = await db.execute(
         sa_select(SleepSession).where(
             and_(
@@ -440,8 +466,19 @@ async def health_auto_export_webhook(
     # Efficienza
     sleep_efficiency = round(duration / time_in_bed * 100, 1) if time_in_bed > 0 else None
 
+    # Cerca sc_quality_score nei dati HAE (Sleep Cycle può scrivere quality in HealthKit)
+    sc_quality = None
+    for rec in sleep_records:
+        q = rec.get("sleepQuality") or rec.get("quality") or rec.get("sc_quality_score")
+        if q is not None:
+            try:
+                sc_quality = int(float(q))
+            except (ValueError, TypeError):
+                pass
+            break
+
     # Quality score
-    quality_score = _calculate_quality_score(duration, deep_min, rem_min, sleep_efficiency, None)
+    quality_score = _calculate_quality_score(duration, deep_min, rem_min, sleep_efficiency, sc_quality)
 
     if existing:
         existing.source = "health_auto_export"
@@ -455,6 +492,8 @@ async def health_auto_export_webhook(
         existing.light_minutes = light_min
         existing.awake_minutes = awake_min
         existing.quality_score = quality_score
+        if sc_quality is not None:
+            existing.sc_quality_score = sc_quality
         db.add(existing)
         await db.commit()
         await db.refresh(existing)
@@ -480,6 +519,7 @@ async def health_auto_export_webhook(
         deep_minutes=deep_min,
         rem_minutes=rem_min,
         source="health_auto_export",
+        sc_quality_score=sc_quality,
     )
     db.add(session)
     await db.commit()
