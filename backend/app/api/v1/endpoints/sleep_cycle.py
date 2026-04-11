@@ -589,6 +589,209 @@ async def health_auto_export_webhook(
     )
 
 
+## ── Nuovo endpoint: ricezione campioni granulari da Apple Shortcut ──────────
+
+@router.post(
+    "/shortcut",
+    response_model=SleepCycleSyncResponse,
+    dependencies=[Depends(_verify_webhook_token)],
+)
+async def shortcut_sleep_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> SleepCycleSyncResponse:
+    """Ricevi campioni di sonno granulari da Apple Shortcut.
+
+    Lo Shortcut legge i singoli HKCategorySample di tipo Sleep Analysis
+    da HealthKit (ogni fase con start/end esatti) e li invia qui.
+    Il backend trova l'ultimo blocco di sonno continuo e lo salva.
+
+    Payload atteso:
+    {
+      "samples": [
+        {"start": "2026-04-11T06:02:00+02:00", "end": "2026-04-11T06:30:00+02:00", "value": "AsleepCore", "source": "Sleep Cycle"},
+        ...
+      ]
+    }
+
+    Valori possibili per "value":
+      InBed, Asleep, Awake, AsleepCore (=light), AsleepDeep, AsleepREM
+    """
+    from app.models.user import User
+
+    body = await request.body()
+    raw = json.loads(body.decode("utf-8", errors="replace"))
+    logger.info("Shortcut webhook: raw payload (%d bytes)", len(body))
+
+    samples = raw.get("samples") or raw.get("data") or []
+    if not samples:
+        raise HTTPException(status_code=422, detail="Nessun campione trovato nel payload")
+
+    # ── 1. Filtra per fonte Sleep Cycle e parse timestamps ──
+    parsed = []
+    for s in samples:
+        src = (s.get("source") or "").lower()
+        if "sleep cycle" not in src and "sleepcycle" not in src:
+            continue
+
+        value = (s.get("value") or s.get("type") or "").strip()
+        start = _parse_date(s.get("start") or s.get("startDate") or "")
+        end = _parse_date(s.get("end") or s.get("endDate") or "")
+
+        if start >= end:
+            continue
+
+        # Ignora campioni "InBed" — usiamo solo le fasi reali
+        val_lower = value.lower().replace(" ", "")
+        if val_lower == "inbed":
+            continue
+
+        parsed.append({
+            "start": start,
+            "end": end,
+            "value": val_lower,
+            "duration_min": (end - start).total_seconds() / 60,
+        })
+
+    if not parsed:
+        raise HTTPException(status_code=422, detail="Nessun campione Sleep Cycle trovato")
+
+    # ── 2. Ordina per start time e trova l'ultimo blocco continuo ──
+    parsed.sort(key=lambda x: x["start"])
+
+    # Un "blocco" = sequenza di campioni dove il gap tra uno e il successivo è < 30 min
+    MAX_GAP = timedelta(minutes=30)
+    blocks: list[list[dict]] = []
+    current_block = [parsed[0]]
+
+    for sample in parsed[1:]:
+        prev_end = current_block[-1]["end"]
+        gap = sample["start"] - prev_end
+        if gap <= MAX_GAP:
+            current_block.append(sample)
+        else:
+            blocks.append(current_block)
+            current_block = [sample]
+    blocks.append(current_block)
+
+    # Prendi l'ultimo blocco (il più recente)
+    last_block = blocks[-1]
+
+    logger.info(
+        "Shortcut: %d campioni SC totali, %d blocchi, ultimo blocco ha %d campioni",
+        len(parsed), len(blocks), len(last_block),
+    )
+
+    # ── 3. Calcola metriche dal blocco ──
+    sleep_start = last_block[0]["start"]
+    sleep_end = last_block[-1]["end"]
+
+    deep_min = 0
+    rem_min = 0
+    light_min = 0
+    awake_min = 0
+
+    for sample in last_block:
+        dur = round(sample["duration_min"])
+        val = sample["value"]
+        if val in ("asleepdeep", "deep"):
+            deep_min += dur
+        elif val in ("asleeprem", "rem"):
+            rem_min += dur
+        elif val in ("asleepcore", "core", "light", "asleep"):
+            light_min += dur
+        elif val in ("awake", "awakeinsleep"):
+            awake_min += dur
+        else:
+            light_min += dur  # fallback
+
+    duration = deep_min + rem_min + light_min  # solo sonno effettivo (no awake)
+    time_in_bed = duration + awake_min
+    sleep_efficiency = round(duration / time_in_bed * 100, 1) if time_in_bed > 0 else None
+
+    logger.info(
+        "Shortcut: blocco %s → %s, dur=%dm, inBed=%dm, deep=%dm, rem=%dm, light=%dm, awake=%dm",
+        sleep_start, sleep_end, duration, time_in_bed, deep_min, rem_min, light_min, awake_min,
+    )
+
+    # ── 4. Resolve user ──
+    result = await db.execute(sa_select(User).limit(1))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=503, detail="Nessun utente trovato.")
+
+    user_id = user.id
+
+    # ── 5. Deduplication ──
+    window = timedelta(minutes=5)
+    dup_result = await db.execute(
+        sa_select(SleepSession).where(
+            and_(
+                SleepSession.user_id == user_id,
+                SleepSession.sleep_start >= sleep_start - window,
+                SleepSession.sleep_start <= sleep_start + window,
+            )
+        ).limit(1)
+    )
+    existing = dup_result.scalar_one_or_none()
+
+    quality_score = _calculate_quality_score(duration, deep_min, rem_min, sleep_efficiency, None)
+
+    if existing:
+        existing.source = "sleep_cycle"
+        existing.sleep_start = sleep_start
+        existing.sleep_end = sleep_end
+        existing.duration_minutes = duration
+        existing.time_in_bed_minutes = time_in_bed
+        existing.sleep_efficiency = sleep_efficiency
+        existing.deep_minutes = deep_min
+        existing.rem_minutes = rem_min
+        existing.light_minutes = light_min
+        existing.awake_minutes = awake_min
+        existing.quality_score = quality_score
+        db.add(existing)
+        await db.commit()
+        await db.refresh(existing)
+        return SleepCycleSyncResponse(
+            ok=True,
+            session_id=str(existing.id),
+            imported=False,
+            reason="Sessione aggiornata con dati Shortcut (campioni granulari)",
+            synced_at=datetime.now(timezone.utc).isoformat(),
+        )
+
+    # Nuova sessione
+    session = SleepSession(
+        user_id=user_id,
+        sleep_start=sleep_start,
+        sleep_end=sleep_end,
+        duration_minutes=duration,
+        quality_score=quality_score,
+        time_in_bed_minutes=time_in_bed,
+        sleep_efficiency=sleep_efficiency,
+        awake_minutes=awake_min,
+        light_minutes=light_min,
+        deep_minutes=deep_min,
+        rem_minutes=rem_min,
+        source="sleep_cycle",
+    )
+    db.add(session)
+    await db.commit()
+    await db.refresh(session)
+
+    logger.info(
+        "Shortcut: nuova sessione %s (%s → %s, dur=%dm, deep=%dm, rem=%dm, quality=%d)",
+        session.id, sleep_start, sleep_end, duration, deep_min, rem_min, quality_score,
+    )
+
+    return SleepCycleSyncResponse(
+        ok=True,
+        session_id=str(session.id),
+        imported=True,
+        synced_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+
 @router.get("/sleep-cycle/status")
 async def sleep_cycle_status(
     db: AsyncSession = Depends(get_db),
