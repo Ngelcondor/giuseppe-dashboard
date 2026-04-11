@@ -380,15 +380,48 @@ async def health_auto_export_webhook(
     if not sleep_records:
         raise HTTPException(status_code=422, detail="Nessun dato sleep trovato nel payload")
 
-    # ── Aggrega TUTTI i segmenti di sonno della stessa notte ──
-    # Health Auto Export può mandare più record (sonno frammentato, pisolini, ecc.)
-    # Li uniamo per avere un quadro completo come fa Sleep Cycle.
+    # ── Filtra record per fonte ──
+    # Health Auto Export spesso manda più record per la stessa notte da fonti
+    # diverse (Sleep Cycle + Apple Watch). Sommandoli si raddoppiano i dati.
+    # Strategia: preferire Sleep Cycle > Apple Watch > altri.
 
     def _hrs_to_min(val) -> int:
         """Converti ore (float) in minuti (int)."""
         return round((float(val) if val else 0) * 60)
 
-    # Accumula dati da tutti i record
+    # Separa per fonte
+    SOURCE_PRIORITY = ["sleep cycle", "sleep_cycle", "sleepcycle"]
+    sc_records = []
+    watch_records = []
+    other_records = []
+
+    for rec in sleep_records:
+        src = (rec.get("source") or "").lower().strip()
+        if any(p in src for p in SOURCE_PRIORITY):
+            sc_records.append(rec)
+        elif "apple watch" in src or "watch" in src:
+            watch_records.append(rec)
+        else:
+            other_records.append(rec)
+
+    # Scegli la fonte migliore disponibile
+    if sc_records:
+        chosen_records = sc_records
+        chosen_source = "sleep_cycle"
+    elif watch_records:
+        chosen_records = watch_records
+        chosen_source = "apple_watch"
+    else:
+        chosen_records = other_records or sleep_records
+        chosen_source = "health_auto_export"
+
+    logger.info(
+        "Health Auto Export: %d record totali (SC=%d, Watch=%d, other=%d) → usando %s (%d record)",
+        len(sleep_records), len(sc_records), len(watch_records),
+        len(other_records), chosen_source, len(chosen_records),
+    )
+
+    # Accumula dati dai record scelti
     all_starts = []
     all_ends = []
     total_deep = 0
@@ -399,7 +432,7 @@ async def health_auto_export_webhook(
     total_in_bed = 0
     total_sleep_explicit = 0
 
-    for rec in sleep_records:
+    for rec in chosen_records:
         start_str = rec.get("sleepStart") or rec.get("sleep_start", "")
         end_str = rec.get("sleepEnd") or rec.get("sleep_end", "")
         if start_str and end_str:
@@ -432,14 +465,14 @@ async def health_auto_export_webhook(
     asleep_min = total_asleep
     in_bed_min = total_in_bed
 
-    # Calcola duration: preferisci dati espliciti, poi somma fasi, poi fallback su timestamps
+    # Calcola duration: preferisci totalSleep esplicito, poi somma fasi, poi fallback
     phase_sum = deep_min + rem_min + light_min
     duration = total_sleep_explicit or asleep_min or phase_sum or max(0, int((sleep_end - sleep_start).total_seconds() / 60))
     time_in_bed = in_bed_min or max(0, int((sleep_end - sleep_start).total_seconds() / 60))
 
     logger.info(
-        "Health Auto Export: aggregati %d record → start=%s, end=%s, dur=%dm, deep=%dm, rem=%dm, light=%dm, awake=%dm",
-        len(sleep_records), sleep_start, sleep_end, duration, deep_min, rem_min, light_min, awake_min,
+        "Health Auto Export: %s → start=%s, end=%s, dur=%dm, inBed=%dm, deep=%dm, rem=%dm, light=%dm, awake=%dm",
+        chosen_source, sleep_start, sleep_end, duration, time_in_bed, deep_min, rem_min, light_min, awake_min,
     )
 
     # Resolve user
@@ -468,7 +501,7 @@ async def health_auto_export_webhook(
 
     # Cerca sc_quality_score nei dati HAE (Sleep Cycle può scrivere quality in HealthKit)
     sc_quality = None
-    for rec in sleep_records:
+    for rec in chosen_records:
         q = rec.get("sleepQuality") or rec.get("quality") or rec.get("sc_quality_score")
         if q is not None:
             try:
@@ -480,8 +513,11 @@ async def health_auto_export_webhook(
     # Quality score
     quality_score = _calculate_quality_score(duration, deep_min, rem_min, sleep_efficiency, sc_quality)
 
+    # Usa la fonte effettiva dei dati (sleep_cycle > apple_watch > health_auto_export)
+    session_source = chosen_source if chosen_source != "health_auto_export" else "health_auto_export"
+
     if existing:
-        existing.source = "health_auto_export"
+        existing.source = session_source
         existing.sleep_start = sleep_start
         existing.sleep_end = sleep_end
         existing.duration_minutes = duration
@@ -518,7 +554,7 @@ async def health_auto_export_webhook(
         light_minutes=light_min,
         deep_minutes=deep_min,
         rem_minutes=rem_min,
-        source="health_auto_export",
+        source=session_source,
         sc_quality_score=sc_quality,
     )
     db.add(session)
@@ -526,8 +562,8 @@ async def health_auto_export_webhook(
     await db.refresh(session)
 
     logger.info(
-        "Health Auto Export: nuova sessione %s (%s → %s, dur=%dm, deep=%dm, rem=%dm, quality=%s)",
-        session.id, sleep_start, sleep_end, duration, deep_min, rem_min, quality_score,
+        "Health Auto Export: nuova sessione %s (source=%s, %s → %s, dur=%dm, deep=%dm, rem=%dm, quality=%s)",
+        session.id, session_source, sleep_start, sleep_end, duration, deep_min, rem_min, quality_score,
     )
 
     return SleepCycleSyncResponse(
