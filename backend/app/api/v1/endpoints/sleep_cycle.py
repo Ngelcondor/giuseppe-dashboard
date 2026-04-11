@@ -433,6 +433,23 @@ async def health_auto_export_webhook(
         except Exception:
             return datetime.min
 
+    # Log dettagliato di tutti i record SC per debug
+    for i, r in enumerate(chosen_records):
+        span_h = None
+        try:
+            s = _parse_date(r.get("sleepStart") or "")
+            e = _parse_date(r.get("sleepEnd") or "")
+            span_h = round((e - s).total_seconds() / 3600, 2)
+        except Exception:
+            pass
+        logger.info(
+            "SC record #%d: date=%s start=%s end=%s span=%.2fh totalSleep=%s inBed=%s deep=%s rem=%s core=%s",
+            i + 1, r.get("date"), r.get("sleepStart"), r.get("sleepEnd"),
+            span_h or 0,
+            r.get("totalSleep"), r.get("inBed"),
+            r.get("deep"), r.get("rem"), r.get("core"),
+        )
+
     if len(chosen_records) > 1:
         chosen_records.sort(key=_record_end_time, reverse=True)
         best_record = chosen_records[0]
