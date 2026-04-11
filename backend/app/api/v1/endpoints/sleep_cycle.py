@@ -421,49 +421,49 @@ async def health_auto_export_webhook(
         len(other_records), chosen_source, len(chosen_records),
     )
 
-    # Accumula dati dai record scelti
-    all_starts = []
-    all_ends = []
-    total_deep = 0
-    total_rem = 0
-    total_light = 0
-    total_awake = 0
-    total_asleep = 0
-    total_in_bed = 0
-    total_sleep_explicit = 0
+    # ── Prendi SOLO il record più recente (per sleepEnd) ──
+    # HAE può mandare più record della stessa fonte (notti diverse, segmenti).
+    # Sommandoli si ottengono valori gonfiati (es. 18h invece di 6h).
+    # Selezioniamo il singolo record con il sleepEnd più recente.
+    def _record_end_time(rec: dict) -> datetime:
+        """Ritorna il datetime di fine sonno per ordinamento."""
+        end_str = rec.get("sleepEnd") or rec.get("sleep_end") or rec.get("date") or ""
+        try:
+            return _parse_date(end_str) if end_str else datetime.min
+        except Exception:
+            return datetime.min
 
-    for rec in chosen_records:
-        start_str = rec.get("sleepStart") or rec.get("sleep_start", "")
-        end_str = rec.get("sleepEnd") or rec.get("sleep_end", "")
-        if start_str and end_str:
-            s = _parse_date(start_str)
-            e = _parse_date(end_str)
-            if s > e:
-                s, e = e, s
-            all_starts.append(s)
-            all_ends.append(e)
+    if len(chosen_records) > 1:
+        chosen_records.sort(key=_record_end_time, reverse=True)
+        best_record = chosen_records[0]
+        logger.info(
+            "Health Auto Export: %d record %s, seleziono il più recente (sleepEnd=%s)",
+            len(chosen_records), chosen_source,
+            best_record.get("sleepEnd") or best_record.get("sleep_end"),
+        )
+        chosen_records = [best_record]
 
-        total_deep += _hrs_to_min(rec.get("deep"))
-        total_rem += _hrs_to_min(rec.get("rem"))
-        total_light += _hrs_to_min(rec.get("core"))  # HealthKit "core" = light
-        total_awake += _hrs_to_min(rec.get("awake"))
-        total_asleep += _hrs_to_min(rec.get("asleep"))
-        total_in_bed += _hrs_to_min(rec.get("inBed"))
-        total_sleep_explicit += _hrs_to_min(rec.get("totalSleep"))
+    # Estrai dati dal singolo record scelto
+    rec = chosen_records[0]
 
-    if not all_starts or not all_ends:
+    start_str = rec.get("sleepStart") or rec.get("sleep_start", "")
+    end_str = rec.get("sleepEnd") or rec.get("sleep_end", "")
+
+    if not start_str or not end_str:
         raise HTTPException(status_code=422, detail="sleepStart e sleepEnd sono obbligatori")
 
-    # Usa il primo addormentamento e l'ultimo risveglio
-    sleep_start = min(all_starts)
-    sleep_end = max(all_ends)
+    sleep_start = _parse_date(start_str)
+    sleep_end = _parse_date(end_str)
+    if sleep_start > sleep_end:
+        sleep_start, sleep_end = sleep_end, sleep_start
 
-    deep_min = total_deep
-    rem_min = total_rem
-    light_min = total_light
-    awake_min = total_awake
-    asleep_min = total_asleep
-    in_bed_min = total_in_bed
+    deep_min = _hrs_to_min(rec.get("deep"))
+    rem_min = _hrs_to_min(rec.get("rem"))
+    light_min = _hrs_to_min(rec.get("core"))  # HealthKit "core" = light
+    awake_min = _hrs_to_min(rec.get("awake"))
+    asleep_min = _hrs_to_min(rec.get("asleep"))
+    in_bed_min = _hrs_to_min(rec.get("inBed"))
+    total_sleep_explicit = _hrs_to_min(rec.get("totalSleep"))
 
     # Calcola duration: preferisci totalSleep esplicito, poi somma fasi, poi fallback
     phase_sum = deep_min + rem_min + light_min
@@ -501,14 +501,12 @@ async def health_auto_export_webhook(
 
     # Cerca sc_quality_score nei dati HAE (Sleep Cycle può scrivere quality in HealthKit)
     sc_quality = None
-    for rec in chosen_records:
-        q = rec.get("sleepQuality") or rec.get("quality") or rec.get("sc_quality_score")
-        if q is not None:
-            try:
-                sc_quality = int(float(q))
-            except (ValueError, TypeError):
-                pass
-            break
+    q = rec.get("sleepQuality") or rec.get("quality") or rec.get("sc_quality_score")
+    if q is not None:
+        try:
+            sc_quality = int(float(q))
+        except (ValueError, TypeError):
+            pass
 
     # Quality score
     quality_score = _calculate_quality_score(duration, deep_min, rem_min, sleep_efficiency, sc_quality)
