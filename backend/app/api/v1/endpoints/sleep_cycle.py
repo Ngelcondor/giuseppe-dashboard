@@ -822,13 +822,20 @@ async def shortcut_sleep_webhook(
             current_block = [sample]
     blocks.append(current_block)
 
-    # Prendi l'ultimo blocco (il più recente)
-    last_block = blocks[-1]
+    # Prendi il blocco PIÙ LUNGO (la sessione principale, non un pisolino)
+    def _block_duration(block: list[dict]) -> float:
+        return sum(s["duration_min"] for s in block)
 
-    logger.info(
-        "Shortcut: %d campioni SC totali, %d blocchi, ultimo blocco ha %d campioni",
-        len(parsed), len(blocks), len(last_block),
-    )
+    last_block = max(blocks, key=_block_duration)
+
+    # Log tutti i blocchi per debug
+    for i, b in enumerate(blocks):
+        dur = round(_block_duration(b))
+        marker = " ← SCELTO" if b is last_block else ""
+        logger.info(
+            "Shortcut: blocco #%d: %s → %s, %d campioni, dur=%dm%s",
+            i + 1, b[0]["start"], b[-1]["end"], len(b), dur, marker,
+        )
 
     # ── 3. Calcola metriche dal blocco ──
     sleep_start = last_block[0]["start"]
