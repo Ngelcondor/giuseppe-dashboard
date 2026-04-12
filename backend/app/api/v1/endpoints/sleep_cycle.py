@@ -804,8 +804,8 @@ async def shortcut_sleep_webhook(
     }
 
     # Filtra: solo campioni delle ultime 24 ore (evita che dati vecchi sovrascrivano sessioni)
-    now = datetime.now(timezone.utc)
-    cutoff = now - timedelta(hours=24)
+    # _parse_date() ritorna naive UTC, quindi cutoff deve essere naive
+    cutoff = datetime.utcnow() - timedelta(hours=24)
 
     # Separa per fonte: preferisci Sleep Cycle > altre fonti
     sc_samples = []
