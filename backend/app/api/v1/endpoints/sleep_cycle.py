@@ -803,6 +803,10 @@ async def shortcut_sleep_webhook(
         "deep": "asleepdeep", "rem": "asleeprem", "light": "asleepcore",
     }
 
+    # Filtra: solo campioni delle ultime 24 ore (evita che dati vecchi sovrascrivano sessioni)
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=24)
+
     # Separa per fonte: preferisci Sleep Cycle > altre fonti
     sc_samples = []
     other_samples = []
@@ -813,6 +817,10 @@ async def shortcut_sleep_webhook(
         end = _parse_date(s.get("end") or s.get("endDate") or "")
 
         if start >= end:
+            continue
+
+        # Scarta campioni più vecchi di 24h
+        if end < cutoff:
             continue
 
         val_lower = _VALUE_MAP.get(value_raw.lower(), value_raw.lower().replace(" ", "").replace("(", "").replace(")", ""))
