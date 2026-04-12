@@ -48,8 +48,24 @@ async def _verify_webhook_token(
         )
 
 
+_IT_MONTHS = {
+    "gen": "01", "feb": "02", "mar": "03", "apr": "04",
+    "mag": "05", "giu": "06", "lug": "07", "ago": "08",
+    "set": "09", "ott": "10", "nov": "11", "dic": "12",
+}
+
+
 def _parse_date(date_str: str) -> datetime:
-    """Parse ISO-8601 date string da iOS Shortcut. Ritorna naive UTC."""
+    """Parse date string da iOS/HAE. Supporta ISO-8601 e formato italiano.
+
+    Formati supportati:
+      - 2026-04-11T06:02:00+02:00 (ISO)
+      - 2026-04-11 00:00:00 +0200 (HAE)
+      - 11 apr 2026, 19:25 (iOS Shortcuts in italiano)
+      - 11 apr 2026, 19:25:30 (con secondi)
+
+    Ritorna naive UTC.
+    """
     if not date_str:
         return datetime.utcnow()
 
@@ -78,6 +94,25 @@ def _parse_date(date_str: str) -> datetime:
             return dt
         except ValueError:
             pass
+
+    # Formato italiano da iOS Shortcuts: "11 apr 2026, 19:25" o "11 apr 2026, 19:25:30"
+    import re
+    m = re.match(
+        r"(\d{1,2})\s+([a-zà-ú]{3,})\s+(\d{4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?",
+        s, re.IGNORECASE,
+    )
+    if m:
+        day, month_str, year, hour, minute, second = m.groups()
+        month = _IT_MONTHS.get(month_str[:3].lower())
+        if month:
+            sec = second or "0"
+            # Assume Europe/Rome (CEST=+2, CET=+1) — approssimazione: usa +02:00 per ora legale
+            dt_str = f"{year}-{month}-{int(day):02d}T{int(hour):02d}:{minute}:{int(sec):02d}+02:00"
+            try:
+                dt = datetime.fromisoformat(dt_str)
+                return dt.astimezone(timezone.utc).replace(tzinfo=None)
+            except ValueError:
+                pass
 
     logger.warning("Could not parse date '%s', using now", date_str)
     return datetime.utcnow()
@@ -186,7 +221,7 @@ async def sleep_cycle_webhook(
 
     if existing:
         # Aggiorna solo i campi Sleep Cycle-specifici (arricchimento)
-        existing.source = "sleep_cycle"
+        existing.source = chosen_src
 
         # Ricalcola sempre timestamps e duration dai dati più recenti
         existing.sleep_start = sleep_start
@@ -707,33 +742,64 @@ async def shortcut_sleep_webhook(
     if not samples:
         raise HTTPException(status_code=422, detail="Nessun campione trovato nel payload")
 
-    # ── 1. Filtra per fonte Sleep Cycle e parse timestamps ──
-    parsed = []
-    for s in samples:
-        src = (s.get("source") or "").lower()
-        if "sleep cycle" not in src and "sleepcycle" not in src:
-            continue
+    # ── 1. Parse timestamps e normalizza valori (supporta italiano) ──
+    # Mappa valori italiani → normalizzati
+    _VALUE_MAP = {
+        # Italiano
+        "sonno": "asleep", "sonno profondo": "asleepdeep",
+        "sonno rem": "asleeprem", "sonno core": "asleepcore",
+        "sonno leggero": "asleepcore", "sveglio": "awake",
+        "a letto": "inbed",
+        # English
+        "asleep": "asleep", "asleep (core)": "asleepcore",
+        "asleep (deep)": "asleepdeep", "asleep (rem)": "asleeprem",
+        "awake": "awake", "in bed": "inbed",
+        # Normalized
+        "asleepcore": "asleepcore", "asleepdeep": "asleepdeep",
+        "asleeprem": "asleeprem", "core": "asleepcore",
+        "deep": "asleepdeep", "rem": "asleeprem", "light": "asleepcore",
+    }
 
-        value = (s.get("value") or s.get("type") or "").strip()
+    # Separa per fonte: preferisci Sleep Cycle > altre fonti
+    sc_samples = []
+    other_samples = []
+
+    for s in samples:
+        value_raw = (s.get("value") or s.get("type") or "").strip()
         start = _parse_date(s.get("start") or s.get("startDate") or "")
         end = _parse_date(s.get("end") or s.get("endDate") or "")
 
         if start >= end:
             continue
 
-        # Normalizza nomi fase da Shortcuts (es. "Asleep (Core)" → "asleepcore")
-        val_lower = value.lower().replace(" ", "").replace("(", "").replace(")", "")
+        val_lower = _VALUE_MAP.get(value_raw.lower(), value_raw.lower().replace(" ", "").replace("(", "").replace(")", ""))
 
-        # Ignora campioni "InBed" — usiamo solo le fasi reali
+        # Ignora campioni "InBed"
         if val_lower in ("inbed", ""):
             continue
 
-        parsed.append({
+        src = (s.get("source") or "").lower()
+        sample = {
             "start": start,
             "end": end,
             "value": val_lower,
             "duration_min": (end - start).total_seconds() / 60,
-        })
+            "source": src,
+        }
+
+        if "sleep cycle" in src or "sleepcycle" in src:
+            sc_samples.append(sample)
+        else:
+            other_samples.append(sample)
+
+    # Preferisci Sleep Cycle, altrimenti usa tutti
+    parsed = sc_samples if sc_samples else other_samples
+    chosen_src = "sleep_cycle" if sc_samples else "apple_watch"
+
+    logger.info(
+        "Shortcut: %d campioni totali (SC=%d, altri=%d) → usando %s",
+        len(sc_samples) + len(other_samples), len(sc_samples), len(other_samples), chosen_src,
+    )
 
     if not parsed:
         raise HTTPException(status_code=422, detail="Nessun campione Sleep Cycle trovato")
@@ -820,7 +886,7 @@ async def shortcut_sleep_webhook(
     quality_score = _calculate_quality_score(duration, deep_min, rem_min, sleep_efficiency, None)
 
     if existing:
-        existing.source = "sleep_cycle"
+        existing.source = chosen_src
         existing.sleep_start = sleep_start
         existing.sleep_end = sleep_end
         existing.duration_minutes = duration
@@ -855,15 +921,15 @@ async def shortcut_sleep_webhook(
         light_minutes=light_min,
         deep_minutes=deep_min,
         rem_minutes=rem_min,
-        source="sleep_cycle",
+        source=chosen_src,
     )
     db.add(session)
     await db.commit()
     await db.refresh(session)
 
     logger.info(
-        "Shortcut: nuova sessione %s (%s → %s, dur=%dm, deep=%dm, rem=%dm, quality=%d)",
-        session.id, sleep_start, sleep_end, duration, deep_min, rem_min, quality_score,
+        "Shortcut: nuova sessione %s (src=%s, %s → %s, dur=%dm, deep=%dm, rem=%dm, quality=%d)",
+        session.id, chosen_src, sleep_start, sleep_end, duration, deep_min, rem_min, quality_score,
     )
 
     return SleepCycleSyncResponse(
