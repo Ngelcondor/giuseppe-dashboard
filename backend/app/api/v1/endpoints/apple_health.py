@@ -736,3 +736,209 @@ async def sync_medications_from_hae(
         "errors": errors[:10],
         "synced_at": datetime.now(timezone.utc).isoformat(),
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# UNIFIED iOS SHORTCUT ENDPOINT — accetta TUTTE le metriche in un unico POST.
+# Niente header custom → funziona con iOS Shortcuts senza problemi HTTP/2.
+# Token via query param: ?token=<secret>
+# Body: pipe-delimited text (type|value|unit|date per riga) o JSON
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Mappa tipo (italiano/inglese) → (MetricType, unità default)
+_UNIFIED_TYPE_MAP: dict[str, tuple[MetricType, str]] = {
+    # Inglese
+    "steps": (MetricType.STEPS, "passi"),
+    "step_count": (MetricType.STEPS, "passi"),
+    "heart_rate": (MetricType.HEART_RATE, "bpm"),
+    "resting_heart_rate": (MetricType.HEART_RATE, "bpm"),
+    "walking_heart_rate": (MetricType.HEART_RATE, "bpm"),
+    "calories": (MetricType.CALORIES, "kcal"),
+    "active_energy": (MetricType.CALORIES, "kcal"),
+    "active_energy_burned": (MetricType.CALORIES, "kcal"),
+    "basal_energy": (MetricType.CALORIES, "kcal"),
+    "basal_energy_burned": (MetricType.CALORIES, "kcal"),
+    "weight": (MetricType.WEIGHT, "kg"),
+    "body_mass": (MetricType.WEIGHT, "kg"),
+    "blood_pressure": (MetricType.BLOOD_PRESSURE, "mmHg"),
+    "oxygen": (MetricType.OXYGEN, "%"),
+    "oxygen_saturation": (MetricType.OXYGEN, "%"),
+    "temperature": (MetricType.TEMPERATURE, "°C"),
+    "body_temperature": (MetricType.TEMPERATURE, "°C"),
+    # Italiano
+    "passi": (MetricType.STEPS, "passi"),
+    "battito": (MetricType.HEART_RATE, "bpm"),
+    "battito cardiaco": (MetricType.HEART_RATE, "bpm"),
+    "frequenza cardiaca": (MetricType.HEART_RATE, "bpm"),
+    "calorie": (MetricType.CALORIES, "kcal"),
+    "calorie attive": (MetricType.CALORIES, "kcal"),
+    "energia attiva": (MetricType.CALORIES, "kcal"),
+    "peso": (MetricType.WEIGHT, "kg"),
+    "pressione": (MetricType.BLOOD_PRESSURE, "mmHg"),
+    "ossigeno": (MetricType.OXYGEN, "%"),
+    "temperatura": (MetricType.TEMPERATURE, "°C"),
+    # HealthKit identifiers (short)
+    "stepcount": (MetricType.STEPS, "passi"),
+    "heartrate": (MetricType.HEART_RATE, "bpm"),
+    "restingheartrate": (MetricType.HEART_RATE, "bpm"),
+    "activeenergyburned": (MetricType.CALORIES, "kcal"),
+    "basalenergyburned": (MetricType.CALORIES, "kcal"),
+    "bodymass": (MetricType.WEIGHT, "kg"),
+    "oxygensaturation": (MetricType.OXYGEN, "%"),
+    "bodytemperature": (MetricType.TEMPERATURE, "°C"),
+}
+
+
+@router.post("/shortcut")
+async def unified_shortcut_webhook(
+    request: Request,
+    token: str = "",
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Endpoint unificato per iOS Shortcut — riceve tutte le metriche health.
+
+    Autenticazione via query param: ?token=<APPLE_HEALTH_WEBHOOK_SECRET>
+    Niente header custom → compatibile con iOS Shortcuts.
+
+    Formati accettati:
+      1. Testo pipe-delimited (una riga per metrica):
+         type|value|unit|date
+         steps|8432|passi|2026-04-12T08:00:00+02:00
+         heart_rate|72|bpm|2026-04-12T08:00:00+02:00
+         active_energy|342|kcal|2026-04-12T08:00:00+02:00
+
+      2. JSON:
+         {"metrics": [{"type": "steps", "value": 8432, "unit": "passi", "date": "..."}]}
+    """
+    import json as _json
+
+    # ── Auth ──
+    secret = settings.APPLE_HEALTH_WEBHOOK_SECRET
+    if not secret or token != secret:
+        raise HTTPException(status_code=401, detail="Token non valido.")
+
+    # ── Parse body ──
+    body = await request.body()
+    body_str = body.decode("utf-8", errors="replace").strip()
+
+    if not body_str:
+        raise HTTPException(status_code=422, detail="Body vuoto")
+
+    logger.info("Shortcut health: payload (%d chars): %s", len(body_str), body_str[:500])
+
+    metrics_raw: list[dict] = []
+
+    # Try JSON first
+    try:
+        raw = _json.loads(body_str)
+        if isinstance(raw, dict):
+            metrics_raw = raw.get("metrics") or raw.get("data") or []
+        elif isinstance(raw, list):
+            metrics_raw = raw
+    except (_json.JSONDecodeError, ValueError):
+        pass
+
+    # Fallback: pipe-delimited text
+    if not metrics_raw:
+        for line in body_str.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("|")
+            if len(parts) >= 2:
+                metrics_raw.append({
+                    "type": parts[0].strip(),
+                    "value": parts[1].strip(),
+                    "unit": parts[2].strip() if len(parts) > 2 else "",
+                    "date": parts[3].strip() if len(parts) > 3 else "",
+                })
+
+    if not metrics_raw:
+        raise HTTPException(status_code=422, detail="Nessuna metrica trovata nel payload")
+
+    # ── Resolve user ──
+    from app.models.user import User
+    result = await db.execute(sa_select(User).limit(1))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=503, detail="Nessun utente trovato.")
+    user_id = user.id
+
+    # ── Process metrics ──
+    imported = 0
+    skipped = 0
+    errors: list[str] = []
+    window = timedelta(minutes=1)
+
+    for item in metrics_raw:
+        type_raw = (item.get("type") or item.get("name") or "").strip()
+        type_key = type_raw.lower().replace("_", "").replace(" ", "")
+
+        # Cerca nella mappa (prova prima il raw, poi senza spazi/underscore)
+        mapping = _UNIFIED_TYPE_MAP.get(type_raw.lower())
+        if not mapping:
+            mapping = _UNIFIED_TYPE_MAP.get(type_key)
+        if not mapping:
+            errors.append(f"Tipo sconosciuto: {type_raw}")
+            continue
+
+        metric_type, default_unit = mapping
+
+        # Valore
+        try:
+            value = float(str(item.get("value", 0)).replace(",", "."))
+        except (ValueError, TypeError):
+            errors.append(f"{type_raw}: valore non valido ({item.get('value')})")
+            continue
+
+        if value <= 0:
+            continue  # Ignora valori nulli/negativi
+
+        unit = (item.get("unit") or default_unit).strip() or default_unit
+
+        # Data
+        date_str = item.get("date") or item.get("recorded_at") or item.get("start") or ""
+        try:
+            recorded_at = _parse_shortcut_date(str(date_str))
+        except Exception:
+            recorded_at = datetime.utcnow()
+
+        # Deduplication: skip if same type+value within ±1 min
+        dup_check = await db.execute(
+            sa_select(HealthMetric.id).where(
+                and_(
+                    HealthMetric.user_id == user_id,
+                    HealthMetric.metric_type == metric_type,
+                    HealthMetric.recorded_at >= recorded_at - window,
+                    HealthMetric.recorded_at <= recorded_at + window,
+                )
+            ).limit(1)
+        )
+        if dup_check.scalar_one_or_none():
+            skipped += 1
+            continue
+
+        db.add(HealthMetric(
+            user_id=user_id,
+            metric_type=metric_type,
+            value=value,
+            unit=unit,
+            recorded_at=recorded_at,
+            source="ios_shortcut",
+        ))
+        imported += 1
+
+    await db.commit()
+
+    logger.info(
+        "Shortcut health: imported=%d, skipped=%d, errors=%d",
+        imported, skipped, len(errors),
+    )
+
+    return {
+        "ok": True,
+        "imported": imported,
+        "skipped": skipped,
+        "errors": errors[:10],
+        "synced_at": datetime.now(timezone.utc).isoformat(),
+    }
