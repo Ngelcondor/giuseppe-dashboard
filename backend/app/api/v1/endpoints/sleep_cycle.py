@@ -591,10 +591,31 @@ async def health_auto_export_webhook(
 
 ## ── Nuovo endpoint: ricezione campioni granulari da Apple Shortcut ──────────
 
+async def _verify_webhook_token_or_query(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
+) -> None:
+    """Verifica token via header Authorization OPPURE query param ?token=..."""
+    secret = settings.APPLE_HEALTH_WEBHOOK_SECRET
+    if not secret:
+        raise HTTPException(status_code=503, detail="Webhook non configurato.")
+
+    # Prima prova header
+    if credentials and credentials.credentials == secret:
+        return
+
+    # Poi prova query param
+    token = request.query_params.get("token")
+    if token and token == secret:
+        return
+
+    raise HTTPException(status_code=401, detail="Token non valido.")
+
+
 @router.post(
     "/shortcut",
     response_model=SleepCycleSyncResponse,
-    dependencies=[Depends(_verify_webhook_token)],
+    dependencies=[Depends(_verify_webhook_token_or_query)],
 )
 async def shortcut_sleep_webhook(
     request: Request,
