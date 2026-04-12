@@ -612,6 +612,44 @@ async def _verify_webhook_token_or_query(
     raise HTTPException(status_code=401, detail="Token non valido.")
 
 
+@router.get(
+    "/shortcut",
+    response_model=SleepCycleSyncResponse,
+)
+async def shortcut_sleep_get(
+    request: Request,
+    token: str = "",
+    data: str = "",
+    db: AsyncSession = Depends(get_db),
+) -> SleepCycleSyncResponse:
+    """Endpoint GET per iOS Shortcuts — riceve dati base64 nel query param.
+
+    iOS Shortcuts manda header HTTP/2 invalidi nei POST, causando 400.
+    Questo endpoint GET accetta i dati come ?data=<base64>&token=<secret>.
+    Il base64 decodificato deve essere testo pipe-delimited (start|end|value|source per riga).
+    """
+    import base64
+
+    secret = settings.APPLE_HEALTH_WEBHOOK_SECRET
+    if not secret or token != secret:
+        raise HTTPException(status_code=401, detail="Token non valido.")
+
+    if not data:
+        raise HTTPException(status_code=422, detail="Parametro 'data' mancante")
+
+    try:
+        body_str = base64.b64decode(data).decode("utf-8", errors="replace")
+    except Exception:
+        # Forse non è base64, prova come testo diretto (URL-decoded)
+        body_str = data
+
+    logger.info("Shortcut GET: decoded payload (%d chars): %s", len(body_str), body_str[:300])
+
+    # Redirige al handler POST con il body decodificato
+    request._body = body_str.encode("utf-8")
+    return await shortcut_sleep_webhook(request, db)
+
+
 @router.post(
     "/shortcut",
     response_model=SleepCycleSyncResponse,
