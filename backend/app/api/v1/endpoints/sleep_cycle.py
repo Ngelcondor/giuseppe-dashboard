@@ -620,10 +620,31 @@ async def shortcut_sleep_webhook(
     from app.models.user import User
 
     body = await request.body()
-    raw = json.loads(body.decode("utf-8", errors="replace"))
-    logger.info("Shortcut webhook: raw payload (%d bytes)", len(body))
+    body_str = body.decode("utf-8", errors="replace").strip()
+    logger.info("Shortcut webhook: raw payload (%d bytes): %s", len(body), body_str[:500])
 
-    samples = raw.get("samples") or raw.get("data") or []
+    # Supporta sia JSON {"samples": [...]} sia testo pipe-delimited (start|end|value|source per riga)
+    samples: list[dict] = []
+    try:
+        raw = json.loads(body_str)
+        samples = raw.get("samples") or raw.get("data") or []
+        if isinstance(raw, list):
+            samples = raw
+    except (json.JSONDecodeError, ValueError):
+        # Formato testo: una riga per campione, campi separati da |
+        for line in body_str.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("|")
+            if len(parts) >= 3:
+                samples.append({
+                    "start": parts[0].strip(),
+                    "end": parts[1].strip(),
+                    "value": parts[2].strip(),
+                    "source": parts[3].strip() if len(parts) > 3 else "Sleep Cycle",
+                })
+
     if not samples:
         raise HTTPException(status_code=422, detail="Nessun campione trovato nel payload")
 
@@ -641,9 +662,11 @@ async def shortcut_sleep_webhook(
         if start >= end:
             continue
 
+        # Normalizza nomi fase da Shortcuts (es. "Asleep (Core)" → "asleepcore")
+        val_lower = value.lower().replace(" ", "").replace("(", "").replace(")", "")
+
         # Ignora campioni "InBed" — usiamo solo le fasi reali
-        val_lower = value.lower().replace(" ", "")
-        if val_lower == "inbed":
+        if val_lower in ("inbed", ""):
             continue
 
         parsed.append({
