@@ -29,6 +29,34 @@ router = APIRouter(prefix="/health/sleep/sync", tags=["sleep-cycle"])
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 
+# ── Priorità fonti: valore più alto = più affidabile ──
+_SOURCE_PRIORITY = {
+    "sleep_cycle": 30,   # Shortcut con campioni individuali
+    "apple_watch": 20,   # Shortcut con dati Apple Watch
+    "health_auto_export": 10,  # HAE webhook (dati aggregati, spesso imprecisi)
+}
+
+
+async def _find_same_night_session(
+    db: AsyncSession, user_id, sleep_start: datetime
+) -> Optional["SleepSession"]:
+    """Trova una sessione esistente per la stessa 'notte di sonno'.
+
+    Una notte = finestra di ±4 ore da sleep_start. Molto più robusta di ±5 min
+    perché HAE e Shortcut possono avere orari di inizio diversi per la stessa notte.
+    """
+    window = timedelta(hours=4)
+    result = await db.execute(
+        sa_select(SleepSession).where(
+            and_(
+                SleepSession.user_id == user_id,
+                SleepSession.sleep_start >= sleep_start - window,
+                SleepSession.sleep_start <= sleep_start + window,
+            )
+        ).order_by(SleepSession.created_at.desc()).limit(1)
+    )
+    return result.scalar_one_or_none()
+
 
 async def _verify_webhook_token(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
@@ -534,19 +562,9 @@ async def health_auto_export_webhook(
         raise HTTPException(status_code=503, detail="Nessun utente trovato.")
 
     user_id = user.id
-    window = timedelta(minutes=2)  # Finestra più stretta per evitare match errati
 
-    # Deduplication: match sia su sleep_start che sleep_end per maggiore precisione
-    dup_result = await db.execute(
-        sa_select(SleepSession).where(
-            and_(
-                SleepSession.user_id == user_id,
-                SleepSession.sleep_start >= sleep_start - window,
-                SleepSession.sleep_start <= sleep_start + window,
-            )
-        ).limit(1)
-    )
-    existing = dup_result.scalar_one_or_none()
+    # Deduplication: same-night (±4h)
+    existing = await _find_same_night_session(db, user_id, sleep_start)
 
     # Efficienza
     sleep_efficiency = round(duration / time_in_bed * 100, 1) if time_in_bed > 0 else None
@@ -563,10 +581,34 @@ async def health_auto_export_webhook(
     # Quality score
     quality_score = _calculate_quality_score(duration, deep_min, rem_min, sleep_efficiency, sc_quality)
 
-    # Usa la fonte effettiva dei dati (sleep_cycle > apple_watch > health_auto_export)
+    # Usa la fonte effettiva dei dati
     session_source = chosen_source if chosen_source != "health_auto_export" else "health_auto_export"
 
     if existing:
+        # ── Source priority: NON sovrascrivere se la sessione ha una fonte migliore ──
+        existing_prio = _SOURCE_PRIORITY.get(existing.source or "", 0)
+        new_prio = _SOURCE_PRIORITY.get(session_source, 0)
+
+        if new_prio < existing_prio:
+            logger.info(
+                "HAE: sessione %s già presente con fonte migliore (%s > %s), skip",
+                existing.id, existing.source, session_source,
+            )
+            # Aggiorna solo sc_quality_score se disponibile (è un dato extra utile)
+            if sc_quality is not None and existing.sc_quality_score is None:
+                existing.sc_quality_score = sc_quality
+                db.add(existing)
+                await db.commit()
+                await db.refresh(existing)
+            return SleepCycleSyncResponse(
+                ok=True,
+                session_id=str(existing.id),
+                imported=False,
+                reason=f"Sessione già presente con fonte migliore ({existing.source})",
+                synced_at=datetime.now(timezone.utc).isoformat(),
+            )
+
+        # Stessa priorità o superiore → aggiorna
         existing.source = session_source
         existing.sleep_start = sleep_start
         existing.sleep_end = sleep_end
@@ -583,6 +625,7 @@ async def health_auto_export_webhook(
         db.add(existing)
         await db.commit()
         await db.refresh(existing)
+        logger.info("HAE: aggiornata sessione %s (source=%s)", existing.id, session_source)
         return SleepCycleSyncResponse(
             ok=True,
             session_id=str(existing.id),
@@ -913,22 +956,13 @@ async def shortcut_sleep_webhook(
 
     user_id = user.id
 
-    # ── 5. Deduplication ──
-    window = timedelta(minutes=5)
-    dup_result = await db.execute(
-        sa_select(SleepSession).where(
-            and_(
-                SleepSession.user_id == user_id,
-                SleepSession.sleep_start >= sleep_start - window,
-                SleepSession.sleep_start <= sleep_start + window,
-            )
-        ).limit(1)
-    )
-    existing = dup_result.scalar_one_or_none()
+    # ── 5. Deduplication (same-night, ±4h) ──
+    existing = await _find_same_night_session(db, user_id, sleep_start)
 
     quality_score = _calculate_quality_score(duration, deep_min, rem_min, sleep_efficiency, None)
 
     if existing:
+        # Shortcut sovrascrive SEMPRE (priorità massima)
         existing.source = chosen_src
         existing.sleep_start = sleep_start
         existing.sleep_end = sleep_end
@@ -943,6 +977,7 @@ async def shortcut_sleep_webhook(
         db.add(existing)
         await db.commit()
         await db.refresh(existing)
+        logger.info("Shortcut: aggiornata sessione esistente %s (era source=%s)", existing.id, existing.source)
         return SleepCycleSyncResponse(
             ok=True,
             session_id=str(existing.id),
