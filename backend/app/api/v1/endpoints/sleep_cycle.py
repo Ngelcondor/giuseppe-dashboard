@@ -890,153 +890,177 @@ async def shortcut_sleep_webhook(
             current_block = [sample]
     blocks.append(current_block)
 
-    # Prendi il blocco PIÙ LUNGO (la sessione principale, non un pisolino)
+    # ── Raggruppa blocchi per "notte" (mezzogiorno→mezzogiorno) ──
+    # Ogni blocco con start tra le 12:00 del giorno X e le 11:59 del giorno X+1
+    # appartiene alla stessa notte. Poi per ogni notte si prende il blocco più lungo.
     def _block_duration(block: list[dict]) -> float:
         return sum(s["duration_min"] for s in block)
 
-    last_block = max(blocks, key=_block_duration)
+    def _night_key(block: list[dict]) -> str:
+        """Restituisce la data della 'notte' (giorno in cui ci si addormenta).
+        Convenzione: prima delle 12:00 → notte del giorno precedente."""
+        start = block[0]["start"]
+        if start.hour < 12:
+            night = (start - timedelta(days=1)).date()
+        else:
+            night = start.date()
+        return night.isoformat()
 
     # Log tutti i blocchi per debug
     for i, b in enumerate(blocks):
         dur = round(_block_duration(b))
-        marker = " ← SCELTO" if b is last_block else ""
         logger.info(
-            "Shortcut: blocco #%d: %s → %s, %d campioni, dur=%dm%s",
-            i + 1, b[0]["start"], b[-1]["end"], len(b), dur, marker,
+            "Shortcut: blocco #%d: %s → %s, %d campioni, dur=%dm, notte=%s",
+            i + 1, b[0]["start"], b[-1]["end"], len(b), dur, _night_key(b),
         )
 
-    # ── 3. Calcola metriche dal blocco ──
-    sleep_start = last_block[0]["start"]
-    sleep_end = last_block[-1]["end"]
+    # Raggruppa per notte e seleziona il blocco più lungo per ciascuna
+    from collections import defaultdict
+    nights: dict[str, list[list[dict]]] = defaultdict(list)
+    for b in blocks:
+        nights[_night_key(b)].append(b)
 
-    deep_min = 0
-    rem_min = 0
-    light_min = 0
-    awake_min = 0
-
-    for sample in last_block:
-        dur = round(sample["duration_min"])
-        val = sample["value"]
-        if val in ("asleepdeep", "deep"):
-            deep_min += dur
-        elif val in ("asleeprem", "rem"):
-            rem_min += dur
-        elif val in ("asleepcore", "core", "light", "asleep"):
-            light_min += dur
-        elif val in ("awake", "awakeinsleep"):
-            awake_min += dur
-        else:
-            light_min += dur  # fallback
-
-    # Calcola time_in_bed dai TIMESTAMPS (non dalla somma dei campioni, che può
-    # essere gonfiata da sovrapposizioni residue).
-    time_in_bed_ts = max(0, int((sleep_end - sleep_start).total_seconds() / 60))
-
-    stage_sum = deep_min + rem_min + light_min  # solo sonno effettivo (no awake)
-    # Se la somma degli stage supera time_in_bed, c'è ancora sovrapposizione → tronca
-    if stage_sum > time_in_bed_ts:
-        logger.warning(
-            "Shortcut: somma stage (%dm) > time_in_bed (%dm) — si usano i timestamp",
-            stage_sum, time_in_bed_ts,
+    # Filtra: per ogni notte prendi il blocco più lungo, scarta blocchi < 15 min
+    night_blocks: list[list[dict]] = []
+    for night_date, night_blks in sorted(nights.items()):
+        best = max(night_blks, key=_block_duration)
+        best_dur = _block_duration(best)
+        if best_dur < 15:
+            logger.info("Shortcut: notte %s scartata — blocco migliore solo %dm", night_date, round(best_dur))
+            continue
+        night_blocks.append(best)
+        logger.info(
+            "Shortcut: notte %s → blocco scelto %s→%s, dur=%dm",
+            night_date, best[0]["start"], best[-1]["end"], round(best_dur),
         )
-        # Ricalcola proporzionalmente
-        ratio = time_in_bed_ts / stage_sum if stage_sum > 0 else 1
-        deep_min = round(deep_min * ratio)
-        rem_min = round(rem_min * ratio)
-        light_min = round(light_min * ratio)
-        awake_min = time_in_bed_ts - deep_min - rem_min - light_min
-        stage_sum = deep_min + rem_min + light_min
 
-    duration = stage_sum
-    time_in_bed = time_in_bed_ts
-    awake_min = max(0, time_in_bed - duration)
-    sleep_efficiency = round(duration / time_in_bed * 100, 1) if time_in_bed > 0 else None
+    if not night_blocks:
+        raise HTTPException(status_code=422, detail="Nessun blocco di sonno significativo trovato")
 
-    logger.info(
-        "Shortcut: blocco %s → %s, dur=%dm, inBed=%dm, deep=%dm, rem=%dm, light=%dm, awake=%dm",
-        sleep_start, sleep_end, duration, time_in_bed, deep_min, rem_min, light_min, awake_min,
-    )
-
-    # ── 4. Resolve user ──
+    # ── 3-5. Resolve user (una volta sola) ──
     result = await db.execute(sa_select(User).limit(1))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=503, detail="Nessun utente trovato.")
-
     user_id = user.id
 
-    # ── 5. Deduplication (same-night, ±4h) ──
-    existing = await _find_same_night_session(db, user_id, sleep_start)
+    # ── Processa ogni notte ──
+    saved_ids: list[str] = []
+    any_imported = False
 
-    quality_score = _calculate_quality_score(duration, deep_min, rem_min, sleep_efficiency, None)
+    for night_block in night_blocks:
+        sleep_start = night_block[0]["start"]
+        sleep_end = night_block[-1]["end"]
 
-    if existing:
-        # ── Protezione: NON sovrascrivere se i nuovi dati sono peggiori ──
-        if duration < existing.duration_minutes and existing.duration_minutes > 30:
-            logger.info(
-                "Shortcut: skip aggiornamento sessione %s — nuova durata (%dm) < esistente (%dm)",
-                existing.id, duration, existing.duration_minutes,
+        deep_min = 0
+        rem_min = 0
+        light_min = 0
+        awake_min = 0
+
+        for sample in night_block:
+            dur = round(sample["duration_min"])
+            val = sample["value"]
+            if val in ("asleepdeep", "deep"):
+                deep_min += dur
+            elif val in ("asleeprem", "rem"):
+                rem_min += dur
+            elif val in ("asleepcore", "core", "light", "asleep"):
+                light_min += dur
+            elif val in ("awake", "awakeinsleep"):
+                awake_min += dur
+            else:
+                light_min += dur  # fallback
+
+        # Calcola time_in_bed dai TIMESTAMPS (non dalla somma dei campioni, che può
+        # essere gonfiata da sovrapposizioni residue).
+        time_in_bed_ts = max(0, int((sleep_end - sleep_start).total_seconds() / 60))
+
+        stage_sum = deep_min + rem_min + light_min  # solo sonno effettivo (no awake)
+        # Se la somma degli stage supera time_in_bed, c'è ancora sovrapposizione → tronca
+        if stage_sum > time_in_bed_ts:
+            logger.warning(
+                "Shortcut: somma stage (%dm) > time_in_bed (%dm) — si usano i timestamp",
+                stage_sum, time_in_bed_ts,
             )
-            return SleepCycleSyncResponse(
-                ok=True,
-                session_id=str(existing.id),
-                imported=False,
-                reason=f"Sessione esistente ha durata maggiore ({existing.duration_minutes}m > {duration}m), skip",
-                synced_at=datetime.now(timezone.utc).isoformat(),
-            )
+            ratio = time_in_bed_ts / stage_sum if stage_sum > 0 else 1
+            deep_min = round(deep_min * ratio)
+            rem_min = round(rem_min * ratio)
+            light_min = round(light_min * ratio)
+            awake_min = time_in_bed_ts - deep_min - rem_min - light_min
+            stage_sum = deep_min + rem_min + light_min
 
-        # Shortcut sovrascrive (priorità massima)
-        existing.source = chosen_src
-        existing.sleep_start = sleep_start
-        existing.sleep_end = sleep_end
-        existing.duration_minutes = duration
-        existing.time_in_bed_minutes = time_in_bed
-        existing.sleep_efficiency = sleep_efficiency
-        existing.deep_minutes = deep_min
-        existing.rem_minutes = rem_min
-        existing.light_minutes = light_min
-        existing.awake_minutes = awake_min
-        existing.quality_score = quality_score
-        db.add(existing)
-        await db.commit()
-        await db.refresh(existing)
-        logger.info("Shortcut: aggiornata sessione esistente %s (era source=%s)", existing.id, existing.source)
-        return SleepCycleSyncResponse(
-            ok=True,
-            session_id=str(existing.id),
-            imported=False,
-            reason="Sessione aggiornata con dati Shortcut (campioni granulari)",
-            synced_at=datetime.now(timezone.utc).isoformat(),
+        duration = stage_sum
+        time_in_bed = time_in_bed_ts
+        awake_min = max(0, time_in_bed - duration)
+        sleep_efficiency = round(duration / time_in_bed * 100, 1) if time_in_bed > 0 else None
+
+        logger.info(
+            "Shortcut: blocco %s → %s, dur=%dm, inBed=%dm, deep=%dm, rem=%dm, light=%dm, awake=%dm",
+            sleep_start, sleep_end, duration, time_in_bed, deep_min, rem_min, light_min, awake_min,
         )
 
-    # Nuova sessione
-    session = SleepSession(
-        user_id=user_id,
-        sleep_start=sleep_start,
-        sleep_end=sleep_end,
-        duration_minutes=duration,
-        quality_score=quality_score,
-        time_in_bed_minutes=time_in_bed,
-        sleep_efficiency=sleep_efficiency,
-        awake_minutes=awake_min,
-        light_minutes=light_min,
-        deep_minutes=deep_min,
-        rem_minutes=rem_min,
-        source=chosen_src,
-    )
-    db.add(session)
-    await db.commit()
-    await db.refresh(session)
+        # Deduplication (same-night, ±4h)
+        existing = await _find_same_night_session(db, user_id, sleep_start)
+        quality_score = _calculate_quality_score(duration, deep_min, rem_min, sleep_efficiency, None)
 
-    logger.info(
-        "Shortcut: nuova sessione %s (src=%s, %s → %s, dur=%dm, deep=%dm, rem=%dm, quality=%d)",
-        session.id, chosen_src, sleep_start, sleep_end, duration, deep_min, rem_min, quality_score,
-    )
+        if existing:
+            # Protezione: NON sovrascrivere se i nuovi dati sono peggiori
+            if duration < existing.duration_minutes and existing.duration_minutes > 30:
+                logger.info(
+                    "Shortcut: skip aggiornamento sessione %s — nuova durata (%dm) < esistente (%dm)",
+                    existing.id, duration, existing.duration_minutes,
+                )
+                saved_ids.append(str(existing.id))
+                continue
+
+            # Shortcut sovrascrive (priorità massima)
+            existing.source = chosen_src
+            existing.sleep_start = sleep_start
+            existing.sleep_end = sleep_end
+            existing.duration_minutes = duration
+            existing.time_in_bed_minutes = time_in_bed
+            existing.sleep_efficiency = sleep_efficiency
+            existing.deep_minutes = deep_min
+            existing.rem_minutes = rem_min
+            existing.light_minutes = light_min
+            existing.awake_minutes = awake_min
+            existing.quality_score = quality_score
+            db.add(existing)
+            await db.commit()
+            await db.refresh(existing)
+            logger.info("Shortcut: aggiornata sessione esistente %s (era source=%s)", existing.id, existing.source)
+            saved_ids.append(str(existing.id))
+        else:
+            # Nuova sessione
+            session = SleepSession(
+                user_id=user_id,
+                sleep_start=sleep_start,
+                sleep_end=sleep_end,
+                duration_minutes=duration,
+                quality_score=quality_score,
+                time_in_bed_minutes=time_in_bed,
+                sleep_efficiency=sleep_efficiency,
+                awake_minutes=awake_min,
+                light_minutes=light_min,
+                deep_minutes=deep_min,
+                rem_minutes=rem_min,
+                source=chosen_src,
+            )
+            db.add(session)
+            await db.commit()
+            await db.refresh(session)
+            any_imported = True
+            saved_ids.append(str(session.id))
+            logger.info(
+                "Shortcut: nuova sessione %s (src=%s, %s → %s, dur=%dm, deep=%dm, rem=%dm, quality=%d)",
+                session.id, chosen_src, sleep_start, sleep_end, duration, deep_min, rem_min, quality_score,
+            )
 
     return SleepCycleSyncResponse(
         ok=True,
-        session_id=str(session.id),
-        imported=True,
+        session_id=saved_ids[-1] if saved_ids else "",
+        imported=any_imported,
+        reason=f"Processate {len(night_blocks)} notti, {len(saved_ids)} sessioni salvate",
         synced_at=datetime.now(timezone.utc).isoformat(),
     )
 
