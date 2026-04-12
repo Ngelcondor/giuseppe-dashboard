@@ -804,6 +804,22 @@ async def shortcut_sleep_webhook(
     if not parsed:
         raise HTTPException(status_code=422, detail="Nessun campione Sleep Cycle trovato")
 
+    # ── 1b. Rimuovi campioni "asleep" generici se esistono campioni granulari ──
+    # Apple Watch scrive SIA "asleep" (broad) SIA "asleepcore/deep/rem" (granulari)
+    # che si sovrappongono → sommarli duplica il tempo.
+    granular_values = {"asleepcore", "asleepdeep", "asleeprem"}
+    has_granular = any(s["value"] in granular_values for s in parsed)
+    if has_granular:
+        before = len(parsed)
+        parsed = [s for s in parsed if s["value"] != "asleep"]
+        logger.info(
+            "Shortcut: rimossi %d campioni 'asleep' generici (granulari presenti)",
+            before - len(parsed),
+        )
+
+    if not parsed:
+        raise HTTPException(status_code=422, detail="Nessun campione valido dopo filtro")
+
     # ── 2. Ordina per start time e trova l'ultimo blocco continuo ──
     parsed.sort(key=lambda x: x["start"])
 
@@ -860,8 +876,28 @@ async def shortcut_sleep_webhook(
         else:
             light_min += dur  # fallback
 
-    duration = deep_min + rem_min + light_min  # solo sonno effettivo (no awake)
-    time_in_bed = duration + awake_min
+    # Calcola time_in_bed dai TIMESTAMPS (non dalla somma dei campioni, che può
+    # essere gonfiata da sovrapposizioni residue).
+    time_in_bed_ts = max(0, int((sleep_end - sleep_start).total_seconds() / 60))
+
+    stage_sum = deep_min + rem_min + light_min  # solo sonno effettivo (no awake)
+    # Se la somma degli stage supera time_in_bed, c'è ancora sovrapposizione → tronca
+    if stage_sum > time_in_bed_ts:
+        logger.warning(
+            "Shortcut: somma stage (%dm) > time_in_bed (%dm) — si usano i timestamp",
+            stage_sum, time_in_bed_ts,
+        )
+        # Ricalcola proporzionalmente
+        ratio = time_in_bed_ts / stage_sum if stage_sum > 0 else 1
+        deep_min = round(deep_min * ratio)
+        rem_min = round(rem_min * ratio)
+        light_min = round(light_min * ratio)
+        awake_min = time_in_bed_ts - deep_min - rem_min - light_min
+        stage_sum = deep_min + rem_min + light_min
+
+    duration = stage_sum
+    time_in_bed = time_in_bed_ts
+    awake_min = max(0, time_in_bed - duration)
     sleep_efficiency = round(duration / time_in_bed * 100, 1) if time_in_bed > 0 else None
 
     logger.info(
