@@ -803,9 +803,10 @@ async def shortcut_sleep_webhook(
         "deep": "asleepdeep", "rem": "asleeprem", "light": "asleepcore",
     }
 
-    # Filtra: solo campioni delle ultime 24 ore (evita che dati vecchi sovrascrivano sessioni)
+    # Filtra: solo campioni delle ultime 36 ore (copre sempre l'intera notte anche se
+    # lo Shortcut viene eseguito nel pomeriggio, ma scarta dati di 2+ notti fa)
     # _parse_date() ritorna naive UTC, quindi cutoff deve essere naive
-    cutoff = datetime.utcnow() - timedelta(hours=24)
+    cutoff = datetime.utcnow() - timedelta(hours=36)
 
     # Separa per fonte: preferisci Sleep Cycle > altre fonti
     sc_samples = []
@@ -970,7 +971,21 @@ async def shortcut_sleep_webhook(
     quality_score = _calculate_quality_score(duration, deep_min, rem_min, sleep_efficiency, None)
 
     if existing:
-        # Shortcut sovrascrive SEMPRE (priorità massima)
+        # ── Protezione: NON sovrascrivere se i nuovi dati sono peggiori ──
+        if duration < existing.duration_minutes and existing.duration_minutes > 30:
+            logger.info(
+                "Shortcut: skip aggiornamento sessione %s — nuova durata (%dm) < esistente (%dm)",
+                existing.id, duration, existing.duration_minutes,
+            )
+            return SleepCycleSyncResponse(
+                ok=True,
+                session_id=str(existing.id),
+                imported=False,
+                reason=f"Sessione esistente ha durata maggiore ({existing.duration_minutes}m > {duration}m), skip",
+                synced_at=datetime.now(timezone.utc).isoformat(),
+            )
+
+        # Shortcut sovrascrive (priorità massima)
         existing.source = chosen_src
         existing.sleep_start = sleep_start
         existing.sleep_end = sleep_end
