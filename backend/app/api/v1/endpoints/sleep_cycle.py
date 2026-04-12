@@ -890,11 +890,18 @@ async def shortcut_sleep_webhook(
             current_block = [sample]
     blocks.append(current_block)
 
-    # ── Raggruppa blocchi per "notte" (mezzogiorno→mezzogiorno) ──
-    # Ogni blocco con start tra le 12:00 del giorno X e le 11:59 del giorno X+1
-    # appartiene alla stessa notte. Poi per ogni notte si prende il blocco più lungo.
     def _block_duration(block: list[dict]) -> float:
         return sum(s["duration_min"] for s in block)
+
+    # Filtra micro-blocchi (< 10 min) — rumore da campioni isolati (es. 17:22→17:25)
+    MIN_BLOCK_DUR = 10  # minuti
+    blocks = [b for b in blocks if _block_duration(b) >= MIN_BLOCK_DUR]
+    if not blocks:
+        raise HTTPException(status_code=422, detail="Nessun blocco di sonno significativo (tutti < 10 min)")
+
+    # ── Raggruppa blocchi per "notte" (mezzogiorno→mezzogiorno) ──
+    # Ogni blocco con start tra le 12:00 del giorno X e le 11:59 del giorno X+1
+    # appartiene alla stessa notte. Unisce tutti i blocchi della stessa notte.
 
     def _night_key(block: list[dict]) -> str:
         """Restituisce la data della 'notte' (giorno in cui ci si addormenta).
