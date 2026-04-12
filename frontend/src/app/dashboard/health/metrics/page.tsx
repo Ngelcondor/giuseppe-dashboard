@@ -63,6 +63,49 @@ function getTrend(metrics: HealthMetric[]): { direction: 'up' | 'down' | 'stable
   return { direction: pct > 0 ? 'up' : 'down', pct: Math.abs(Math.round(pct)) };
 }
 
+// For high-frequency metrics like heart_rate, a single "latest" sample is
+// volatile (it could be a workout spike, a stress reading, or a rest value).
+// Display instead a stable figure: the average of the most recent day's
+// samples. For all other metrics (weight, steps, calories, …) the latest
+// recorded sample is already representative.
+function getDisplayLatest(
+  metrics: HealthMetric[],
+  type: MetricType,
+): { value: number; recorded_at: string; source: string } | null {
+  if (metrics.length === 0) return null;
+  const sorted = [...metrics].sort(
+    (a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime(),
+  );
+  const newest = sorted[0];
+
+  if (type === 'heart_rate' && sorted.length > 1) {
+    const newestDay = new Date(newest.recorded_at).toDateString();
+    const sameDay = sorted.filter(
+      (m) => new Date(m.recorded_at).toDateString() === newestDay,
+    );
+    if (sameDay.length > 1) {
+      const avg = sameDay.reduce((s, m) => s + m.value, 0) / sameDay.length;
+      return { value: avg, recorded_at: newest.recorded_at, source: newest.source };
+    }
+  }
+
+  return { value: newest.value, recorded_at: newest.recorded_at, source: newest.source };
+}
+
+// Which trend direction represents an improvement for each metric.
+// Heart rate and blood pressure going down is clinically positive; going up is
+// a warning. Oxygen going up is positive. Weight and temperature don't have a
+// universally "good" direction, so we treat any change as neutral.
+const GOOD_TREND_DIRECTION: Record<MetricType, 'up' | 'down' | null> = {
+  heart_rate: 'down',
+  blood_pressure: 'down',
+  oxygen: 'up',
+  steps: 'up',
+  calories: 'up',
+  weight: null,
+  temperature: null,
+};
+
 // ─── Metric Card ────────────────────────────────────────────────────────────
 
 function MetricCard({
@@ -75,10 +118,11 @@ function MetricCard({
   onAdd: (type: MetricType) => void;
 }) {
   const config = METRIC_CONFIG[type];
-  const latest = metrics.length > 0
-    ? [...metrics].sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime())[0]
-    : null;
+  const latest = getDisplayLatest(metrics, type);
   const trend = getTrend(metrics);
+  const goodDir = GOOD_TREND_DIRECTION[type];
+  const trendIsPositive =
+    goodDir !== null && trend.direction !== 'stable' && trend.direction === goodDir;
 
   return (
     <div className="rounded-xl bg-card border border-border-default hover:border-border-hover p-4 transition-all">
@@ -102,7 +146,11 @@ function MetricCard({
         <div className="flex items-center gap-2">
           {trend.direction !== 'stable' && (
             <div className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full ${
-              trend.direction === 'up' ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400'
+              goodDir === null
+                ? 'bg-surface-hover text-body'
+                : trendIsPositive
+                ? 'bg-emerald-900/30 text-emerald-400'
+                : 'bg-red-900/30 text-red-400'
             }`}>
               {trend.direction === 'up' ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
               {trend.pct}%
