@@ -893,11 +893,15 @@ async def shortcut_sleep_webhook(
     def _block_duration(block: list[dict]) -> float:
         return sum(s["duration_min"] for s in block)
 
-    # Filtra micro-blocchi (< 10 min) — rumore da campioni isolati (es. 17:22→17:25)
-    MIN_BLOCK_DUR = 10  # minuti
-    blocks = [b for b in blocks if _block_duration(b) >= MIN_BLOCK_DUR]
+    # Filtra rumore DIURNO: blocchi < 10 min tra le 10:00 e le 20:00 sono noise
+    # (es. campione isolato delle 17:22). Blocchi notturni brevi sono frammenti reali.
+    def _is_daytime_noise(block: list[dict]) -> bool:
+        start_hour = block[0]["start"].hour
+        return _block_duration(block) < 10 and 10 <= start_hour < 20
+
+    blocks = [b for b in blocks if not _is_daytime_noise(b)]
     if not blocks:
-        raise HTTPException(status_code=422, detail="Nessun blocco di sonno significativo (tutti < 10 min)")
+        raise HTTPException(status_code=422, detail="Nessun blocco di sonno significativo trovato")
 
     # ── Raggruppa blocchi per "notte" (mezzogiorno→mezzogiorno) ──
     # Ogni blocco con start tra le 12:00 del giorno X e le 11:59 del giorno X+1
