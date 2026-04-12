@@ -914,24 +914,29 @@ async def shortcut_sleep_webhook(
             i + 1, b[0]["start"], b[-1]["end"], len(b), dur, _night_key(b),
         )
 
-    # Raggruppa per notte e seleziona il blocco più lungo per ciascuna
+    # Raggruppa per notte e UNISCI tutti i blocchi della stessa notte
     from collections import defaultdict
     nights: dict[str, list[list[dict]]] = defaultdict(list)
     for b in blocks:
         nights[_night_key(b)].append(b)
 
-    # Filtra: per ogni notte prendi il blocco più lungo, scarta blocchi < 15 min
+    # Per ogni notte: unisci tutti i campioni di tutti i blocchi in un unico "mega-blocco"
     night_blocks: list[list[dict]] = []
     for night_date, night_blks in sorted(nights.items()):
-        best = max(night_blks, key=_block_duration)
-        best_dur = _block_duration(best)
-        if best_dur < 15:
-            logger.info("Shortcut: notte %s scartata — blocco migliore solo %dm", night_date, round(best_dur))
+        # Unisci tutti i campioni di tutti i blocchi di questa notte
+        merged = []
+        for blk in night_blks:
+            merged.extend(blk)
+        merged.sort(key=lambda x: x["start"])
+        total_dur = _block_duration(merged)
+        if total_dur < 15:
+            logger.info("Shortcut: notte %s scartata — durata totale solo %dm", night_date, round(total_dur))
             continue
-        night_blocks.append(best)
+        night_blocks.append(merged)
         logger.info(
-            "Shortcut: notte %s → blocco scelto %s→%s, dur=%dm",
-            night_date, best[0]["start"], best[-1]["end"], round(best_dur),
+            "Shortcut: notte %s → %d blocchi uniti, %d campioni, %s→%s, dur=%dm",
+            night_date, len(night_blks), len(merged),
+            merged[0]["start"], merged[-1]["end"], round(total_dur),
         )
 
     if not night_blocks:
