@@ -6,11 +6,20 @@ import { usePathname } from 'next/navigation';
 import {
   Activity, Heart, Flame, Brain, Clock, Shield, TrendingUp,
   AlertTriangle, LayoutDashboard, Calendar, Utensils, Wallet, Rss,
-  Settings, Zap, Menu, X, ChevronRight, CheckCircle2, Circle, Sun, Sunset, CloudMoon, Play
+  Settings, Zap, Menu, X, ChevronRight, CheckCircle2, Circle, Sun, Sunset, CloudMoon, Play,
+  BookOpen, Coffee
 } from 'lucide-react';
 import routineService, { type RoutineResponse, type TimeOfDay } from '@/services/routineService';
 import SleepWidget from '@/components/widgets/SleepWidget';
 import api from '@/lib/api';
+import {
+  loadState,
+  toggleTask,
+  getTodayDay,
+  getDayProgress,
+  getPendingPastTasks,
+  type StudyDay,
+} from '@/lib/studyPlanState';
 
 const navSections = [
   { label: 'Dashboard',      href: '/dashboard',           icon: LayoutDashboard },
@@ -21,6 +30,7 @@ const navSections = [
   { label: 'Umore',          href: '/dashboard/mood',      icon: TrendingUp },
   { label: 'Scadenze',       href: '/dashboard/deadlines', icon: AlertTriangle },
   { label: 'Calendario',     href: '/dashboard/calendar',  icon: Calendar },
+  { label: 'Studio',         href: '/dashboard/study',     icon: BookOpen },
   { label: 'CTF Tracker',    href: '/dashboard/ctf',       icon: Shield },
   { label: 'Cyber Feed',     href: '/dashboard/feed',      icon: Rss },
   { label: 'Budget',         href: '/dashboard/budget',    icon: Wallet },
@@ -229,6 +239,141 @@ function DeadlinesWidget() {
         </>
       )}
     </Widget>
+  );
+}
+
+// ─── Study Widget (CRTP plan, da localStorage) ────────────────────────────────
+
+function StudyWidget() {
+  const [today, setToday] = useState<StudyDay | undefined>(undefined);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [, force] = useState(0);
+
+  useEffect(() => {
+    const s = loadState();
+    setToday(getTodayDay(s));
+    setPendingCount(getPendingPastTasks(s).length);
+  }, []);
+
+  const handleToggle = (e: React.MouseEvent, taskId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!today) return;
+    const s = loadState();
+    const next = toggleTask(s, today.date, taskId);
+    setToday(getTodayDay(next));
+    force(n => n + 1);
+  };
+
+  // Nessun giorno pianificato (fuori dal range del piano)
+  if (!today) {
+    return (
+      <Widget href="/dashboard/study">
+        <WidgetHeader icon={BookOpen} label="Studio CRTP" />
+        <p className="text-sm text-muted">Nessun giorno pianificato.</p>
+        <p className="text-xs text-muted mt-1.5">Il piano va dal 28 Apr al 22 Set 2026.</p>
+      </Widget>
+    );
+  }
+
+  // Giorno di rest
+  if (today.isRest) {
+    return (
+      <Widget href="/dashboard/study">
+        <WidgetHeader icon={BookOpen} label="Studio CRTP" />
+        <div className="flex flex-col items-center text-center py-4">
+          <Coffee size={28} className="text-blue-400 mb-2.5" />
+          <p className="text-sm font-medium text-heading">{today.label}</p>
+          <p className="text-xs text-tertiary mt-1.5">Domenica sacra. Riposa.</p>
+        </div>
+      </Widget>
+    );
+  }
+
+  const progress = getDayProgress(today);
+  const visibleTasks = today.tasks.slice(0, 4);
+
+  return (
+    <div className="group block p-7 rounded-2xl bg-card border border-border-default hover:bg-surface-hover hover:border-border-hover transition-all duration-200">
+      <Link href="/dashboard/study">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-3">
+            <BookOpen size={18} className="text-teal-400" />
+            <span className="text-sm font-medium text-teal-400 uppercase tracking-widest">
+              Studio CRTP
+            </span>
+          </div>
+          <ChevronRight size={16} className="text-muted group-hover:text-tertiary transition-colors" />
+        </div>
+      </Link>
+
+      {/* Pending banner */}
+      {pendingCount > 0 && (
+        <Link
+          href="/dashboard/study/today"
+          className="flex items-center gap-2 px-3 py-2 mb-4 rounded-lg bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300 hover:bg-rose-500/20 transition-colors"
+        >
+          <AlertTriangle size={12} />
+          {pendingCount} task in arretrato — riprogramma
+        </Link>
+      )}
+
+      {/* Progress bar */}
+      {progress.total > 0 && (
+        <div className="mb-5">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs text-muted truncate pr-2">{today.label}</span>
+            <span className="text-xs font-medium text-teal-400 shrink-0">{progress.done}/{progress.total}</span>
+          </div>
+          <div className="w-full h-1.5 rounded-full bg-card-inner overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${progress.pct}%`,
+                backgroundColor: progress.pct === 100 ? '#34d399' : '#2dd4bf',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Tasks (max 4 visibili) */}
+      <div className="space-y-3">
+        {visibleTasks.map(task => {
+          const done = task.completed;
+          return (
+            <button
+              key={task.id}
+              onClick={(e) => handleToggle(e, task.id)}
+              className="flex items-start gap-3 w-full text-left group/step"
+            >
+              {done ? (
+                <CheckCircle2 size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+              ) : task.skipped ? (
+                <Circle size={16} className="text-amber-400/60 shrink-0 mt-0.5" />
+              ) : (
+                <Circle size={16} className="text-muted group-hover/step:text-body shrink-0 mt-0.5 transition-colors" />
+              )}
+              <span
+                className={`text-sm leading-relaxed ${
+                  done ? 'text-tertiary line-through' : task.skipped ? 'text-amber-300/70 italic' : 'text-body'
+                }`}
+              >
+                {task.text}
+              </span>
+            </button>
+          );
+        })}
+        {today.tasks.length > 4 && (
+          <Link href="/dashboard/study/today" className="text-xs text-muted hover:text-body transition-colors pl-7">
+            +{today.tasks.length - 4} altri task →
+          </Link>
+        )}
+        {today.tasks.length === 0 && (
+          <p className="text-xs text-muted">Nessun task per oggi 🎉</p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -488,6 +633,7 @@ export default function DashboardPage() {
               { label: 'Log umore', emoji: '😊', href: '/dashboard/mood' },
               { label: 'Farmaco', emoji: '💊', href: '/dashboard/habits' },
               { label: 'Pomodoro', emoji: '🍅', href: '/dashboard/focus' },
+              { label: 'Studio CRTP', emoji: '📚', href: '/dashboard/study/today' },
               { label: 'Spesa', emoji: '💸', href: '/dashboard/budget' },
               { label: 'Log sensoriale', emoji: '🧠', href: '/dashboard/sensory' },
             ].map(a => (
@@ -504,6 +650,9 @@ export default function DashboardPage() {
 
             {/* Sleep (stile Sleep Cycle) */}
             <SleepWidget />
+
+            {/* Studio CRTP — task del giorno */}
+            <StudyWidget />
 
             {/* Health (dati reali) */}
             <HealthWidget />
