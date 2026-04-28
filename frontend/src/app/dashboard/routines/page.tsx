@@ -3,12 +3,13 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import {
-  ArrowLeft, Plus, Play, Pause, Check, CheckCircle2, Circle,
+  Plus, Play, Pause, Check, CheckCircle2, Circle,
   Clock, Sun, Sunset, Moon, Trash2, Edit3, X,
   ChevronDown, ChevronUp, Flame, Timer, Star,
   GripVertical, RotateCcw, AlertCircle, Trophy, Zap,
   Sparkles, TrendingUp, Coffee,
 } from 'lucide-react';
+import { EditorialPage } from '@/components/ui/EditorialPage';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Modal, ConfirmModal } from '@/components/ui/Modal';
@@ -1288,37 +1289,32 @@ export default function RoutinesPage() {
 
   // ─── Render ───────────────────────────────────────────────────────────
 
-  return (
-    <div className="min-h-screen bg-page text-heading">
-      {/* Header */}
-      <header className="sticky top-0 z-30 px-6 py-4 border-b border-border-default bg-page/85 backdrop-blur-md">
-        <div className="max-w-3xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-tertiary hover:text-heading hover:border-border-hover transition-colors">
-              <ArrowLeft size={15} />
-            </Link>
-            <div>
-              <p className="section-label leading-none mb-0.5">Daily structure</p>
-              <h1 className="text-[15px] font-semibold tracking-tight flex items-center gap-2">
-                Routine
-                {streak > 0 && (
-                  <span className="flex items-center gap-1 text-xs font-semibold text-orange-400 font-mono-display">
-                    <Flame size={12} /> {streak}
-                  </span>
-                )}
-              </h1>
-            </div>
-          </div>
-          <button
-            onClick={() => { setEditingRoutine(null); setShowForm(true); }}
-            className="chip border-blue-500/30 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20"
-          >
-            <Plus size={12} /> Nuova
-          </button>
-        </div>
-      </header>
+  const headerActions = (
+    <>
+      {streak > 0 && (
+        <span className="chip border-orange-500/30 bg-orange-500/10 text-orange-300">
+          <Flame size={12} /> {streak}
+        </span>
+      )}
+      <button
+        onClick={() => { setEditingRoutine(null); setShowForm(true); }}
+        className="chip border-accent-soft bg-accent-soft text-accent hover:bg-accent hover:text-white"
+      >
+        <Plus size={12} /> Nuova
+      </button>
+    </>
+  );
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
+  return (
+    <EditorialPage
+      eyebrow="Daily structure"
+      title="Le tue"
+      titleAccent="routine"
+      description="Struttura ogni momento della giornata. Senza pensare."
+      width="lg"
+      actions={headerActions}
+    >
+      <div>
         {/* Gamification Header */}
         {!loading && todayRoutines.length > 0 && activeTab === 'today' && (
           <div className="mb-6">
@@ -1506,7 +1502,7 @@ export default function RoutinesPage() {
             onToggleActive={handleToggleActive}
           />
         )}
-      </main>
+      </div>
 
       {/* Form Modal */}
       <RoutineFormModal
@@ -1527,6 +1523,6 @@ export default function RoutinesPage() {
         isDanger
         isLoading={isDeleting}
       />
-    </div>
+    </EditorialPage>
   );
 }

@@ -3,12 +3,13 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
-  ArrowLeft, Wallet, RefreshCw, Link2, Upload, ChevronLeft, ChevronRight,
+  Wallet, RefreshCw, Link2, Upload, ChevronLeft, ChevronRight,
   TrendingUp, TrendingDown, AlertTriangle, Check, Clock, CreditCard,
   Plus, X, Banknote, PieChart, Calendar, ArrowUpRight, ArrowDownRight,
   Unlink,
 } from 'lucide-react';
 import { API_BASE_URL } from '@/lib/constants';
+import { EditorialPage } from '@/components/ui/EditorialPage';
 import {
   getBudgetDashboard,
   getBankConnection,
@@ -285,48 +286,42 @@ export default function BudgetPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
+  const headerActions = (
+    <>
+      <button onClick={fetchDashboard} disabled={loading} className="p-2 text-tertiary hover:text-body transition-colors rounded-lg hover:bg-card-inner" aria-label="Ricarica">
+        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+      </button>
+      <div className="flex gap-0.5 p-1 rounded-xl bg-card-inner border border-border-default">
+        {([
+          { key: 'overview' as View, label: 'Panoramica' },
+          { key: 'transactions' as View, label: 'Movimenti' },
+          { key: 'scadenze' as View, label: 'Scadenze' },
+          { key: 'settings' as View, label: 'Banca' },
+        ]).map(({ key, label }) => (
+          <button key={key} onClick={() => setView(key)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${view === key ? 'bg-surface-hover text-heading' : 'text-tertiary hover:text-body'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+
   return (
-    <div className="min-h-screen bg-page text-heading">
+    <EditorialPage
+      eyebrow="Finance"
+      title="Il tuo"
+      titleAccent="budget"
+      description="Entrate, uscite, scadenze. Controllo, non ansia."
+      width="lg"
+      actions={headerActions}
+    >
       {/* Global hidden file input for CSV */}
       <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVImport} />
 
-      {/* Header */}
-      <header className="sticky top-0 z-30 px-6 py-4 border-b border-border-default bg-page/85 backdrop-blur-md">
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-tertiary hover:text-heading hover:border-border-hover transition-colors">
-              <ArrowLeft size={15} />
-            </Link>
-            <div>
-              <p className="section-label leading-none mb-0.5">Finance</p>
-              <h1 className="text-[15px] font-semibold tracking-tight">Budget</h1>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <button onClick={fetchDashboard} disabled={loading} className="p-2 text-tertiary hover:text-body transition-colors rounded-lg hover:bg-card-inner">
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            </button>
-            <div className="flex gap-0.5 p-1 rounded-xl bg-card-inner border border-border-default">
-              {([
-                { key: 'overview' as View, label: 'Panoramica' },
-                { key: 'transactions' as View, label: 'Movimenti' },
-                { key: 'scadenze' as View, label: 'Scadenze' },
-                { key: 'settings' as View, label: 'Banca' },
-              ]).map(({ key, label }) => (
-                <button key={key} onClick={() => setView(key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${view === key ? 'bg-surface-hover text-heading' : 'text-tertiary hover:text-body'}`}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* Messages */}
       {error && (
-        <div className="max-w-2xl mx-auto px-6 mt-4">
+        <div className="mb-4">
           <div className="flex items-center justify-between p-3 rounded-xl bg-red-500/5 border border-red-500/20 text-red-400 text-xs">
             <span>{error}</span>
             <button onClick={() => setError('')}><X size={12} /></button>
@@ -334,14 +329,14 @@ export default function BudgetPage() {
         </div>
       )}
       {successMsg && (
-        <div className="max-w-2xl mx-auto px-6 mt-4">
+        <div className="mb-4">
           <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-emerald-400 text-xs">
             {successMsg}
           </div>
         </div>
       )}
 
-      <main className="max-w-2xl mx-auto px-6 py-8 space-y-6">
+      <div className="space-y-6">
 
         {/* Loading */}
         {loading && !dashboard && (
@@ -738,7 +733,7 @@ export default function BudgetPage() {
             )}
           </>
         )}
-      </main>
-    </div>
+      </div>
+    </EditorialPage>
   );
 }

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { EditorialPage } from '@/components/ui/EditorialPage';
 import {
   ArrowLeft,
   Dumbbell,
@@ -785,31 +786,27 @@ export default function WorkoutsPage() {
   );
   const sessionProgress = totalSets > 0 ? (completedSets / totalSets) * 100 : 0;
 
-  return (
-    <div className="min-h-screen bg-page text-heading">
-      {/* Header */}
-      <header className="sticky top-0 z-30 px-6 py-4 border-b border-border-default bg-page/85 backdrop-blur-md flex items-center gap-3">
-        <Link
-          href="/dashboard/health"
-          className="flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-tertiary hover:text-heading hover:border-border-hover transition-colors"
-        >
-          <ArrowLeft size={15} />
-        </Link>
-        <Dumbbell size={15} className="text-violet-400" />
-        <div className="flex-1">
-          <p className="section-label leading-none mb-0.5">Training</p>
-          <h1 className="text-[15px] font-semibold tracking-tight">Allenamenti</h1>
-        </div>
-        <button
-          onClick={() => setShowHistory(true)}
-          className="p-2 rounded-lg bg-card text-body hover:text-heading transition-colors"
-          title="Storico"
-        >
-          <History size={18} />
-        </button>
-      </header>
+  const headerActions = (
+    <button
+      onClick={() => setShowHistory(true)}
+      className="p-2 rounded-lg text-tertiary hover:text-heading hover:bg-card-inner transition-colors"
+      title="Storico"
+    >
+      <History size={14} />
+    </button>
+  );
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-5">
+  return (
+    <EditorialPage
+      eyebrow="Training"
+      title="I tuoi"
+      titleAccent="allenamenti"
+      description="Upper / Lower split, set, reps, intensità."
+      back="/dashboard/health"
+      width="md"
+      actions={headerActions}
+    >
+      <div className="space-y-5">
         {/* Weekly Progress */}
         <div className="rounded-2xl bg-gradient-to-br from-violet-950/40 to-slate-900 border border-violet-500/10 p-5">
           <div className="flex items-center justify-between mb-3">
@@ -1012,7 +1009,7 @@ export default function WorkoutsPage() {
           <p>Scheda: Upper / Lower / Upper — 4 settimane</p>
           <p>Obiettivo: reclutamento fibre, adattamento muscolare, gesto motorio</p>
         </div>
-      </main>
+      </div>
 
       {/* History Modal */}
       <HistoryPanel
@@ -1024,6 +1021,6 @@ export default function WorkoutsPage() {
           saveHistory([]);
         }}
       />
-    </div>
+    </EditorialPage>
   );
 }

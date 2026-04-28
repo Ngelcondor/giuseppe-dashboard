@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { EditorialPage } from '@/components/ui/EditorialPage';
 import {
-  ArrowLeft,
   Settings,
   Bell,
   Moon,
@@ -789,21 +789,14 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-page text-body">
-      <header className="sticky top-0 z-30 px-6 py-4 border-b border-border-default bg-page/85 backdrop-blur-md">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <Link href="/dashboard" className="flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-tertiary hover:text-heading hover:border-border-hover transition-colors">
-            <ArrowLeft size={15} />
-          </Link>
-          <Settings size={15} className="text-accent" />
-          <div>
-            <p className="section-label leading-none mb-0.5">System</p>
-            <h1 className="text-[15px] font-semibold text-heading tracking-tight">Pannello di Controllo</h1>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+    <EditorialPage
+      eyebrow="System"
+      title="Pannello di"
+      titleAccent="controllo"
+      description="Tutte le manopole del tuo sistema operativo personale."
+      width="md"
+    >
+      <div className="space-y-4">
         {/* Status banners */}
         {error && (
           <div className="px-4 py-3 rounded-lg bg-red-900/30 border border-red-700/50 flex items-start gap-3">
@@ -993,13 +986,13 @@ export default function SettingsPage() {
           <p className="text-[10px] text-muted">Giuseppe Dashboard v1.0.0</p>
           <p className="text-[10px] text-muted/50 mt-1">FastAPI + Next.js + PostgreSQL</p>
         </div>
-      </main>
+      </div>
 
       {/* Password Modal */}
       <PasswordChangeModal
         isOpen={showPasswordModal}
         onClose={() => setShowPasswordModal(false)}
       />
-    </div>
+    </EditorialPage>
   );
 }

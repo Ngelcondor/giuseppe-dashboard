@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import Link from 'next/link';
-import { ArrowLeft, Play, Pause, RotateCcw, SkipForward, Settings, X } from 'lucide-react';
+import { Play, Pause, RotateCcw, SkipForward, Settings, X } from 'lucide-react';
+import { EditorialPage } from '@/components/ui/EditorialPage';
 
 type Mode = 'work' | 'short' | 'long';
 
@@ -132,31 +132,26 @@ export default function FocusPage() {
   const todayMinutes = todaySessions.filter(s => s.type === 'work').reduce((a, s) => a + s.duration, 0);
   const color = MODE_COLORS[mode];
 
+  const settingsBtn = (
+    <button
+      onClick={() => { setDraftConfig(config); setShowConfig(true); }}
+      className="p-2 text-tertiary hover:text-body transition-colors rounded-lg hover:bg-card-inner"
+      aria-label="Configura timer"
+    >
+      <Settings size={14} />
+    </button>
+  );
+
   return (
-    <div className="min-h-screen bg-page text-heading">
-
-      {/* Header */}
-      <header className="sticky top-0 z-30 px-6 py-4 border-b border-border-default bg-page/85 backdrop-blur-md">
-        <div className="max-w-md mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-tertiary hover:text-heading hover:border-border-hover transition-colors">
-              <ArrowLeft size={15} />
-            </Link>
-            <div>
-              <p className="section-label leading-none mb-0.5">Deep Work</p>
-              <h1 className="text-[15px] font-semibold tracking-tight">Focus</h1>
-            </div>
-          </div>
-          <button
-            onClick={() => { setDraftConfig(config); setShowConfig(true); }}
-            className="p-2 text-tertiary hover:text-body transition-colors rounded-lg hover:bg-card-inner"
-          >
-            <Settings size={14} />
-          </button>
-        </div>
-      </header>
-
-      <main className="max-w-md mx-auto px-6 py-8">
+    <EditorialPage
+      eyebrow="Deep Work"
+      title="Focus"
+      titleAccent="presente"
+      description="Pomodoro classico per le sessioni di lavoro non-CRTP."
+      width="sm"
+      actions={settingsBtn}
+    >
+      <div>
 
         {/* Mode selector */}
         <div className="flex justify-center mb-10">
@@ -269,7 +264,7 @@ export default function FocusPage() {
             </div>
           </div>
         )}
-      </main>
+      </div>
 
       {/* Config modal */}
       {showConfig && (
@@ -312,6 +307,6 @@ export default function FocusPage() {
           </div>
         </div>
       )}
-    </div>
+    </EditorialPage>
   );
 }

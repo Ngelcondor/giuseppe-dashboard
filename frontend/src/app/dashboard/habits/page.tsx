@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
-import { ArrowLeft, Flame, Plus, X, RefreshCw, Trophy, ChevronDown, ChevronUp } from 'lucide-react';
+import { Flame, Plus, X, RefreshCw, Trophy, ChevronDown, ChevronUp } from 'lucide-react';
 import { API_BASE_URL } from '@/lib/constants';
+import { EditorialPage } from '@/components/ui/EditorialPage';
 
 const API = `${API_BASE_URL}/habits-api`;
 
@@ -175,40 +175,35 @@ export default function HabitsPage() {
   const todayDone = habits.filter(h => h.done_today).length;
   const todayTotal = habits.length;
 
+  const headerActions = (
+    <>
+      <button
+        onClick={fetchHabits}
+        className="p-2 text-tertiary hover:text-body transition-colors rounded-lg hover:bg-card-inner"
+        aria-label="Ricarica"
+      >
+        <RefreshCw size={14} />
+      </button>
+      <button
+        onClick={() => setShowAdd(v => !v)}
+        className="chip hover:border-border-hover hover:bg-surface-hover"
+      >
+        <Plus size={12} />
+        {showAdd ? 'Annulla' : 'Aggiungi'}
+      </button>
+    </>
+  );
+
   return (
-    <div className="min-h-screen bg-page text-heading">
-
-      {/* Header */}
-      <header className="sticky top-0 z-30 px-6 py-4 border-b border-border-default bg-page/85 backdrop-blur-md">
-        <div className="max-w-xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-tertiary hover:text-heading hover:border-border-hover transition-colors">
-              <ArrowLeft size={15} />
-            </Link>
-            <div>
-              <p className="section-label leading-none mb-0.5">Daily ritual</p>
-              <h1 className="text-[15px] font-semibold tracking-tight">Abitudini</h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={fetchHabits}
-              className="p-2 text-tertiary hover:text-body transition-colors rounded-lg hover:bg-card-inner"
-            >
-              <RefreshCw size={14} />
-            </button>
-            <button
-              onClick={() => setShowAdd(v => !v)}
-              className="chip hover:border-border-hover hover:bg-surface-hover"
-            >
-              <Plus size={12} />
-              {showAdd ? 'Annulla' : 'Aggiungi'}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-xl mx-auto px-6 py-8 space-y-5">
+    <EditorialPage
+      eyebrow="Daily ritual"
+      title="Le tue"
+      titleAccent="abitudini"
+      description="Le ancore quotidiane. Mantienile vive — sono il tuo sistema operativo."
+      width="md"
+      actions={headerActions}
+    >
+      <div className="space-y-5">
 
         {/* Error */}
         {error && (
@@ -395,7 +390,7 @@ export default function HabitsPage() {
           </div>
         )}
 
-      </main>
-    </div>
+      </div>
+    </EditorialPage>
   );
 }

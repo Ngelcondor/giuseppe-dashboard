@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { EditorialPage } from '@/components/ui/EditorialPage';
 import {
   ArrowLeft,
   Pill,
@@ -940,39 +941,40 @@ export default function MedicationsPage() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-page text-heading">
-      {/* Header */}
-      <header className="sticky top-0 z-30 px-6 py-4 border-b border-border-default bg-page/85 backdrop-blur-md flex items-center gap-3">
-        <Link href="/dashboard/health" className="flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-tertiary hover:text-heading hover:border-border-hover transition-colors">
-          <ArrowLeft size={15} />
-        </Link>
-        <Pill size={15} className="text-indigo-400" />
-        <div className="flex-1">
-          <p className="section-label leading-none mb-0.5">Therapy</p>
-          <h1 className="text-[15px] font-semibold tracking-tight">Farmaci</h1>
-        </div>
-        <button
-          onClick={() => setShowSyncPanel(!showSyncPanel)}
-          className={`p-2 rounded-lg transition-colors ${
-            showSyncPanel
-              ? 'bg-red-600/20 text-red-300 hover:bg-red-600/30'
-              : 'bg-emerald-600/15 text-emerald-400 hover:bg-emerald-600/25'
-          }`}
-          title="Sync Apple Health"
-        >
-          <Heart size={18} />
-        </button>
-        <button
-          onClick={() => setShowForm(true)}
-          className="p-2 rounded-lg bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 transition-colors"
-          title="Aggiungi farmaco"
-        >
-          <Plus size={18} />
-        </button>
-      </header>
+  const headerActions = (
+    <>
+      <button
+        onClick={() => setShowSyncPanel(!showSyncPanel)}
+        className={`p-2 rounded-lg transition-colors ${
+          showSyncPanel
+            ? 'bg-red-600/20 text-red-300 hover:bg-red-600/30'
+            : 'bg-emerald-600/15 text-emerald-400 hover:bg-emerald-600/25'
+        }`}
+        title="Sync Apple Health"
+      >
+        <Heart size={14} />
+      </button>
+      <button
+        onClick={() => setShowForm(true)}
+        className="chip border-accent-soft bg-accent-soft text-accent hover:bg-accent hover:text-white"
+        title="Aggiungi farmaco"
+      >
+        <Plus size={12} /> Aggiungi
+      </button>
+    </>
+  );
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
+  return (
+    <EditorialPage
+      eyebrow="Therapy"
+      title="I tuoi"
+      titleAccent="farmaci"
+      description="Terapia, dosaggi, PRN. Sincronizzato con Apple Health."
+      back="/dashboard/health"
+      width="md"
+      actions={headerActions}
+    >
+      <div className="space-y-6">
         {/* Error / Offline banners */}
         {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
         {isOffline && (
@@ -1256,7 +1258,7 @@ export default function MedicationsPage() {
             ))}
           </div>
         )}
-      </main>
+      </div>
 
       {/* Modals */}
       <MedFormModal
@@ -1294,6 +1296,6 @@ export default function MedicationsPage() {
         logs={historyLogs}
         isLoading={historyLoading}
       />
-    </div>
+    </EditorialPage>
   );
 }

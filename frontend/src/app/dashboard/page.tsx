@@ -56,14 +56,14 @@ function Tile({
   if (href) {
     return (
       <Link href={href} className={`${base} ${interactive} ${span}`}>
-        {accent && <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-tricolore-soft" />}
+        {accent && <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-accent-line" />}
         {children}
       </Link>
     );
   }
   return (
     <div className={`${base} ${span}`}>
-      {accent && <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-tricolore-soft" />}
+      {accent && <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-accent-line" />}
       {children}
     </div>
   );
@@ -103,8 +103,8 @@ function Hero({ now }: { now: Date }) {
 
       <h1 className="font-display text-[clamp(2.5rem,7vw,5.5rem)] leading-[0.95] tracking-[-0.04em] text-heading">
         <span className="font-extrabold">{greeting},</span>{' '}
-        <span className="font-serif italic font-medium text-tricolore">Giuseppe</span>
-        <span className="text-accent font-extrabold">.</span>
+        <span className="font-serif italic font-medium text-accent">Giuseppe</span>
+        <span className="text-heading font-extrabold">.</span>
       </h1>
 
       <p className="mt-6 max-w-2xl text-[17px] sm:text-[19px] leading-relaxed text-tertiary">
@@ -505,11 +505,8 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-page text-heading">
-      {/* Tricolore stripe — only "Italia" cue, 1.5px */}
-      <div className="h-[1.5px] w-full bg-tricolore-soft" aria-hidden />
-
       {/* Slim brand bar */}
-      <header className="px-5 sm:px-10 py-4 flex items-center justify-between">
+      <header className="px-5 sm:px-10 py-4 flex items-center justify-between border-b border-border-default">
         <Link href="/dashboard" className="font-serif italic text-[15px] text-heading">
           giuseppe<span className="text-accent">.</span>dashboard
         </Link>

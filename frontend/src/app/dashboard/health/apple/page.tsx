@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { EditorialPage } from '@/components/ui/EditorialPage';
 import {
   ArrowLeft,
   Watch,
@@ -370,27 +371,27 @@ export default function AppleHealthPage() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-page text-heading">
-      <header className="sticky top-0 z-30 px-6 py-4 border-b border-border-default bg-page/85 backdrop-blur-md flex items-center gap-3">
-        <Link href="/dashboard/health" className="flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-tertiary hover:text-heading hover:border-border-hover transition-colors">
-          <ArrowLeft size={15} />
-        </Link>
-        <Watch size={15} className="text-pink-400" />
-        <div className="flex-1">
-          <p className="section-label leading-none mb-0.5">Apple ecosystem</p>
-          <h1 className="text-[15px] font-semibold tracking-tight">Apple Health</h1>
-        </div>
-        <button
-          onClick={fetchStatus}
-          className="p-2 rounded-lg bg-card text-body hover:text-heading transition-colors"
-          title="Aggiorna stato"
-        >
-          <RefreshCw size={16} />
-        </button>
-      </header>
+  const headerActions = (
+    <button
+      onClick={fetchStatus}
+      className="p-2 rounded-lg text-tertiary hover:text-heading hover:bg-card-inner transition-colors"
+      title="Aggiorna stato"
+    >
+      <RefreshCw size={14} />
+    </button>
+  );
 
-      <main className="max-w-xl mx-auto px-4 py-6 space-y-5">
+  return (
+    <EditorialPage
+      eyebrow="Apple ecosystem"
+      title="Apple"
+      titleAccent="Health"
+      description="Dati Watch e iPhone via Health Auto Export."
+      back="/dashboard/health"
+      width="md"
+      actions={headerActions}
+    >
+      <div className="space-y-5">
         {error && (
           <div className="px-4 py-3 rounded-lg bg-red-900/30 border border-red-700/50 flex items-start gap-3">
             <AlertTriangle size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
@@ -502,7 +503,7 @@ export default function AppleHealthPage() {
             </div>
           </>
         )}
-      </main>
-    </div>
+      </div>
+    </EditorialPage>
   );
 }

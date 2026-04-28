@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
-import { ArrowLeft, Plus, X, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, X, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { API_BASE_URL } from '@/lib/constants';
+import { EditorialPage } from '@/components/ui/EditorialPage';
 
 const API = `${API_BASE_URL}/mood-api`;
 
@@ -279,37 +279,31 @@ export default function MoodPage() {
 
   const hasHistory = history.some(p => p.mood > 0);
 
+  const headerActions = (
+    <>
+      <button onClick={load} className="p-2 text-tertiary hover:text-body rounded-lg hover:bg-card-inner transition-colors" aria-label="Ricarica">
+        <RefreshCw size={14} />
+      </button>
+      <button
+        onClick={() => setShowForm(v => !v)}
+        className="chip hover:border-border-hover hover:bg-surface-hover"
+      >
+        <Plus size={12} />
+        {showForm ? 'Annulla' : 'Nuovo log'}
+      </button>
+    </>
+  );
+
   return (
-    <div className="min-h-screen bg-page text-heading">
-
-      {/* Header */}
-      <header className="sticky top-0 z-30 px-6 py-4 border-b border-border-default bg-page/85 backdrop-blur-md">
-        <div className="max-w-xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-tertiary hover:text-heading hover:border-border-hover transition-colors">
-              <ArrowLeft size={15} />
-            </Link>
-            <div>
-              <p className="section-label leading-none mb-0.5">Mind & Body</p>
-              <h1 className="text-[15px] font-semibold tracking-tight">Umore</h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <button onClick={load} className="p-2 text-tertiary hover:text-body rounded-lg hover:bg-card-inner transition-colors">
-              <RefreshCw size={14} />
-            </button>
-            <button
-              onClick={() => setShowForm(v => !v)}
-              className="chip hover:border-border-hover hover:bg-surface-hover"
-            >
-              <Plus size={12} />
-              {showForm ? 'Annulla' : 'Nuovo log'}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-xl mx-auto px-6 py-8 space-y-6">
+    <EditorialPage
+      eyebrow="Mind & Body"
+      title="Come stai"
+      titleAccent="oggi?"
+      description="Traccia umore, energia, ansia e stimming. Più dati = più consapevolezza."
+      width="md"
+      actions={headerActions}
+    >
+      <div className="space-y-6">
 
         {loading && (
           <div className="flex justify-center py-16">
@@ -438,7 +432,7 @@ export default function MoodPage() {
           </div>
         )}
 
-      </main>
-    </div>
+      </div>
+    </EditorialPage>
   );
 }
