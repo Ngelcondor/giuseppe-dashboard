@@ -16,6 +16,7 @@ import {
   Utensils,
   Tv,
   Gamepad2,
+  BookOpen,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -45,6 +46,7 @@ const navItems: SidebarItem[] = [
   { id: 'meals', label: 'Pasti', icon: <Utensils size={20} />, href: '/dashboard/meals', color: 'text-amber-400' },
   { id: 'feed', label: 'Feed', icon: <Tv size={20} />, href: '/dashboard/feed', color: 'text-indigo-400' },
   { id: 'ctf', label: 'CTF', icon: <Gamepad2 size={20} />, href: '/dashboard/ctf', color: 'text-rose-400' },
+  { id: 'study', label: 'Studio', icon: <BookOpen size={20} />, href: '/dashboard/study', color: 'text-teal-400' },
 ];
 
 interface SidebarProps {
