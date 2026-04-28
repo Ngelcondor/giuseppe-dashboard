@@ -11,9 +11,11 @@ import { API_BASE_URL } from '@/lib/constants';
 import { BottomDock } from '@/components/ui/AppShell';
 import {
   loadState, toggleTask, getTodayDay, getDayProgress,
-  getPendingPastTasks, getOverallProgress,
-  type StudyDay,
+  getPendingPastTasks, getOverallProgress, getDayContext,
+  type StudyDay, type DayContext,
 } from '@/lib/studyPlanState';
+import { buildClaudeStudyPrompt } from '@/lib/studyClaudePrompt';
+import { CopyPromptButton } from '@/components/ui/CopyPromptButton';
 
 /* ─────────────────────────────────────────────────────── helpers */
 
@@ -118,13 +120,16 @@ function Hero({ now }: { now: Date }) {
 
 function StudioHeroTile() {
   const [today, setToday] = useState<StudyDay | undefined>(undefined);
+  const [ctx, setCtx] = useState<DayContext | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [overall, setOverall] = useState({ done: 0, total: 0, pct: 0 });
   const [, force] = useState(0);
 
   useEffect(() => {
     const s = loadState();
-    setToday(getTodayDay(s));
+    const t = getTodayDay(s);
+    setToday(t);
+    setCtx(t ? getDayContext(s, t.date) : null);
     setPendingCount(getPendingPastTasks(s).length);
     setOverall(getOverallProgress(s));
   }, []);
@@ -188,10 +193,10 @@ function StudioHeroTile() {
 
           <ul className="space-y-3 flex-1">
             {today?.tasks.slice(0, 4).map((t) => (
-              <li key={t.id}>
+              <li key={t.id} className="flex items-start gap-2 group/task">
                 <button
                   onClick={(e) => handleToggle(e, t.id)}
-                  className="flex items-start gap-3.5 w-full text-left group/task"
+                  className="flex items-start gap-3.5 flex-1 text-left"
                 >
                   {t.completed ? (
                     <CheckCircle2 size={18} className="text-accent shrink-0 mt-[2px]" />
@@ -209,6 +214,12 @@ function StudioHeroTile() {
                     {t.text}
                   </span>
                 </button>
+                {ctx && !t.completed && !t.skipped && (
+                  <CopyPromptButton
+                    prompt={buildClaudeStudyPrompt({ taskText: t.text, ctx })}
+                    className="opacity-0 group-hover/task:opacity-100 focus:opacity-100 transition-opacity"
+                  />
+                )}
               </li>
             )) ?? (
               <li className="text-sm text-tertiary">Piano fuori range (28 Apr → 22 Set 2026).</li>

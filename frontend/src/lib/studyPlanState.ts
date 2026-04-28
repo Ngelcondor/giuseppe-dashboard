@@ -123,6 +123,23 @@ export function getAllDays(state: StudyPlanState): StudyDay[] {
   return state.phases.flatMap((p) => p.weeks.flatMap((w) => w.days));
 }
 
+export interface DayContext {
+  day: StudyDay;
+  week: StudyWeek;
+  phase: StudyPhase;
+}
+
+/** Resolve the phase and week that contain a given day. */
+export function getDayContext(state: StudyPlanState, date: string): DayContext | null {
+  for (const phase of state.phases) {
+    for (const week of phase.weeks) {
+      const day = week.days.find((d) => d.date === date);
+      if (day) return { day, week, phase };
+    }
+  }
+  return null;
+}
+
 export function todayISO(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

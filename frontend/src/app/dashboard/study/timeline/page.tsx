@@ -34,6 +34,8 @@ import {
   StudyWeek,
   StudyDay,
 } from '@/lib/studyPlanState';
+import { buildClaudeStudyPrompt } from '@/lib/studyClaudePrompt';
+import { CopyPromptButton } from '@/components/ui/CopyPromptButton';
 
 function formatItalianDate(iso: string): string {
   const d = new Date(iso + 'T00:00:00');
@@ -259,6 +261,7 @@ function PhaseBlock({
             <WeekBlock
               key={week.id}
               week={week}
+              phase={phase}
               isOpen={!!openWeeks[week.id]}
               onToggle={() => setOpenWeeks((prev) => ({ ...prev, [week.id]: !prev[week.id] }))}
               onTaskToggle={onTaskToggle}
@@ -274,9 +277,10 @@ function PhaseBlock({
 /* ─── Week block ─────────────────────────────────────────────────────────── */
 
 function WeekBlock({
-  week, isOpen, onToggle, onTaskToggle, onTaskSkip,
+  week, phase, isOpen, onToggle, onTaskToggle, onTaskSkip,
 }: {
   week: StudyWeek;
+  phase: StudyPhase;
   isOpen: boolean;
   onToggle: () => void;
   onTaskToggle: (date: string, taskId: string) => void;
@@ -301,7 +305,14 @@ function WeekBlock({
       {isOpen && (
         <div className="px-3 pb-3 pt-2 space-y-2 border-t border-border-default">
           {week.days.map((day) => (
-            <DayBlock key={day.id} day={day} onTaskToggle={onTaskToggle} onTaskSkip={onTaskSkip} />
+            <DayBlock
+              key={day.id}
+              day={day}
+              week={week}
+              phase={phase}
+              onTaskToggle={onTaskToggle}
+              onTaskSkip={onTaskSkip}
+            />
           ))}
         </div>
       )}
@@ -312,9 +323,11 @@ function WeekBlock({
 /* ─── Day block ──────────────────────────────────────────────────────────── */
 
 function DayBlock({
-  day, onTaskToggle, onTaskSkip,
+  day, week, phase, onTaskToggle, onTaskSkip,
 }: {
   day: StudyDay;
+  week: StudyWeek;
+  phase: StudyPhase;
   onTaskToggle: (date: string, taskId: string) => void;
   onTaskSkip: (date: string, taskId: string) => void;
 }) {
@@ -395,6 +408,15 @@ function DayBlock({
                 )}
               </div>
             </div>
+            {!task.completed && !task.skipped && (
+              <CopyPromptButton
+                prompt={buildClaudeStudyPrompt({
+                  taskText: task.text,
+                  ctx: { day, week, phase },
+                })}
+                className="w-6 h-6"
+              />
+            )}
             {!task.completed && !task.skipped && isPast && (
               <button
                 onClick={() => onTaskSkip(day.date, task.id)}

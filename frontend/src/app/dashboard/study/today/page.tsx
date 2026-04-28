@@ -19,12 +19,16 @@ import {
   getTodayDay,
   getDayProgress,
   getPendingPastTasks,
+  getDayContext,
   rescheduleToToday,
   rescheduleSpread,
   markAllPendingSkipped,
   StudyPlanState,
   StudyDay,
+  DayContext,
 } from '@/lib/studyPlanState';
+import { buildClaudeStudyPrompt } from '@/lib/studyClaudePrompt';
+import { CopyPromptButton } from '@/components/ui/CopyPromptButton';
 
 function ProgressRing({ done, total }: { done: number; total: number }) {
   const r = 32;
@@ -56,12 +60,15 @@ function ProgressRing({ done, total }: { done: number; total: number }) {
 export default function TodayPage() {
   const [state, setState] = useState<StudyPlanState | null>(null);
   const [today, setToday] = useState<StudyDay | undefined>(undefined);
+  const [ctx, setCtx] = useState<DayContext | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
     const s = loadState();
     setState(s);
-    setToday(getTodayDay(s));
+    const t = getTodayDay(s);
+    setToday(t);
+    setCtx(t ? getDayContext(s, t.date) : null);
     setPendingCount(getPendingPastTasks(s).length);
   }, []);
 
@@ -268,6 +275,12 @@ export default function TodayPage() {
                       )}
                     </div>
                   </div>
+                  {!task.completed && !task.skipped && ctx && (
+                    <CopyPromptButton
+                      prompt={buildClaudeStudyPrompt({ taskText: task.text, ctx })}
+                      variant="chip"
+                    />
+                  )}
                   {!task.completed && !task.skipped && (
                     <button
                       onClick={() => handleSkip(task.id)}
