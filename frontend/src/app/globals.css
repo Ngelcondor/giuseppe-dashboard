@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Inter+Tight:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -7,61 +7,61 @@
 /* ─── Theme Variables ─────────────────────────────────────────────────────── */
 
 :root {
-  /* Dark mode (default) — refined "carbon" palette */
-  --bg-primary: 12 14 20;
-  --bg-secondary: 22 25 33;
-  --bg-tertiary: 38 42 54;
-  --text-primary: 245 246 250;
-  --text-secondary: 196 204 219;
-  --text-tertiary: 138 148 168;
-  --border-color: 50 56 72;
-  --accent-color: 16 185 129;       /* emerald-500 */
-  --accent-glow: 16 185 129;
+  /* Dark mode (default) — clean editorial palette */
+  --bg-primary: 8 8 10;
+  --bg-secondary: 18 18 22;
+  --bg-tertiary: 32 32 38;
+  --text-primary: 250 250 252;
+  --text-secondary: 200 200 210;
+  --text-tertiary: 130 132 145;
+  --border-color: 38 40 48;
+  --accent-color: 99 102 241;       /* indigo-500 */
 
   /* Semantic tokens — dark defaults */
-  --color-page: 10 11 16;            /* near-black with subtle warm undertone */
-  --color-card: 255 255 255 / 0.025;
-  --color-card-solid: 18 20 28;
-  --color-card-inner: 255 255 255 / 0.03;
-  --color-input: 18 20 28;
-  --color-heading: 245 246 250;
-  --color-body: 196 204 219;
-  --color-tertiary: 138 148 168;
-  --color-muted: 100 110 130;
-  --color-border: 255 255 255 / 0.06;
-  --color-border-hover: 255 255 255 / 0.12;
+  --color-page: 8 8 10;
+  --color-card: 22 22 26;
+  --color-card-solid: 22 22 26;
+  --color-card-inner: 28 28 33;
+  --color-input: 22 22 26;
+  --color-heading: 250 250 252;
+  --color-body: 200 200 210;
+  --color-tertiary: 130 132 145;
+  --color-muted: 95 98 110;
+  --color-border: 255 255 255 / 0.07;
+  --color-border-hover: 255 255 255 / 0.14;
   --color-surface-hover: 255 255 255 / 0.04;
 
-  /* Brand accents */
-  --accent-primary: 16 185 129;       /* terminal emerald */
-  --accent-secondary: 6 182 212;      /* cyber cyan */
-  --accent-warning: 251 191 36;       /* amber */
-  --accent-danger: 239 68 68;         /* red */
+  /* Brand accents — vibrant, used sparingly */
+  --accent-primary: 99 102 241;       /* indigo */
+  --accent-secondary: 236 72 153;     /* pink */
+  --accent-tertiary: 250 204 21;      /* yellow — Italian sun */
+  --accent-warning: 251 146 60;
+  --accent-danger: 239 68 68;
+  --accent-success: 34 197 94;
 }
 
 [data-theme='light'] {
   --bg-primary: 255 255 255;
-  --bg-secondary: 248 250 252;
-  --bg-tertiary: 241 245 249;
-  --text-primary: 15 23 42;
-  --text-secondary: 51 65 85;
-  --text-tertiary: 100 116 139;
-  --border-color: 203 213 225;
-  --accent-color: 16 185 129;
+  --bg-secondary: 250 250 252;
+  --bg-tertiary: 244 244 248;
+  --text-primary: 12 12 14;
+  --text-secondary: 55 55 65;
+  --text-tertiary: 110 110 120;
+  --border-color: 226 226 232;
+  --accent-color: 99 102 241;
 
-  /* Semantic tokens — light */
-  --color-page: 248 250 252;
+  --color-page: 250 250 252;
   --color-card: 255 255 255;
   --color-card-solid: 255 255 255;
-  --color-card-inner: 248 250 252;
+  --color-card-inner: 244 244 248;
   --color-input: 255 255 255;
-  --color-heading: 15 23 42;
-  --color-body: 51 65 85;
-  --color-tertiary: 100 116 139;
-  --color-muted: 148 163 184;
-  --color-border: 226 232 240;
-  --color-border-hover: 203 213 225;
-  --color-surface-hover: 241 245 249;
+  --color-heading: 12 12 14;
+  --color-body: 55 55 65;
+  --color-tertiary: 110 110 120;
+  --color-muted: 160 160 170;
+  --color-border: 0 0 0 / 0.08;
+  --color-border-hover: 0 0 0 / 0.16;
+  --color-surface-hover: 0 0 0 / 0.04;
 }
 
 [data-theme='low-stim'] {
@@ -99,9 +99,9 @@
   --accent-color: 138 124 111;
 
   --color-page: 15 14 12;
-  --color-card: 255 255 255 / 0.02;
+  --color-card: 22 20 16;
   --color-card-solid: 22 20 16;
-  --color-card-inner: 255 255 255 / 0.03;
+  --color-card-inner: 28 25 21;
   --color-input: 25 21 18;
   --color-heading: 232 232 230;
   --color-body: 180 170 160;
@@ -120,67 +120,14 @@ html {
 }
 
 body {
-  @apply transition-colors duration-300;
   background-color: rgb(var(--color-page));
   color: rgb(var(--color-body));
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Inter Tight', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: 'cv11', 'ss01';
-}
-
-/* Subtle dot-grid background for that "terminal canvas" feel */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background-image: radial-gradient(
-    rgb(var(--color-border)) 1px,
-    transparent 1px
-  );
-  background-size: 28px 28px;
-  background-position: 0 0;
-  opacity: 0.45;
-}
-
-/* Soft accent glow at the top of the viewport */
-body::after {
-  content: '';
-  position: fixed;
-  top: -300px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 1100px;
-  height: 600px;
-  pointer-events: none;
-  z-index: 0;
-  background: radial-gradient(
-    ellipse at center,
-    rgb(var(--accent-primary) / 0.06) 0%,
-    transparent 60%
-  );
-  filter: blur(40px);
-}
-
-/* Make sure content sits above background layers */
-#__next,
-main,
-aside,
-header,
-.relative-content {
-  position: relative;
-  z-index: 1;
-}
-
-/* Light mode: soften the dot grid */
-[data-theme='light'] body::before {
-  opacity: 0.6;
-}
-
-[data-theme='light'] body::after {
-  display: none;
+  /* Bottom dock breathing room on mobile */
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* ─── Semantic Utility Classes ────────────────────────────────────────────── */
@@ -206,11 +153,34 @@ header,
 
   /* Accents */
   .text-accent { color: rgb(var(--accent-primary)); }
-  .text-accent-secondary { color: rgb(var(--accent-secondary)); }
+  .text-accent-pink { color: rgb(var(--accent-secondary)); }
+  .text-accent-sun { color: rgb(var(--accent-tertiary)); }
   .bg-accent { background-color: rgb(var(--accent-primary)); }
   .bg-accent-soft { background-color: rgb(var(--accent-primary) / 0.12); }
   .border-accent { border-color: rgb(var(--accent-primary)); }
   .border-accent-soft { border-color: rgb(var(--accent-primary) / 0.3); }
+
+  /* Italian flag gradient — subtle nod to passion */
+  .bg-tricolore-soft {
+    background: linear-gradient(
+      90deg,
+      rgb(34 197 94 / 0.25) 0%,
+      rgb(255 255 255 / 0.15) 50%,
+      rgb(239 68 68 / 0.25) 100%
+    );
+  }
+
+  .text-tricolore {
+    background: linear-gradient(
+      90deg,
+      rgb(34 197 94) 0%,
+      rgb(255 255 255) 50%,
+      rgb(239 68 68) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
 
   /* Mono */
   .font-mono-display {
@@ -219,135 +189,132 @@ header,
     letter-spacing: -0.02em;
   }
 
+  /* Editorial display + serif italic — magazine grade */
+  .font-display { font-family: 'Inter Tight', system-ui, sans-serif; }
+  .font-serif { font-family: 'Fraunces', Georgia, serif; }
+
+  /* Editorial display type */
+  .text-display {
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 0.95;
+  }
+
   /* Tracking utility */
   .tracking-uppercase {
-    letter-spacing: 0.18em;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
+  }
+
+  /* Hide scrollbar but keep scroll */
+  .scrollbar-hidden {
+    scrollbar-width: none;
+  }
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
   }
 }
 
 /* ─── Reusable design primitives ───────────────────────────────────────────── */
 
 @layer components {
-  /* Card with refined glass + border */
-  .card-glass {
-    background: linear-gradient(
-      180deg,
-      rgb(var(--color-card-solid)) 0%,
-      rgb(var(--color-card-solid) / 0.92) 100%
-    );
+  /* Editorial card — calm, with subtle border */
+  .panel {
+    background-color: rgb(var(--color-card));
     border: 1px solid rgb(var(--color-border));
-    border-radius: 1rem;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    border-radius: 1.25rem;
   }
 
-  /* Card with very subtle accent gradient border (top-only) */
-  .card-accent {
-    position: relative;
-    background-color: rgb(var(--color-card-solid));
-    border: 1px solid rgb(var(--color-border));
-    border-radius: 1rem;
-    overflow: hidden;
-  }
-  .card-accent::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 1rem;
-    right: 1rem;
-    height: 1px;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      rgb(var(--accent-primary) / 0.6) 50%,
-      transparent 100%
-    );
-  }
-
-  /* Section label — uppercase widget header */
-  .section-label {
-    @apply text-[11px] font-medium uppercase;
+  /* Section eyebrow label */
+  .eyebrow {
+    @apply text-[11px] font-medium;
     color: rgb(var(--color-tertiary));
-    letter-spacing: 0.18em;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
   }
 
-  /* Status dot with subtle pulse */
-  .status-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 9999px;
-    background-color: rgb(var(--accent-primary));
-    box-shadow: 0 0 0 0 rgb(var(--accent-primary) / 0.6);
-    animation: status-pulse 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-
-  @keyframes status-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgb(var(--accent-primary) / 0.45); }
-    50% { box-shadow: 0 0 0 6px rgb(var(--accent-primary) / 0); }
-  }
-
-  /* Pill/chip */
+  /* Pill / chip */
   .chip {
     @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium;
     background-color: rgb(var(--color-card-inner));
     border: 1px solid rgb(var(--color-border));
     color: rgb(var(--color-body));
+    transition: all 0.15s ease;
+  }
+  .chip:hover {
+    border-color: rgb(var(--color-border-hover));
+    background-color: rgb(var(--color-surface-hover));
   }
 
   .chip-accent {
-    background-color: rgb(var(--accent-primary) / 0.1);
+    background-color: rgb(var(--accent-primary) / 0.12);
     border-color: rgb(var(--accent-primary) / 0.3);
     color: rgb(var(--accent-primary));
   }
 
-  /* Decorative terminal brackets — for personal cyber aesthetic */
-  .term-bracket-l::before {
-    content: '[';
-    color: rgb(var(--accent-primary));
-    margin-right: 0.5rem;
-    font-family: 'JetBrains Mono', monospace;
-    opacity: 0.7;
+  /* Bottom dock for navigation */
+  .dock {
+    position: fixed;
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background-color: rgb(var(--color-card-solid) / 0.85);
+    border: 1px solid rgb(var(--color-border));
+    border-radius: 9999px;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      0 12px 30px -10px rgb(0 0 0 / 0.4),
+      0 0 0 1px rgb(255 255 255 / 0.04) inset;
   }
-  .term-bracket-r::after {
-    content: ']';
-    color: rgb(var(--accent-primary));
-    margin-left: 0.5rem;
-    font-family: 'JetBrains Mono', monospace;
-    opacity: 0.7;
+
+  .dock-item {
+    @apply flex items-center justify-center w-11 h-11 rounded-full transition-all duration-150;
+    color: rgb(var(--color-tertiary));
+  }
+  .dock-item:hover {
+    background-color: rgb(var(--color-surface-hover));
+    color: rgb(var(--color-heading));
+  }
+  .dock-item-active {
+    background-color: rgb(var(--accent-primary));
+    color: rgb(255 255 255);
+    box-shadow: 0 6px 20px -6px rgb(var(--accent-primary) / 0.6);
+  }
+  .dock-item-active:hover {
+    background-color: rgb(var(--accent-primary));
+    color: rgb(255 255 255);
   }
 }
 
-/* Legacy utility classes */
+/* Legacy utility classes preserved for compat */
 .text-primary {
   color: rgb(var(--text-primary));
 }
-
 .text-secondary {
   color: rgb(var(--text-secondary));
 }
-
 .bg-primary {
   background-color: rgb(var(--bg-primary));
 }
-
 .bg-secondary {
   background-color: rgb(var(--bg-secondary));
 }
-
 .bg-tertiary {
   background-color: rgb(var(--bg-tertiary));
 }
-
 .border-color {
   border-color: rgb(var(--border-color));
 }
-
 .light {
   background-color: rgb(var(--bg-primary));
   color: rgb(var(--text-primary));
 }
-
 .low-stim {
   --accent-color: 142 124 111;
 }
@@ -383,69 +350,23 @@ header,
   border-radius: 4px;
 }
 
-/* ─── Smooth Theme Transitions ────────────────────────────────────────────── */
-
-.transition-theme {
-  @apply transition-colors duration-300;
-}
-
 /* ─── Animations ──────────────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
   * {
     @apply !animate-none !transition-none;
   }
-  body::before, body::after { display: none; }
-}
-
-/* ─── Widget Grid ─────────────────────────────────────────────────────────── */
-
-.react-grid-layout {
-  background-color: transparent;
-}
-
-.react-grid-item {
-  @apply rounded-2xl;
-}
-
-.react-grid-item.react-grid-placeholder {
-  background-color: rgb(var(--accent-primary)) !important;
-  opacity: 0.18;
-  z-index: 2;
-}
-
-.react-grid-item.static {
-  background-color: rgb(var(--color-card-solid));
-}
-
-.react-grid-item > .react-resizable-handle {
-  @apply opacity-0 hover:opacity-100 transition-opacity;
-  background: linear-gradient(to bottom right, rgb(var(--border-color)), rgb(var(--bg-tertiary)));
-}
-
-.react-grid-item > .react-resizable-handle::after {
-  border-color: rgb(var(--text-tertiary));
 }
 
 /* ─── Typography ──────────────────────────────────────────────────────────── */
 
 h1, h2, h3, h4, h5, h6 {
-  @apply font-semibold;
-  letter-spacing: -0.01em;
-}
-
-h1 {
-  @apply text-3xl;
-  letter-spacing: -0.025em;
-}
-
-h2 {
-  @apply text-2xl;
   letter-spacing: -0.02em;
 }
 
-h3 {
-  @apply text-xl;
+h1 {
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
 /* ─── Form Elements ───────────────────────────────────────────────────────── */
@@ -472,17 +393,7 @@ input[type='checkbox'], input[type='radio'] {
 }
 
 /* ─── Low Stimulation Mode — ASD / ADHD friendly ─────────────────────────── */
-/*
- * Design principles:
- *  1. ZERO motion — all animations, transitions, transforms disabled
- *  2. Muted, warm palette — no saturated accent colors
- *  3. Uniform visual weight — no glows, gradients, or shadows
- *  4. Reduced border contrast — softer edges
- *  5. Consistent spacing — no visual surprises
- *  6. No blinking cursors, no backdrop-blur (can cause visual fatigue)
- */
 
-/* Kill every animation and transition globally */
 .low-stim,
 .low-stim *,
 .low-stim *::before,
@@ -496,31 +407,24 @@ input[type='checkbox'], input[type='radio'] {
   scroll-behavior: auto !important;
 }
 
-/* Remove decorative background elements completely */
-.low-stim body::before,
-.low-stim body::after {
-  display: none !important;
-}
-
-/* Remove backdrop blur (can shimmer / cause visual fatigue) */
 .low-stim [class*='backdrop-blur'] {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
 
-/* Remove all box shadows and glows */
 .low-stim [class*='shadow'],
 .low-stim [class*='ring'] {
   box-shadow: none !important;
 }
 
-/* Desaturate accent colors into warm neutral tones */
 .low-stim .text-blue-400,
 .low-stim .text-indigo-400,
 .low-stim .text-purple-400,
 .low-stim .text-cyan-400,
 .low-stim .text-teal-400,
-.low-stim .text-accent {
+.low-stim .text-accent,
+.low-stim .text-accent-pink,
+.low-stim .text-accent-sun {
   color: rgb(var(--color-tertiary)) !important;
 }
 
@@ -538,7 +442,6 @@ input[type='checkbox'], input[type='radio'] {
   color: rgb(var(--color-tertiary)) !important;
 }
 
-/* Mute colored backgrounds (badges, indicators) */
 .low-stim [class*='bg-blue-'],
 .low-stim [class*='bg-indigo-'],
 .low-stim [class*='bg-purple-'],
@@ -552,37 +455,34 @@ input[type='checkbox'], input[type='radio'] {
   opacity: 0.6;
 }
 
-/* Tone down red danger elements but keep them recognizable */
 .low-stim [class*='bg-red-'] {
   opacity: 0.5;
 }
 
-/* Remove hover scale/transform effects */
 .low-stim [class*='hover:scale'],
 .low-stim [class*='hover:-translate'],
 .low-stim [class*='hover:translate'] {
   transform: none !important;
 }
 
-/* Soften notification badges */
 .low-stim .bg-red-500 {
   background-color: rgb(var(--color-muted)) !important;
 }
 
-/* Disable status-dot pulse */
-.low-stim .status-dot {
-  animation: none !important;
-  box-shadow: none !important;
-  background-color: rgb(var(--color-muted)) !important;
+.low-stim .bg-tricolore-soft,
+.low-stim .text-tricolore {
+  background: rgb(var(--color-card-inner)) !important;
+  color: rgb(var(--color-body)) !important;
+  -webkit-text-fill-color: currentColor !important;
 }
 
-/* Reduce emoji visual weight */
 .low-stim span:has(> .lucide),
-.low-stim .text-3xl {
+.low-stim .text-3xl,
+.low-stim .text-4xl,
+.low-stim .text-5xl {
   filter: grayscale(0.4);
 }
 
-/* Keep the loading spinner functional but slow and subtle */
 .low-stim .spinner {
   animation: spin-slow 2s linear infinite !important;
 }
@@ -592,20 +492,17 @@ input[type='checkbox'], input[type='radio'] {
   to { transform: rotate(360deg); }
 }
 
-/* Remove blinking cursor in low-stim mode */
 .low-stim input,
 .low-stim textarea {
   caret-color: rgb(var(--color-body));
 }
 
-/* Simplify focus outlines — solid, no ring spread */
 .low-stim :focus-visible {
   outline: 2px solid rgb(var(--accent-color)) !important;
   outline-offset: 2px !important;
   box-shadow: none !important;
 }
 
-/* Make scrollbars thinner and less visible */
 .low-stim ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
@@ -613,6 +510,17 @@ input[type='checkbox'], input[type='radio'] {
 
 .low-stim ::-webkit-scrollbar-thumb {
   background: rgb(var(--color-muted));
+}
+
+.low-stim .dock {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+.low-stim .dock-item-active {
+  background-color: rgb(var(--color-tertiary)) !important;
+  box-shadow: none !important;
 }
 
 /* ─── Loading Spinner ─────────────────────────────────────────────────────── */
@@ -636,18 +544,27 @@ input[type='checkbox'], input[type='radio'] {
   @apply fixed inset-0 bg-black/60 backdrop-blur-sm;
 }
 
+/* ─── Widget grid (legacy compat) ─────────────────────────────────────────── */
+
+.react-grid-layout {
+  background-color: transparent;
+}
+.react-grid-item {
+  @apply rounded-2xl;
+}
+.react-grid-item.react-grid-placeholder {
+  background-color: rgb(var(--accent-primary)) !important;
+  opacity: 0.18;
+  z-index: 2;
+}
+.react-grid-item.static {
+  background-color: rgb(var(--color-card-solid));
+}
+
 /* ─── Responsive ──────────────────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
-  .react-grid-layout {
-    @apply gap-2;
-  }
-
   .react-grid-item {
     @apply !static;
-  }
-
-  body::before {
-    background-size: 22px 22px;
   }
 }

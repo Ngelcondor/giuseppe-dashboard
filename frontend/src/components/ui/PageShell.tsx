@@ -1,9 +1,8 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
-import { ArrowLeft, LucideIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { LucideIcon } from 'lucide-react';
+import { AppShell } from './AppShell';
 
 interface PageShellProps {
   title: string;
@@ -13,58 +12,39 @@ interface PageShellProps {
   actions?: React.ReactNode;
   width?: 'sm' | 'md' | 'lg' | 'xl';
   children: React.ReactNode;
-  /** Optional uppercase eyebrow above the title */
   eyebrow?: string;
 }
 
-const WIDTHS: Record<NonNullable<PageShellProps['width']>, string> = {
-  sm: 'max-w-md',
-  md: 'max-w-xl',
-  lg: 'max-w-3xl',
-  xl: 'max-w-5xl',
+const WIDTH_MAP = {
+  sm: 'sm' as const,
+  md: 'lg' as const,
+  lg: 'xl' as const,
+  xl: 'xl' as const,
 };
 
 /**
- * Standard page chrome: header with back-button, optional icon, title, actions.
- * Use this for all sub-pages so the layout stays consistent.
+ * Backward-compat wrapper around AppShell for existing pages.
+ * The icon and iconColor props are no longer rendered visually
+ * (the new design uses an editorial title hierarchy instead),
+ * but the props are kept so existing call-sites still work.
  */
 export function PageShell({
   title,
-  icon: Icon,
-  iconColor = 'text-accent',
-  back = '/dashboard',
+  back,
   actions,
   width = 'md',
   children,
   eyebrow,
 }: PageShellProps) {
   return (
-    <div className="min-h-screen bg-page text-heading">
-      <header className="sticky top-0 z-30 px-6 py-4 border-b border-border-default bg-page/85 backdrop-blur-md">
-        <div className={cn('mx-auto flex items-center justify-between gap-4', WIDTHS[width])}>
-          <div className="flex items-center gap-3 min-w-0">
-            <Link
-              href={back}
-              className="flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-tertiary hover:text-heading hover:border-border-hover transition-colors"
-              aria-label="Indietro"
-            >
-              <ArrowLeft size={15} />
-            </Link>
-            <div className="flex items-center gap-2.5 min-w-0">
-              {Icon && <Icon size={16} className={cn('shrink-0', iconColor)} />}
-              <div className="min-w-0">
-                {eyebrow && (
-                  <p className="section-label leading-none mb-0.5">{eyebrow}</p>
-                )}
-                <h1 className="text-[15px] font-semibold tracking-tight truncate">{title}</h1>
-              </div>
-            </div>
-          </div>
-          {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
-        </div>
-      </header>
-
-      <main className={cn('mx-auto px-6 py-8', WIDTHS[width])}>{children}</main>
-    </div>
+    <AppShell
+      title={title}
+      subtitle={eyebrow}
+      back={back || '/dashboard'}
+      actions={actions}
+      width={WIDTH_MAP[width]}
+    >
+      {children}
+    </AppShell>
   );
 }
