@@ -4,9 +4,10 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle, ChevronRight, CheckCircle2, Circle,
-  Coffee, Moon, Clock,
+  Coffee, Moon,
 } from 'lucide-react';
 import api from '@/lib/api';
+import { API_BASE_URL } from '@/lib/constants';
 import { BottomDock } from '@/components/ui/AppShell';
 import {
   loadState, toggleTask, getTodayDay, getDayProgress,
@@ -31,12 +32,6 @@ function greetingFor(d: Date) {
 }
 
 const DAY_NAMES_IT = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
-
-function isSameDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() &&
-         a.getMonth() === b.getMonth() &&
-         a.getDate() === b.getDate();
-}
 
 /* ─────────────────────────────────────────────────────── tile primitives */
 
@@ -149,7 +144,7 @@ function StudioHeroTile() {
 
   return (
     <Tile
-      span="lg:col-span-7 lg:row-span-2 min-h-[320px] sm:min-h-[440px]"
+      span="lg:col-span-7 min-h-[420px]"
       accent
     >
       <div className="flex items-start justify-between mb-8">
@@ -279,7 +274,7 @@ function SleepTile() {
 
   if (loading) {
     return (
-      <Tile span="lg:col-span-5 lg:row-span-2">
+      <Tile span="lg:col-span-5 min-h-[420px]">
         <Eyebrow>Sonno</Eyebrow>
         <div className="mt-6 h-32 rounded-xl bg-card-inner animate-pulse" />
       </Tile>
@@ -288,8 +283,8 @@ function SleepTile() {
 
   if (!latest) {
     return (
-      <Tile href="/dashboard/health/sleep" span="lg:col-span-5 lg:row-span-2">
-        <Eyebrow>Sonno</Eyebrow>
+      <Tile href="/dashboard/health/sleep" span="lg:col-span-5 min-h-[420px]">
+        <Eyebrow>Sonno · Apple Watch</Eyebrow>
         <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 py-8">
           <Moon size={28} className="text-blue-400" />
           <p className="font-serif italic text-xl text-heading">Niente Apple Watch</p>
@@ -318,7 +313,7 @@ function SleepTile() {
   const fmtTime = (d: Date) => d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 
   return (
-    <Tile href="/dashboard/health/sleep" span="lg:col-span-5 lg:row-span-2">
+    <Tile href="/dashboard/health/sleep" span="lg:col-span-5 min-h-[420px]">
       <div className="flex items-start justify-between mb-6">
         <div>
           <Eyebrow>Sonno · Apple Watch</Eyebrow>
@@ -449,88 +444,88 @@ function HealthTile() {
 
 /* ─────────────────────────────────────────────────────── DEADLINES TILE — today + week */
 
-interface DeadlineData {
+interface Scadenza {
   id: string;
-  title: string;
-  due_date: string;
-  category: string;
-  priority: string;
-  is_completed: boolean;
+  desc: string;
+  mese: string;             // Italian month name e.g. "Aprile"
+  scadenza_gg_mm: string;   // "DD" or "DD/MM"
+  importo: number;
+  tipo: string;             // "Uscita" | "Entrata" | "Abbonamento" | "Rata" | "Ricorrente"
+  pagato: boolean;
+  note: string;
 }
 
-const PRIORITY_COLORS: Record<string, string> = {
-  urgent: '#ef4444',
-  high: '#f97316',
-  medium: '#eab308',
-  low: '#6b7280',
+const MESI_NUM: Record<string, number> = {
+  Gennaio: 1, Febbraio: 2, Marzo: 3, Aprile: 4, Maggio: 5, Giugno: 6,
+  Luglio: 7, Agosto: 8, Settembre: 9, Ottobre: 10, Novembre: 11, Dicembre: 12,
 };
 
-const CATEGORY_EMOJI: Record<string, string> = {
-  university: '🎓',
-  work: '💼',
-  personal: '📌',
-  certification: '📜',
-  ctf: '🏴',
-  other: '📋',
+const TIPO_DOT: Record<string, string> = {
+  Uscita: '#f87171',
+  Entrata: '#4ade80',
+  Abbonamento: '#60a5fa',
+  Rata: '#fb923c',
+  Ricorrente: '#a78bfa',
 };
 
-function isInThisWeek(date: Date, today: Date): boolean {
-  // "Questa settimana" = days 1-7 from today (excluding today itself)
-  const diffDays = Math.floor((date.getTime() - today.getTime()) / 86_400_000);
-  return diffDays >= 1 && diffDays <= 7;
+function parseScadenzaDate(s: Scadenza, year: number): Date | null {
+  const day = parseInt(s.scadenza_gg_mm.split('/')[0], 10);
+  const monthNum = MESI_NUM[s.mese];
+  if (!day || !monthNum) return null;
+  return new Date(year, monthNum - 1, day);
+}
+
+function fmtImporto(n: number): string {
+  const sign = n >= 0 ? '+' : '−';
+  return `${sign} ${Math.abs(n).toFixed(2).replace('.', ',')} €`;
 }
 
 function DeadlinesTile() {
-  const [data, setData] = useState<{ upcoming: DeadlineData[]; overdue: DeadlineData[] } | null>(null);
+  const [items, setItems] = useState<Scadenza[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
-    api.get('/deadlines/upcoming/list')
-      .then((r) => setData(r.data))
-      .catch(() => {})
+    fetch(`${API_BASE_URL}/scadenze`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d: Scadenza[]) => setItems(Array.isArray(d) ? d : []))
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const now = new Date();
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yearForFiltering = now.getFullYear();
 
-  const todayItems = (data?.upcoming ?? []).filter((d) => {
-    const dd = new Date(d.due_date);
-    dd.setHours(0, 0, 0, 0);
-    return isSameDay(dd, today);
-  });
-  const weekItems = (data?.upcoming ?? []).filter((d) => {
-    const dd = new Date(d.due_date);
-    dd.setHours(0, 0, 0, 0);
-    return isInThisWeek(dd, today);
-  });
-  const overdue = data?.overdue?.length ?? 0;
+  // Decorate each item with a parsed Date and the diff from today (in days).
+  const decorated = items
+    .filter((s) => !s.pagato)
+    .map((s) => {
+      const d = parseScadenzaDate(s, yearForFiltering);
+      if (!d) return null;
+      const diff = Math.round((d.getTime() - todayMidnight.getTime()) / 86_400_000);
+      return { s, date: d, diff };
+    })
+    .filter((x): x is { s: Scadenza; date: Date; diff: number } => x !== null)
+    .sort((a, b) => a.diff - b.diff);
 
-  const fmtDay = (iso: string) => {
-    const d = new Date(iso);
-    return d.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric' });
-  };
+  const todayItems = decorated.filter((x) => x.diff === 0);
+  const weekItems  = decorated.filter((x) => x.diff >= 1 && x.diff <= 7);
+  const overdueItems = decorated.filter((x) => x.diff < 0);
+  const upcomingFallback = decorated.filter((x) => x.diff > 7).slice(0, 3);
 
-  const fmtTime = (iso: string) => {
-    const d = new Date(iso);
-    const h = d.getHours();
-    const m = d.getMinutes();
-    if (h === 0 && m === 0) return null;
-    return d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-  };
+  const fmtDay = (d: Date) =>
+    d.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' });
 
-  const renderItem = (it: DeadlineData, withDay = false) => {
-    const time = fmtTime(it.due_date);
+  const renderItem = (x: { s: Scadenza; date: Date; diff: number }, label?: string) => {
+    const dot = TIPO_DOT[x.s.tipo] || '#6b7280';
     return (
-      <li key={it.id} className="flex items-center gap-3 py-1.5">
-        <span className="w-1 h-7 rounded-full shrink-0" style={{ backgroundColor: PRIORITY_COLORS[it.priority] || '#6b7280' }} />
+      <li key={x.s.id} className="flex items-center gap-3 py-1.5">
+        <span className="w-1 h-7 rounded-full shrink-0" style={{ backgroundColor: dot }} />
         <div className="flex-1 min-w-0">
-          <p className="text-[13px] text-body truncate">
-            <span className="mr-1.5">{CATEGORY_EMOJI[it.category] || '📋'}</span>
-            {it.title}
-          </p>
+          <p className="text-[13px] text-body truncate">{x.s.desc}</p>
           <p className="text-[11px] text-muted font-mono-display">
-            {withDay ? fmtDay(it.due_date) : 'Oggi'}{time ? ` · ${time}` : ''}
+            {label ?? fmtDay(x.date)} · {fmtImporto(x.s.importo)}
           </p>
         </div>
       </li>
@@ -541,46 +536,56 @@ function DeadlinesTile() {
     <Tile href="/dashboard/deadlines" span="lg:col-span-6">
       <div className="flex items-center justify-between mb-4">
         <Eyebrow>Scadenze</Eyebrow>
-        {overdue > 0 && (
+        {overdueItems.length > 0 && (
           <span className="flex items-center gap-1.5 text-[11px] text-rose-400 font-mono-display">
-            <AlertTriangle size={11} /> {overdue} scadut{overdue === 1 ? 'a' : 'e'}
+            <AlertTriangle size={11} /> {overdueItems.length} scadut{overdueItems.length === 1 ? 'a' : 'e'}
           </span>
         )}
       </div>
 
       {loading ? (
         <div className="h-24 rounded-xl bg-card-inner animate-pulse" />
-      ) : todayItems.length === 0 && weekItems.length === 0 && overdue === 0 ? (
+      ) : error ? (
+        <p className="text-sm text-muted">Backend non raggiungibile.</p>
+      ) : decorated.length === 0 ? (
         <>
           <p className="font-serif italic text-2xl text-heading">Tutto in ordine.</p>
-          <p className="mt-1.5 text-sm text-tertiary">Nessuna scadenza imminente.</p>
+          <p className="mt-1.5 text-sm text-tertiary">Nessuna scadenza in vista.</p>
         </>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
           {/* Oggi */}
           <div>
-            <div className="flex items-baseline justify-between mb-2">
+            <div className="flex items-baseline justify-between mb-1.5">
               <p className="text-[11px] tracking-uppercase text-tertiary">Oggi</p>
               <span className="text-[11px] font-mono-display text-muted">{todayItems.length}</span>
             </div>
             {todayItems.length > 0 ? (
               <ul className="divide-y divide-white/[0.04]">
-                {todayItems.slice(0, 3).map((it) => renderItem(it, false))}
+                {todayItems.slice(0, 3).map((x) => renderItem(x, 'Oggi'))}
               </ul>
             ) : (
               <p className="text-[12px] text-muted py-1.5">Niente per oggi</p>
             )}
           </div>
 
-          {/* Questa settimana */}
+          {/* Questa settimana — falls back to "Prossime" if week is empty */}
           <div>
-            <div className="flex items-baseline justify-between mb-2">
-              <p className="text-[11px] tracking-uppercase text-tertiary">Questa settimana</p>
-              <span className="text-[11px] font-mono-display text-muted">{weekItems.length}</span>
+            <div className="flex items-baseline justify-between mb-1.5">
+              <p className="text-[11px] tracking-uppercase text-tertiary">
+                {weekItems.length > 0 || upcomingFallback.length === 0 ? 'Questa settimana' : 'Prossime'}
+              </p>
+              <span className="text-[11px] font-mono-display text-muted">
+                {weekItems.length > 0 ? weekItems.length : upcomingFallback.length}
+              </span>
             </div>
             {weekItems.length > 0 ? (
               <ul className="divide-y divide-white/[0.04]">
-                {weekItems.slice(0, 3).map((it) => renderItem(it, true))}
+                {weekItems.slice(0, 3).map((x) => renderItem(x))}
+              </ul>
+            ) : upcomingFallback.length > 0 ? (
+              <ul className="divide-y divide-white/[0.04]">
+                {upcomingFallback.map((x) => renderItem(x))}
               </ul>
             ) : (
               <p className="text-[12px] text-muted py-1.5">Settimana libera</p>
@@ -623,10 +628,13 @@ export default function DashboardPage() {
       <div className="max-w-6xl mx-auto px-5 sm:px-10 pb-32">
         <Hero now={now} />
 
-        {/* Bento — 5 tiles */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 lg:auto-rows-[160px] gap-3 sm:gap-4">
+        {/* Bento — 5 tiles, two visual rows */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
+          {/* Row 1: hero + sleep (each takes its full natural height; grid stretches them to match) */}
           <StudioHeroTile />
           <SleepTile />
+
+          {/* Row 2: smaller stat tiles */}
           <PomodoroTile />
           <HealthTile />
           <DeadlinesTile />
