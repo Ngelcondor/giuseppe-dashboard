@@ -4,10 +4,8 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle, ChevronRight, CheckCircle2, Circle,
-  Sun, Sunset, CloudMoon, Coffee,
+  Coffee, Moon, Clock,
 } from 'lucide-react';
-import routineService, { type RoutineResponse, type TimeOfDay } from '@/services/routineService';
-import SleepWidget from '@/components/widgets/SleepWidget';
 import api from '@/lib/api';
 import { BottomDock } from '@/components/ui/AppShell';
 import {
@@ -33,6 +31,12 @@ function greetingFor(d: Date) {
 }
 
 const DAY_NAMES_IT = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
+
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() &&
+         a.getMonth() === b.getMonth() &&
+         a.getDate() === b.getDate();
+}
 
 /* ─────────────────────────────────────────────────────── tile primitives */
 
@@ -235,6 +239,158 @@ function StudioHeroTile() {
   );
 }
 
+/* ─────────────────────────────────────────────────────── SLEEP TILE — Apple Watch only */
+
+interface SleepSession {
+  id: string;
+  sleep_start: string;
+  sleep_end: string;
+  duration_minutes: number;
+  quality_score: number | null;
+  light_minutes: number;
+  deep_minutes: number;
+  rem_minutes: number;
+  awake_minutes: number;
+  source: string;
+}
+
+const APPLE_SOURCES = new Set(['apple_watch', 'health_auto_export', 'apple_health']);
+
+function SleepTile() {
+  const [latest, setLatest] = useState<SleepSession | null>(null);
+  const [recent, setRecent] = useState<SleepSession[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get('/sleep?days=7')
+      .then((r) => {
+        const all: SleepSession[] = Array.isArray(r.data) ? r.data : [];
+        const apple = all.filter((s) => APPLE_SOURCES.has(s.source));
+        setRecent(apple.slice(0, 7));
+        setLatest(apple[0] ?? null);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Build a 7-night sparkline of duration_minutes (newest right)
+  const maxMin = Math.max(...recent.map(r => r.duration_minutes), 480);
+  const sparkline = [...recent].reverse(); // oldest left → newest right
+
+  if (loading) {
+    return (
+      <Tile span="lg:col-span-5 lg:row-span-2">
+        <Eyebrow>Sonno</Eyebrow>
+        <div className="mt-6 h-32 rounded-xl bg-card-inner animate-pulse" />
+      </Tile>
+    );
+  }
+
+  if (!latest) {
+    return (
+      <Tile href="/dashboard/health/sleep" span="lg:col-span-5 lg:row-span-2">
+        <Eyebrow>Sonno</Eyebrow>
+        <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 py-8">
+          <Moon size={28} className="text-blue-400" />
+          <p className="font-serif italic text-xl text-heading">Niente Apple Watch</p>
+          <p className="text-xs text-tertiary max-w-xs">
+            Indossa l&apos;orologio durante la notte e i dati appariranno qui.
+          </p>
+        </div>
+      </Tile>
+    );
+  }
+
+  const totalMin = latest.duration_minutes;
+  const hours = Math.floor(totalMin / 60);
+  const mins = totalMin % 60;
+
+  const stagesTotal = latest.light_minutes + latest.deep_minutes + latest.rem_minutes + latest.awake_minutes;
+  const stages = stagesTotal > 0 ? [
+    { key: 'awake',  label: 'Sveglio', min: latest.awake_minutes, color: '#ef4444' },
+    { key: 'rem',    label: 'REM',     min: latest.rem_minutes,   color: '#a78bfa' },
+    { key: 'light',  label: 'Leggero', min: latest.light_minutes, color: '#60a5fa' },
+    { key: 'deep',   label: 'Profondo', min: latest.deep_minutes, color: '#1e40af' },
+  ] : [];
+
+  const startDate = new Date(latest.sleep_start);
+  const endDate = new Date(latest.sleep_end);
+  const fmtTime = (d: Date) => d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <Tile href="/dashboard/health/sleep" span="lg:col-span-5 lg:row-span-2">
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <Eyebrow>Sonno · Apple Watch</Eyebrow>
+          <p className="mt-2 text-[13px] text-tertiary font-mono-display">
+            {fmtTime(startDate)} → {fmtTime(endDate)}
+          </p>
+        </div>
+        <ArrowChevron />
+      </div>
+
+      {/* Big total */}
+      <div className="flex items-baseline gap-2 mb-6">
+        <p className="font-mono-display font-semibold text-[56px] sm:text-[64px] leading-none tracking-[-0.04em] text-heading">
+          {hours}<span className="text-tertiary text-3xl">h</span>{' '}
+          {String(mins).padStart(2, '0')}<span className="text-tertiary text-3xl">m</span>
+        </p>
+      </div>
+
+      {/* Stage bar */}
+      {stagesTotal > 0 && (
+        <>
+          <div className="flex h-2 rounded-full overflow-hidden bg-card-inner mb-3">
+            {stages.map(s => s.min > 0 && (
+              <span
+                key={s.key}
+                style={{ width: `${(s.min / stagesTotal) * 100}%`, backgroundColor: s.color }}
+              />
+            ))}
+          </div>
+          <div className="grid grid-cols-4 gap-2 mb-6">
+            {stages.map(s => (
+              <div key={s.key}>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: s.color }} />
+                  <span className="text-[10px] text-tertiary tracking-uppercase">{s.label}</span>
+                </div>
+                <p className="text-[13px] font-mono-display text-body">
+                  {Math.floor(s.min / 60)}h {String(s.min % 60).padStart(2, '0')}
+                </p>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* 7-night sparkline */}
+      {sparkline.length > 1 && (
+        <div className="mt-auto pt-4 border-t border-border-default">
+          <div className="flex items-end justify-between gap-1 h-12">
+            {sparkline.map((s, i) => {
+              const h = Math.max(8, (s.duration_minutes / maxMin) * 48);
+              const isLast = i === sparkline.length - 1;
+              return (
+                <div
+                  key={s.id ?? i}
+                  className="flex-1 rounded-t-md"
+                  style={{
+                    height: `${h}px`,
+                    backgroundColor: isLast ? 'rgb(var(--accent-primary))' : 'rgb(var(--color-tertiary) / 0.4)',
+                  }}
+                  title={`${(s.duration_minutes / 60).toFixed(1)}h`}
+                />
+              );
+            })}
+          </div>
+          <p className="mt-2 text-[10px] text-muted tracking-uppercase">Ultime 7 notti</p>
+        </div>
+      )}
+    </Tile>
+  );
+}
+
 /* ─────────────────────────────────────────────────────── small tiles */
 
 function PomodoroTile() {
@@ -248,17 +404,6 @@ function PomodoroTile() {
       <div className="mt-auto flex items-center justify-between pt-6">
         <span className="text-[13px] text-body">Avvia sessione</span>
         <ArrowChevron />
-      </div>
-    </Tile>
-  );
-}
-
-function SleepTile() {
-  return (
-    <Tile href="/dashboard/health/sleep" span="lg:col-span-2">
-      <Eyebrow>Sonno</Eyebrow>
-      <div className="mt-2 -mx-1 flex-1">
-        <SleepWidget />
       </div>
     </Tile>
   );
@@ -282,7 +427,7 @@ function HealthTile() {
   const hr = latest('heart_rate');
 
   return (
-    <Tile href="/dashboard/health" span="lg:col-span-2">
+    <Tile href="/dashboard/health" span="lg:col-span-3">
       <Eyebrow>Battito</Eyebrow>
       {loading ? (
         <div className="mt-3 h-10 w-20 rounded bg-card-inner animate-pulse" />
@@ -302,124 +447,38 @@ function HealthTile() {
   );
 }
 
-function MoodTile() {
-  const moods = ['😫', '😕', '😐', '🙂', '😄'];
-  return (
-    <Tile span="lg:col-span-2">
-      <Eyebrow>Umore</Eyebrow>
-      <p className="mt-3 font-serif italic text-2xl text-heading">Come va?</p>
-      <div className="mt-5 grid grid-cols-5 gap-1">
-        {moods.map((m, i) => (
-          <Link
-            key={i}
-            href={`/dashboard/mood?initial=${i + 1}`}
-            className="aspect-square flex items-center justify-center rounded-full text-2xl bg-card-inner border border-border-default hover:border-accent hover:bg-accent-soft transition-all duration-150"
-          >
-            {m}
-          </Link>
-        ))}
-      </div>
-    </Tile>
-  );
+/* ─────────────────────────────────────────────────────── DEADLINES TILE — today + week */
+
+interface DeadlineData {
+  id: string;
+  title: string;
+  due_date: string;
+  category: string;
+  priority: string;
+  is_completed: boolean;
 }
 
-const TIME_ICONS: Record<TimeOfDay, React.ElementType> = { morning: Sun, afternoon: Sun, evening: Sunset, night: CloudMoon };
-const TIME_LABELS: Record<TimeOfDay, string> = { morning: 'Mattina', afternoon: 'Pomeriggio', evening: 'Sera', night: 'Notte' };
+const PRIORITY_COLORS: Record<string, string> = {
+  urgent: '#ef4444',
+  high: '#f97316',
+  medium: '#eab308',
+  low: '#6b7280',
+};
 
-function RoutineTile() {
-  const [routine, setRoutine] = useState<RoutineResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [done, setDone] = useState<Set<string>>(new Set());
+const CATEGORY_EMOJI: Record<string, string> = {
+  university: '🎓',
+  work: '💼',
+  personal: '📌',
+  certification: '📜',
+  ctf: '🏴',
+  other: '📋',
+};
 
-  const hour = new Date().getHours();
-  const current: TimeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : hour < 21 ? 'evening' : 'night';
-
-  useEffect(() => {
-    routineService.getToday().then((data) => {
-      const order: TimeOfDay[] = ['morning', 'afternoon', 'evening', 'night'];
-      const idx = order.indexOf(current);
-      for (let i = 0; i < order.length; i++) {
-        const k = order[(idx + i) % order.length];
-        if (data[k]) { setRoutine(data[k]); break; }
-      }
-    }).catch(() => {}).finally(() => setLoading(false));
-  }, [current]);
-
-  if (!loading && !routine) {
-    return (
-      <Tile href="/dashboard/routines" span="lg:col-span-7">
-        <Eyebrow>Routine</Eyebrow>
-        <p className="mt-3 font-serif italic text-2xl text-heading">Nessuna routine attiva</p>
-        <p className="mt-2 text-sm text-tertiary">Configurane una per oggi.</p>
-      </Tile>
-    );
-  }
-
-  if (loading || !routine) {
-    return (
-      <Tile span="lg:col-span-7">
-        <div className="h-32 animate-pulse" />
-      </Tile>
-    );
-  }
-
-  const steps = [...routine.steps].sort((a, b) => a.order - b.order);
-  const Icon = TIME_ICONS[routine.time_of_day];
-  const pct = steps.length ? Math.round((done.size / steps.length) * 100) : 0;
-
-  const toggle = (id: string) =>
-    setDone((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
-
-  return (
-    <Tile span="lg:col-span-7">
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <Eyebrow>Routine · {TIME_LABELS[routine.time_of_day]}</Eyebrow>
-          <p className="mt-2 font-display font-extrabold text-2xl tracking-[-0.02em] text-heading">{routine.name}</p>
-        </div>
-        <Link
-          href="/dashboard/routines"
-          aria-label="Apri Routine"
-          className="shrink-0 w-9 h-9 rounded-full bg-card-inner border border-border-default flex items-center justify-center text-tertiary hover:text-heading hover:border-border-hover transition-colors"
-        >
-          <Icon size={15} />
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
-        {steps.slice(0, 6).map((s) => {
-          const isDone = done.has(s.id);
-          return (
-            <button
-              key={s.id}
-              onClick={() => toggle(s.id)}
-              className="flex items-center gap-3 text-left group/step"
-            >
-              {isDone ? (
-                <CheckCircle2 size={16} className="text-accent shrink-0" />
-              ) : (
-                <Circle size={16} className="text-muted shrink-0 group-hover/step:text-tertiary transition-colors" />
-              )}
-              <span className={`text-[14px] ${isDone ? 'text-muted line-through' : 'text-body'}`}>
-                {s.icon && <span className="mr-1.5">{s.icon}</span>}
-                {s.title}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-7 pt-5 border-t border-border-default flex items-center justify-between text-[13px]">
-        <span className="text-tertiary font-mono-display">{done.size}/{steps.length} step</span>
-        <span className="text-accent font-mono-display">{pct}%</span>
-      </div>
-    </Tile>
-  );
+function isInThisWeek(date: Date, today: Date): boolean {
+  // "Questa settimana" = days 1-7 from today (excluding today itself)
+  const diffDays = Math.floor((date.getTime() - today.getTime()) / 86_400_000);
+  return diffDays >= 1 && diffDays <= 7;
 }
-
-interface DeadlineData { id: string; title: string; due_date: string; category: string; priority: string; is_completed: boolean; }
-const PRIORITY_COLORS: Record<string, string> = { urgent: '#ef4444', high: '#f97316', medium: '#eab308', low: '#6b7280' };
-const CATEGORY_EMOJI: Record<string, string> = { university: '🎓', work: '💼', personal: '📌', certification: '📜', ctf: '🏴', other: '📋' };
 
 function DeadlinesTile() {
   const [data, setData] = useState<{ upcoming: DeadlineData[]; overdue: DeadlineData[] } | null>(null);
@@ -432,62 +491,105 @@ function DeadlinesTile() {
       .finally(() => setLoading(false));
   }, []);
 
-  const items = data?.upcoming?.slice(0, 3) ?? [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const todayItems = (data?.upcoming ?? []).filter((d) => {
+    const dd = new Date(d.due_date);
+    dd.setHours(0, 0, 0, 0);
+    return isSameDay(dd, today);
+  });
+  const weekItems = (data?.upcoming ?? []).filter((d) => {
+    const dd = new Date(d.due_date);
+    dd.setHours(0, 0, 0, 0);
+    return isInThisWeek(dd, today);
+  });
   const overdue = data?.overdue?.length ?? 0;
 
-  const fmt = (d: string) => {
-    const date = new Date(d);
-    const today = new Date();
-    const tom = new Date(); tom.setDate(today.getDate() + 1);
-    if (date.toDateString() === today.toDateString()) return 'Oggi';
-    if (date.toDateString() === tom.toDateString()) return 'Domani';
-    return date.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+  const fmtDay = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric' });
+  };
+
+  const fmtTime = (iso: string) => {
+    const d = new Date(iso);
+    const h = d.getHours();
+    const m = d.getMinutes();
+    if (h === 0 && m === 0) return null;
+    return d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const renderItem = (it: DeadlineData, withDay = false) => {
+    const time = fmtTime(it.due_date);
+    return (
+      <li key={it.id} className="flex items-center gap-3 py-1.5">
+        <span className="w-1 h-7 rounded-full shrink-0" style={{ backgroundColor: PRIORITY_COLORS[it.priority] || '#6b7280' }} />
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] text-body truncate">
+            <span className="mr-1.5">{CATEGORY_EMOJI[it.category] || '📋'}</span>
+            {it.title}
+          </p>
+          <p className="text-[11px] text-muted font-mono-display">
+            {withDay ? fmtDay(it.due_date) : 'Oggi'}{time ? ` · ${time}` : ''}
+          </p>
+        </div>
+      </li>
+    );
   };
 
   return (
-    <Tile href="/dashboard/deadlines" span="lg:col-span-2">
-      <Eyebrow>Scadenze</Eyebrow>
+    <Tile href="/dashboard/deadlines" span="lg:col-span-6">
+      <div className="flex items-center justify-between mb-4">
+        <Eyebrow>Scadenze</Eyebrow>
+        {overdue > 0 && (
+          <span className="flex items-center gap-1.5 text-[11px] text-rose-400 font-mono-display">
+            <AlertTriangle size={11} /> {overdue} scadut{overdue === 1 ? 'a' : 'e'}
+          </span>
+        )}
+      </div>
+
       {loading ? (
-        <div className="mt-3 h-12 animate-pulse" />
-      ) : items.length === 0 && overdue === 0 ? (
+        <div className="h-24 rounded-xl bg-card-inner animate-pulse" />
+      ) : todayItems.length === 0 && weekItems.length === 0 && overdue === 0 ? (
         <>
-          <p className="mt-3 font-serif italic text-2xl text-heading">Tutto in ordine.</p>
-          <p className="mt-2 text-sm text-tertiary">Nessuna scadenza imminente.</p>
+          <p className="font-serif italic text-2xl text-heading">Tutto in ordine.</p>
+          <p className="mt-1.5 text-sm text-tertiary">Nessuna scadenza imminente.</p>
         </>
       ) : (
-        <ul className="mt-4 space-y-3 flex-1">
-          {overdue > 0 && (
-            <li className="text-sm text-rose-400 font-medium flex items-center gap-2">
-              <AlertTriangle size={13} /> {overdue} scadut{overdue === 1 ? 'a' : 'e'}
-            </li>
-          )}
-          {items.map((it) => (
-            <li key={it.id} className="flex items-center gap-3">
-              <span className="w-1 h-7 rounded-full shrink-0" style={{ backgroundColor: PRIORITY_COLORS[it.priority] || '#6b7280' }} />
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] text-body truncate">{CATEGORY_EMOJI[it.category]} {it.title}</p>
-                <p className="text-[11px] text-muted font-mono-display">{fmt(it.due_date)}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="mt-auto pt-5 flex items-center justify-end">
-        <ArrowChevron />
-      </div>
-    </Tile>
-  );
-}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+          {/* Oggi */}
+          <div>
+            <div className="flex items-baseline justify-between mb-2">
+              <p className="text-[11px] tracking-uppercase text-tertiary">Oggi</p>
+              <span className="text-[11px] font-mono-display text-muted">{todayItems.length}</span>
+            </div>
+            {todayItems.length > 0 ? (
+              <ul className="divide-y divide-white/[0.04]">
+                {todayItems.slice(0, 3).map((it) => renderItem(it, false))}
+              </ul>
+            ) : (
+              <p className="text-[12px] text-muted py-1.5">Niente per oggi</p>
+            )}
+          </div>
 
-function HabitsTile() {
-  return (
-    <Tile href="/dashboard/habits" span="lg:col-span-2">
-      <Eyebrow>Abitudini</Eyebrow>
-      <p className="mt-3 font-mono-display font-medium text-[44px] leading-none tracking-[-0.03em] text-heading">
-        3<span className="text-tertiary">/5</span>
-      </p>
-      <p className="mt-3 text-sm text-tertiary">oggi completate</p>
-      <div className="mt-auto pt-6 flex items-center justify-end">
+          {/* Questa settimana */}
+          <div>
+            <div className="flex items-baseline justify-between mb-2">
+              <p className="text-[11px] tracking-uppercase text-tertiary">Questa settimana</p>
+              <span className="text-[11px] font-mono-display text-muted">{weekItems.length}</span>
+            </div>
+            {weekItems.length > 0 ? (
+              <ul className="divide-y divide-white/[0.04]">
+                {weekItems.slice(0, 3).map((it) => renderItem(it, true))}
+              </ul>
+            ) : (
+              <p className="text-[12px] text-muted py-1.5">Settimana libera</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-auto pt-4 flex items-center justify-end">
         <ArrowChevron />
       </div>
     </Tile>
@@ -521,16 +623,13 @@ export default function DashboardPage() {
       <div className="max-w-6xl mx-auto px-5 sm:px-10 pb-32">
         <Hero now={now} />
 
-        {/* Bento grid */}
+        {/* Bento — 5 tiles */}
         <section className="grid grid-cols-1 lg:grid-cols-12 lg:auto-rows-[160px] gap-3 sm:gap-4">
           <StudioHeroTile />
           <SleepTile />
           <PomodoroTile />
           <HealthTile />
-          <MoodTile />
-          <RoutineTile />
           <DeadlinesTile />
-          <HabitsTile />
         </section>
 
         <p className="mt-16 text-center font-serif italic text-[13px] text-muted">
