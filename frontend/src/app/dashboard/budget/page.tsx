@@ -291,20 +291,23 @@ export default function BudgetPage() {
       <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCSVImport} />
 
       {/* Header */}
-      <header className="px-6 py-5 border-b border-border-default sticky top-0 bg-page/90 backdrop-blur-sm z-10">
+      <header className="sticky top-0 z-30 px-6 py-4 border-b border-border-default bg-page/85 backdrop-blur-md">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="text-tertiary hover:text-body transition-colors">
-              <ArrowLeft size={18} />
+            <Link href="/dashboard" className="flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-tertiary hover:text-heading hover:border-border-hover transition-colors">
+              <ArrowLeft size={15} />
             </Link>
-            <h1 className="text-base font-semibold">Budget</h1>
+            <div>
+              <p className="section-label leading-none mb-0.5">Finance</p>
+              <h1 className="text-[15px] font-semibold tracking-tight">Budget</h1>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1">
-            <button onClick={fetchDashboard} disabled={loading} className="p-2 text-muted hover:text-body transition-colors rounded-lg hover:bg-surface-hover">
+          <div className="flex items-center gap-1.5">
+            <button onClick={fetchDashboard} disabled={loading} className="p-2 text-tertiary hover:text-body transition-colors rounded-lg hover:bg-card-inner">
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             </button>
-            <div className="flex gap-0.5 p-1 rounded-xl bg-card border border-border-default">
+            <div className="flex gap-0.5 p-1 rounded-xl bg-card-inner border border-border-default">
               {([
                 { key: 'overview' as View, label: 'Panoramica' },
                 { key: 'transactions' as View, label: 'Movimenti' },
@@ -312,7 +315,7 @@ export default function BudgetPage() {
                 { key: 'settings' as View, label: 'Banca' },
               ]).map(({ key, label }) => (
                 <button key={key} onClick={() => setView(key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${view === key ? 'bg-card-inner text-heading' : 'text-tertiary hover:text-body'}`}>
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${view === key ? 'bg-surface-hover text-heading' : 'text-tertiary hover:text-body'}`}>
                   {label}
                 </button>
               ))}

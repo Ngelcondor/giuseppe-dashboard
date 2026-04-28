@@ -790,12 +790,17 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-page text-body">
-      <header className="px-6 py-5 border-b border-border-default flex items-center gap-3">
-        <Link href="/dashboard" className="text-muted hover:text-body transition-colors">
-          <ArrowLeft size={18} />
-        </Link>
-        <Settings size={18} className="text-tertiary" />
-        <h1 className="text-base font-semibold text-heading">Pannello di Controllo</h1>
+      <header className="sticky top-0 z-30 px-6 py-4 border-b border-border-default bg-page/85 backdrop-blur-md">
+        <div className="max-w-2xl mx-auto flex items-center gap-3">
+          <Link href="/dashboard" className="flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-tertiary hover:text-heading hover:border-border-hover transition-colors">
+            <ArrowLeft size={15} />
+          </Link>
+          <Settings size={15} className="text-accent" />
+          <div>
+            <p className="section-label leading-none mb-0.5">System</p>
+            <h1 className="text-[15px] font-semibold text-heading tracking-tight">Pannello di Controllo</h1>
+          </div>
+        </div>
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-4">

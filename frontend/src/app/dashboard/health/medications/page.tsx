@@ -943,12 +943,15 @@ export default function MedicationsPage() {
   return (
     <div className="min-h-screen bg-page text-heading">
       {/* Header */}
-      <header className="px-6 py-5 border-b border-border-default flex items-center gap-3">
-        <Link href="/dashboard/health" className="text-tertiary hover:text-body transition-colors">
-          <ArrowLeft size={18} />
+      <header className="sticky top-0 z-30 px-6 py-4 border-b border-border-default bg-page/85 backdrop-blur-md flex items-center gap-3">
+        <Link href="/dashboard/health" className="flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-tertiary hover:text-heading hover:border-border-hover transition-colors">
+          <ArrowLeft size={15} />
         </Link>
-        <Pill size={18} className="text-indigo-400" />
-        <h1 className="text-base font-semibold flex-1">Farmaci</h1>
+        <Pill size={15} className="text-indigo-400" />
+        <div className="flex-1">
+          <p className="section-label leading-none mb-0.5">Therapy</p>
+          <h1 className="text-[15px] font-semibold tracking-tight">Farmaci</h1>
+        </div>
         <button
           onClick={() => setShowSyncPanel(!showSyncPanel)}
           className={`p-2 rounded-lg transition-colors ${

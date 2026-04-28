@@ -179,33 +179,36 @@ export default function HabitsPage() {
     <div className="min-h-screen bg-page text-heading">
 
       {/* Header */}
-      <header className="px-6 py-5 border-b border-border-default">
+      <header className="sticky top-0 z-30 px-6 py-4 border-b border-border-default bg-page/85 backdrop-blur-md">
         <div className="max-w-xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="text-tertiary hover:text-body transition-colors">
-              <ArrowLeft size={18} />
+            <Link href="/dashboard" className="flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-tertiary hover:text-heading hover:border-border-hover transition-colors">
+              <ArrowLeft size={15} />
             </Link>
-            <h1 className="text-base font-semibold tracking-tight">Abitudini</h1>
+            <div>
+              <p className="section-label leading-none mb-0.5">Daily ritual</p>
+              <h1 className="text-[15px] font-semibold tracking-tight">Abitudini</h1>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={fetchHabits}
-              className="p-2 text-tertiary hover:text-body transition-colors rounded-lg hover:bg-card"
+              className="p-2 text-tertiary hover:text-body transition-colors rounded-lg hover:bg-card-inner"
             >
-              <RefreshCw size={15} />
+              <RefreshCw size={14} />
             </button>
             <button
               onClick={() => setShowAdd(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-card hover:bg-surface-hover transition-colors text-body"
+              className="chip hover:border-border-hover hover:bg-surface-hover"
             >
-              <Plus size={14} />
+              <Plus size={12} />
               {showAdd ? 'Annulla' : 'Aggiungi'}
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-xl mx-auto px-6 py-8 space-y-6">
+      <main className="max-w-xl mx-auto px-6 py-8 space-y-5">
 
         {/* Error */}
         {error && (

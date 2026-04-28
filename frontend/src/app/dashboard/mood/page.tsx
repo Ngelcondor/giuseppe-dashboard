@@ -283,24 +283,29 @@ export default function MoodPage() {
     <div className="min-h-screen bg-page text-heading">
 
       {/* Header */}
-      <header className="px-6 py-5 border-b border-border-default flex items-center justify-between sticky top-0 bg-page/90 backdrop-blur-sm z-10">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="text-tertiary hover:text-body transition-colors">
-            <ArrowLeft size={18} />
-          </Link>
-          <h1 className="text-base font-semibold">Umore</h1>
-        </div>
-        <div className="flex items-center gap-1">
-          <button onClick={load} className="p-2 text-muted hover:text-body rounded-lg hover:bg-card transition-colors">
-            <RefreshCw size={14} />
-          </button>
-          <button
-            onClick={() => setShowForm(v => !v)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-card hover:bg-surface-hover transition-colors text-body"
-          >
-            <Plus size={14} />
-            {showForm ? 'Annulla' : 'Nuovo log'}
-          </button>
+      <header className="sticky top-0 z-30 px-6 py-4 border-b border-border-default bg-page/85 backdrop-blur-md">
+        <div className="max-w-xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard" className="flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-tertiary hover:text-heading hover:border-border-hover transition-colors">
+              <ArrowLeft size={15} />
+            </Link>
+            <div>
+              <p className="section-label leading-none mb-0.5">Mind & Body</p>
+              <h1 className="text-[15px] font-semibold tracking-tight">Umore</h1>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button onClick={load} className="p-2 text-tertiary hover:text-body rounded-lg hover:bg-card-inner transition-colors">
+              <RefreshCw size={14} />
+            </button>
+            <button
+              onClick={() => setShowForm(v => !v)}
+              className="chip hover:border-border-hover hover:bg-surface-hover"
+            >
+              <Plus size={12} />
+              {showForm ? 'Annulla' : 'Nuovo log'}
+            </button>
+          </div>
         </div>
       </header>
 

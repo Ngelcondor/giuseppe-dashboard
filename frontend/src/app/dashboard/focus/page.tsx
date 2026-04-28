@@ -136,22 +136,27 @@ export default function FocusPage() {
     <div className="min-h-screen bg-page text-heading">
 
       {/* Header */}
-      <header className="px-6 py-5 border-b border-border-default flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="text-tertiary hover:text-body transition-colors">
-            <ArrowLeft size={18} />
-          </Link>
-          <h1 className="text-base font-semibold">Focus</h1>
+      <header className="sticky top-0 z-30 px-6 py-4 border-b border-border-default bg-page/85 backdrop-blur-md">
+        <div className="max-w-md mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard" className="flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-tertiary hover:text-heading hover:border-border-hover transition-colors">
+              <ArrowLeft size={15} />
+            </Link>
+            <div>
+              <p className="section-label leading-none mb-0.5">Deep Work</p>
+              <h1 className="text-[15px] font-semibold tracking-tight">Focus</h1>
+            </div>
+          </div>
+          <button
+            onClick={() => { setDraftConfig(config); setShowConfig(true); }}
+            className="p-2 text-tertiary hover:text-body transition-colors rounded-lg hover:bg-card-inner"
+          >
+            <Settings size={14} />
+          </button>
         </div>
-        <button
-          onClick={() => { setDraftConfig(config); setShowConfig(true); }}
-          className="text-muted hover:text-body transition-colors"
-        >
-          <Settings size={16} />
-        </button>
       </header>
 
-      <main className="max-w-md mx-auto px-6 py-10">
+      <main className="max-w-md mx-auto px-6 py-8">
 
         {/* Mode selector */}
         <div className="flex justify-center mb-10">
@@ -185,7 +190,7 @@ export default function FocusPage() {
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-5xl font-mono font-semibold tracking-tight" style={{ color }}>
+              <span className="text-[60px] font-mono-display font-semibold tracking-tight leading-none" style={{ color }}>
                 {mm}:{ss}
               </span>
               <span className="text-xs text-muted mt-2 uppercase tracking-widest">{MODE_LABELS[mode]}</span>

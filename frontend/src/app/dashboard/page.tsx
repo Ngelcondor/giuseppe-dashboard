@@ -6,8 +6,8 @@ import { usePathname } from 'next/navigation';
 import {
   Activity, Heart, Flame, Brain, Clock, Shield, TrendingUp,
   AlertTriangle, LayoutDashboard, Calendar, Utensils, Wallet, Rss,
-  Settings, Zap, Menu, X, ChevronRight, CheckCircle2, Circle, Sun, Sunset, CloudMoon, Play,
-  BookOpen, Coffee
+  Settings, Zap, Menu, X, ChevronRight, CheckCircle2, Circle,
+  Sun, Sunset, CloudMoon, Play, BookOpen, Coffee, Terminal,
 } from 'lucide-react';
 import routineService, { type RoutineResponse, type TimeOfDay } from '@/services/routineService';
 import SleepWidget from '@/components/widgets/SleepWidget';
@@ -18,11 +18,13 @@ import {
   getTodayDay,
   getDayProgress,
   getPendingPastTasks,
+  getOverallProgress,
   type StudyDay,
 } from '@/lib/studyPlanState';
 
 const navSections = [
-  { label: 'Dashboard',      href: '/dashboard',           icon: LayoutDashboard },
+  { label: 'Overview',       href: '/dashboard',           icon: LayoutDashboard },
+  { label: 'Studio',         href: '/dashboard/study',     icon: BookOpen },
   { label: 'Salute',         href: '/dashboard/health',    icon: Heart },
   { label: 'Focus',          href: '/dashboard/focus',     icon: Brain },
   { label: 'Routine',        href: '/dashboard/routines',  icon: Activity },
@@ -30,48 +32,59 @@ const navSections = [
   { label: 'Umore',          href: '/dashboard/mood',      icon: TrendingUp },
   { label: 'Scadenze',       href: '/dashboard/deadlines', icon: AlertTriangle },
   { label: 'Calendario',     href: '/dashboard/calendar',  icon: Calendar },
-  { label: 'Studio',         href: '/dashboard/study',     icon: BookOpen },
   { label: 'CTF Tracker',    href: '/dashboard/ctf',       icon: Shield },
   { label: 'Cyber Feed',     href: '/dashboard/feed',      icon: Rss },
   { label: 'Budget',         href: '/dashboard/budget',    icon: Wallet },
-  { label: 'Meal Planner',   href: '/dashboard/meals',     icon: Utensils },
+  { label: 'Pasti',          href: '/dashboard/meals',     icon: Utensils },
   { label: 'Sensoriale',     href: '/dashboard/sensory',   icon: Zap },
-  { label: 'Impostazioni',   href: '/dashboard/settings',  icon: Settings },
 ];
 
-function Widget({ href, children }: { href: string; children: React.ReactNode }) {
+/* ─── Widget primitives ──────────────────────────────────────────────────── */
+
+function Widget({ href, children, className = '' }: { href: string; children: React.ReactNode; className?: string }) {
   return (
     <Link
       href={href}
-      className="group block p-7 rounded-2xl bg-card border border-border-default hover:bg-surface-hover hover:border-border-hover transition-all duration-200"
+      className={`group block p-6 card-glass hover:border-border-hover transition-all duration-200 ${className}`}
     >
       {children}
     </Link>
   );
 }
 
-function WidgetHeader({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
+function WidgetHeader({
+  icon: Icon,
+  label,
+  iconColor = 'text-tertiary',
+}: {
+  icon: React.ElementType;
+  label: string;
+  iconColor?: string;
+}) {
   return (
-    <div className="flex items-center justify-between mb-6">
-      <div className="flex items-center gap-3">
-        <Icon size={18} className="text-tertiary" />
-        <span className="text-sm font-medium text-tertiary uppercase tracking-widest">{label}</span>
+    <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center gap-2.5">
+        <Icon size={15} className={iconColor} />
+        <span className="section-label">{label}</span>
       </div>
-      <ChevronRight size={16} className="text-muted group-hover:text-tertiary transition-colors" />
+      <ChevronRight size={14} className="text-muted group-hover:text-tertiary group-hover:translate-x-0.5 transition-all" />
     </div>
   );
 }
 
-function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
+function Stat({ label, value, unit, color }: { label: string; value: string; unit?: string; color?: string }) {
   return (
     <div>
-      <p className="text-xs text-muted mb-1">{label}</p>
-      <p className="text-xl font-semibold" style={{ color: color || '#e2e8f0' }}>{value}</p>
+      <p className="text-[11px] text-muted mb-1.5 tracking-uppercase">{label}</p>
+      <p className="text-xl font-semibold font-mono-display leading-none" style={{ color: color || 'rgb(var(--color-heading))' }}>
+        {value}
+        {unit && <span className="text-sm text-tertiary font-normal ml-1">{unit}</span>}
+      </p>
     </div>
   );
 }
 
-// ─── Health Widget (con dati reali) ───────────────────────────────────────────
+/* ─── Health Widget ──────────────────────────────────────────────────────── */
 
 interface HealthMetricData {
   metric_type: string;
@@ -97,7 +110,6 @@ function HealthWidget() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Estrai ultimo valore per tipo
   const latest = (type: string): HealthMetricData | null => {
     if (!summary?.metrics?.[type]?.length) return null;
     const arr = summary.metrics[type];
@@ -111,37 +123,37 @@ function HealthWidget() {
 
   return (
     <Widget href="/dashboard/health">
-      <WidgetHeader icon={Heart} label="Salute" />
+      <WidgetHeader icon={Heart} label="Salute" iconColor="text-rose-400" />
       {loading ? (
         <div className="flex justify-center py-6">
-          <div className="w-6 h-6 border-2 border-white/10 border-t-red-400/60 rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-white/10 border-t-rose-400/60 rounded-full animate-spin" />
         </div>
       ) : hasData ? (
         <>
           <div className="grid grid-cols-2 gap-5">
-            <Stat label="Battito" value={hr ? `${Math.round(hr.value)} bpm` : '—'} color="#f87171" />
-            <Stat label="Passi" value={steps ? `${Math.round(steps.value).toLocaleString('it-IT')}` : '—'} color="#4ade80" />
-            <Stat label="Calorie" value={cal ? `${Math.round(cal.value)} kcal` : '—'} color="#fb923c" />
+            <Stat label="Battito" value={hr ? `${Math.round(hr.value)}` : '—'} unit="bpm" color="#fb7185" />
+            <Stat label="Passi" value={steps ? Math.round(steps.value).toLocaleString('it-IT') : '—'} color="#34d399" />
+            <Stat label="Calorie" value={cal ? `${Math.round(cal.value)}` : '—'} unit="kcal" color="#fb923c" />
           </div>
           {hr?.source && (
-            <p className="text-xs text-muted mt-5 capitalize">Fonte: {hr.source.replace(/_/g, ' ')}</p>
+            <p className="text-[11px] text-muted mt-5 capitalize">via {hr.source.replace(/_/g, ' ')}</p>
           )}
         </>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-5">
-            <Stat label="Battito" value="— bpm" color="#f87171" />
-            <Stat label="Passi" value="—" color="#4ade80" />
-            <Stat label="Calorie" value="— kcal" color="#fb923c" />
+            <Stat label="Battito" value="—" unit="bpm" color="#fb7185" />
+            <Stat label="Passi" value="—" color="#34d399" />
+            <Stat label="Calorie" value="—" unit="kcal" color="#fb923c" />
           </div>
-          <p className="text-xs text-muted mt-5">Collega Apple Health per i dati reali</p>
+          <p className="text-[11px] text-muted mt-5">Collega Apple Health</p>
         </>
       )}
     </Widget>
   );
 }
 
-// ─── Deadlines Widget (con dati reali) ────────────────────────────────────────
+/* ─── Deadlines Widget ───────────────────────────────────────────────────── */
 
 interface DeadlineData {
   id: string;
@@ -200,59 +212,57 @@ function DeadlinesWidget() {
 
   return (
     <Widget href="/dashboard/deadlines">
-      <WidgetHeader icon={AlertTriangle} label="Scadenze" />
+      <WidgetHeader icon={AlertTriangle} label="Scadenze" iconColor="text-amber-400" />
       {loading ? (
         <div className="flex justify-center py-6">
-          <div className="w-6 h-6 border-2 border-white/10 border-t-amber-400/60 rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-white/10 border-t-amber-400/60 rounded-full animate-spin" />
         </div>
       ) : hasItems ? (
         <div className="space-y-3">
-          {/* Overdue banner */}
           {overdueCount > 0 && (
-            <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20">
-              <AlertTriangle size={15} className="text-red-400 shrink-0" />
-              <span className="text-sm text-red-300 font-medium">
-                {overdueCount} scadenz{overdueCount === 1 ? 'a' : 'e'} scadut{overdueCount === 1 ? 'a' : 'e'}
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
+              <AlertTriangle size={13} className="text-red-400 shrink-0" />
+              <span className="text-xs text-red-300 font-medium">
+                {overdueCount} scadut{overdueCount === 1 ? 'a' : 'e'}
               </span>
             </div>
           )}
-          {/* Upcoming list */}
           {upcomingItems.map(item => (
             <div key={item.id} className="flex items-center gap-3">
-              <div className="w-1.5 h-8 rounded-full shrink-0" style={{ backgroundColor: PRIORITY_COLORS[item.priority] || '#6b7280' }} />
+              <div className="w-1 h-7 rounded-full shrink-0" style={{ backgroundColor: PRIORITY_COLORS[item.priority] || '#6b7280' }} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-body truncate">
-                  {CATEGORY_EMOJI[item.category] || '📋'} {item.title}
+                  <span className="mr-1.5">{CATEGORY_EMOJI[item.category] || '📋'}</span>
+                  {item.title}
                 </p>
-                <p className="text-xs text-muted">{formatDate(item.due_date)}</p>
+                <p className="text-[11px] text-muted">{formatDate(item.due_date)}</p>
               </div>
             </div>
           ))}
           {(data?.upcoming?.length ?? 0) > 4 && (
-            <p className="text-xs text-muted pl-5">+{(data?.upcoming?.length ?? 0) - 4} altre →</p>
+            <p className="text-[11px] text-muted pl-4">+{(data?.upcoming?.length ?? 0) - 4} altre</p>
           )}
         </div>
       ) : (
-        <>
-          <p className="text-sm text-muted">Nessuna scadenza imminente</p>
-          <p className="text-xs text-muted mt-1.5">Vai alla sezione per aggiungere scadenze</p>
-        </>
+        <p className="text-sm text-muted">Nessuna scadenza imminente</p>
       )}
     </Widget>
   );
 }
 
-// ─── Study Widget (CRTP plan, da localStorage) ────────────────────────────────
+/* ─── Study Widget ───────────────────────────────────────────────────────── */
 
 function StudyWidget() {
   const [today, setToday] = useState<StudyDay | undefined>(undefined);
   const [pendingCount, setPendingCount] = useState(0);
+  const [overallPct, setOverallPct] = useState(0);
   const [, force] = useState(0);
 
   useEffect(() => {
     const s = loadState();
     setToday(getTodayDay(s));
     setPendingCount(getPendingPastTasks(s).length);
+    setOverallPct(getOverallProgress(s).pct);
   }, []);
 
   const handleToggle = (e: React.MouseEvent, taskId: string) => {
@@ -262,111 +272,108 @@ function StudyWidget() {
     const s = loadState();
     const next = toggleTask(s, today.date, taskId);
     setToday(getTodayDay(next));
+    setOverallPct(getOverallProgress(next).pct);
     force(n => n + 1);
   };
 
-  // Nessun giorno pianificato (fuori dal range del piano)
   if (!today) {
     return (
       <Widget href="/dashboard/study">
-        <WidgetHeader icon={BookOpen} label="Studio CRTP" />
+        <WidgetHeader icon={BookOpen} label="Studio CRTP" iconColor="text-accent" />
         <p className="text-sm text-muted">Nessun giorno pianificato.</p>
-        <p className="text-xs text-muted mt-1.5">Il piano va dal 28 Apr al 22 Set 2026.</p>
+        <p className="text-[11px] text-muted mt-1.5">Piano: 28 Apr → 22 Set 2026</p>
       </Widget>
     );
   }
 
-  // Giorno di rest
   if (today.isRest) {
     return (
       <Widget href="/dashboard/study">
-        <WidgetHeader icon={BookOpen} label="Studio CRTP" />
-        <div className="flex flex-col items-center text-center py-4">
+        <WidgetHeader icon={BookOpen} label="Studio CRTP" iconColor="text-accent" />
+        <div className="flex flex-col items-center text-center py-3">
           <Coffee size={28} className="text-blue-400 mb-2.5" />
           <p className="text-sm font-medium text-heading">{today.label}</p>
-          <p className="text-xs text-tertiary mt-1.5">Domenica sacra. Riposa.</p>
+          <p className="text-[11px] text-tertiary mt-1.5">Domenica sacra. Riposa.</p>
         </div>
       </Widget>
     );
   }
 
   const progress = getDayProgress(today);
-  const visibleTasks = today.tasks.slice(0, 4);
+  const visibleTasks = today.tasks.slice(0, 3);
 
   return (
-    <div className="group block p-7 rounded-2xl bg-card border border-border-default hover:bg-surface-hover hover:border-border-hover transition-all duration-200">
+    <div className="group block p-6 card-glass hover:border-border-hover transition-all duration-200">
       <Link href="/dashboard/study">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-3">
-            <BookOpen size={18} className="text-teal-400" />
-            <span className="text-sm font-medium text-teal-400 uppercase tracking-widest">
-              Studio CRTP
-            </span>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2.5">
+            <BookOpen size={15} className="text-accent" />
+            <span className="section-label">Studio CRTP</span>
           </div>
-          <ChevronRight size={16} className="text-muted group-hover:text-tertiary transition-colors" />
+          <ChevronRight size={14} className="text-muted group-hover:text-accent group-hover:translate-x-0.5 transition-all" />
         </div>
       </Link>
 
-      {/* Pending banner */}
+      {/* Overall progress */}
+      <div className="mb-4 flex items-baseline justify-between">
+        <p className="text-[11px] text-muted tracking-uppercase">Roadmap</p>
+        <p className="text-sm font-mono-display text-accent">{overallPct}%</p>
+      </div>
+
       {pendingCount > 0 && (
         <Link
           href="/dashboard/study/today"
           className="flex items-center gap-2 px-3 py-2 mb-4 rounded-lg bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300 hover:bg-rose-500/20 transition-colors"
         >
           <AlertTriangle size={12} />
-          {pendingCount} task in arretrato — riprogramma
+          {pendingCount} arretrati — riprogramma
         </Link>
       )}
 
-      {/* Progress bar */}
       {progress.total > 0 && (
-        <div className="mb-5">
+        <div className="mb-4">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs text-muted truncate pr-2">{today.label}</span>
-            <span className="text-xs font-medium text-teal-400 shrink-0">{progress.done}/{progress.total}</span>
+            <span className="text-[11px] text-tertiary truncate pr-2">{today.label}</span>
+            <span className="text-[11px] font-mono-display text-accent shrink-0">{progress.done}/{progress.total}</span>
           </div>
-          <div className="w-full h-1.5 rounded-full bg-card-inner overflow-hidden">
+          <div className="w-full h-1 rounded-full bg-card-inner overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-500"
               style={{
                 width: `${progress.pct}%`,
-                backgroundColor: progress.pct === 100 ? '#34d399' : '#2dd4bf',
+                backgroundColor: progress.pct === 100 ? '#34d399' : 'rgb(var(--accent-primary))',
               }}
             />
           </div>
         </div>
       )}
 
-      {/* Tasks (max 4 visibili) */}
-      <div className="space-y-3">
-        {visibleTasks.map(task => {
-          const done = task.completed;
-          return (
-            <button
-              key={task.id}
-              onClick={(e) => handleToggle(e, task.id)}
-              className="flex items-start gap-3 w-full text-left group/step"
+      <div className="space-y-2.5">
+        {visibleTasks.map(task => (
+          <button
+            key={task.id}
+            onClick={(e) => handleToggle(e, task.id)}
+            className="flex items-start gap-3 w-full text-left group/step"
+          >
+            {task.completed ? (
+              <CheckCircle2 size={15} className="text-emerald-400 shrink-0 mt-0.5" />
+            ) : task.skipped ? (
+              <Circle size={15} className="text-amber-400/60 shrink-0 mt-0.5" />
+            ) : (
+              <Circle size={15} className="text-muted group-hover/step:text-body shrink-0 mt-0.5 transition-colors" />
+            )}
+            <span
+              className={`text-xs leading-relaxed ${
+                task.completed ? 'text-muted line-through' : task.skipped ? 'text-amber-300/70 italic' : 'text-body'
+              }`}
             >
-              {done ? (
-                <CheckCircle2 size={16} className="text-emerald-400 shrink-0 mt-0.5" />
-              ) : task.skipped ? (
-                <Circle size={16} className="text-amber-400/60 shrink-0 mt-0.5" />
-              ) : (
-                <Circle size={16} className="text-muted group-hover/step:text-body shrink-0 mt-0.5 transition-colors" />
-              )}
-              <span
-                className={`text-sm leading-relaxed ${
-                  done ? 'text-tertiary line-through' : task.skipped ? 'text-amber-300/70 italic' : 'text-body'
-                }`}
-              >
-                {task.text}
-              </span>
-            </button>
-          );
-        })}
-        {today.tasks.length > 4 && (
-          <Link href="/dashboard/study/today" className="text-xs text-muted hover:text-body transition-colors pl-7">
-            +{today.tasks.length - 4} altri task →
+              {task.text}
+            </span>
+          </button>
+        ))}
+        {today.tasks.length > 3 && (
+          <Link href="/dashboard/study/today" className="text-[11px] text-muted hover:text-body transition-colors pl-6">
+            +{today.tasks.length - 3} altri
           </Link>
         )}
         {today.tasks.length === 0 && (
@@ -377,7 +384,7 @@ function StudyWidget() {
   );
 }
 
-// ─── Routine Widget (con dati reali) ──────────────────────────────────────────
+/* ─── Routine Widget ─────────────────────────────────────────────────────── */
 
 const TIME_ICONS: Record<TimeOfDay, React.ElementType> = {
   morning: Sun,
@@ -405,14 +412,12 @@ function RoutineWidget() {
   const [loading, setLoading] = useState(true);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
 
-  // Determina la fascia oraria corrente
   const hour = new Date().getHours();
   const currentTime: TimeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : hour < 21 ? 'evening' : 'night';
 
   useEffect(() => {
     routineService.getToday()
       .then(data => {
-        // Mostra la routine della fascia corrente, o la prossima disponibile
         const order: TimeOfDay[] = ['morning', 'afternoon', 'evening', 'night'];
         const idx = order.indexOf(currentTime);
         for (let i = 0; i < order.length; i++) {
@@ -435,14 +440,13 @@ function RoutineWidget() {
     });
   };
 
-  // Fallback: nessuna routine
   if (!loading && !routine) {
     return (
       <Widget href="/dashboard/routines">
-        <WidgetHeader icon={Activity} label="Routine" />
+        <WidgetHeader icon={Activity} label="Routine" iconColor="text-emerald-400" />
         <p className="text-sm text-muted">Nessuna routine attiva.</p>
-        <div className="mt-4 flex items-center gap-2 text-xs text-tertiary">
-          <Play size={12} /> Crea la tua prima routine
+        <div className="mt-3 flex items-center gap-2 text-xs text-tertiary">
+          <Play size={11} /> Crea la tua prima routine
         </div>
       </Widget>
     );
@@ -451,9 +455,9 @@ function RoutineWidget() {
   if (loading || !routine) {
     return (
       <Widget href="/dashboard/routines">
-        <WidgetHeader icon={Activity} label="Routine" />
+        <WidgetHeader icon={Activity} label="Routine" iconColor="text-emerald-400" />
         <div className="py-6 flex justify-center">
-          <div className="w-6 h-6 border-2 border-white/10 border-t-white/30 rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-white/10 border-t-white/30 rounded-full animate-spin" />
         </div>
       </Widget>
     );
@@ -465,46 +469,44 @@ function RoutineWidget() {
   const color = TIME_COLORS[routine.time_of_day];
 
   return (
-    <div className="group block p-7 rounded-2xl bg-card border border-border-default hover:bg-surface-hover hover:border-border-hover transition-all duration-200">
+    <div className="group block p-6 card-glass hover:border-border-hover transition-all duration-200">
       <Link href="/dashboard/routines">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-3">
-            <TimeIcon size={18} style={{ color }} />
-            <span className="text-sm font-medium uppercase tracking-widest" style={{ color }}>
-              Routine {TIME_LABELS[routine.time_of_day]}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2.5">
+            <TimeIcon size={15} style={{ color }} />
+            <span className="section-label" style={{ color }}>
+              Routine · {TIME_LABELS[routine.time_of_day]}
             </span>
           </div>
-          <ChevronRight size={16} className="text-muted group-hover:text-tertiary transition-colors" />
+          <ChevronRight size={14} className="text-muted group-hover:text-tertiary transition-colors" />
         </div>
       </Link>
 
-      {/* Progress */}
       {completedSteps.size > 0 && (
-        <div className="mb-5">
+        <div className="mb-4">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs text-muted">{completedSteps.size}/{sortedSteps.length}</span>
-            <span className="text-xs font-medium" style={{ color }}>{pct}%</span>
+            <span className="text-[11px] font-mono-display text-muted">{completedSteps.size}/{sortedSteps.length}</span>
+            <span className="text-[11px] font-mono-display" style={{ color }}>{pct}%</span>
           </div>
-          <div className="w-full h-1.5 rounded-full bg-card-inner overflow-hidden">
+          <div className="w-full h-1 rounded-full bg-card-inner overflow-hidden">
             <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: color }} />
           </div>
         </div>
       )}
 
-      {/* Steps (max 5 visibili) */}
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {sortedSteps.slice(0, 5).map(step => {
           const done = completedSteps.has(step.id);
           return (
             <button
               key={step.id}
               onClick={() => toggleStep(step.id)}
-              className="flex items-center gap-3.5 w-full text-left group/step"
+              className="flex items-center gap-3 w-full text-left group/step"
             >
               {done ? (
-                <CheckCircle2 size={17} className="text-emerald-400 shrink-0" />
+                <CheckCircle2 size={15} className="text-emerald-400 shrink-0" />
               ) : (
-                <Circle size={17} className="text-muted group-hover/step:text-body shrink-0 transition-colors" />
+                <Circle size={15} className="text-muted group-hover/step:text-body shrink-0 transition-colors" />
               )}
               <span className={`text-sm ${done ? 'text-tertiary line-through' : 'text-body'}`}>
                 {step.icon && <span className="mr-1.5">{step.icon}</span>}
@@ -514,8 +516,8 @@ function RoutineWidget() {
           );
         })}
         {sortedSteps.length > 5 && (
-          <Link href="/dashboard/routines" className="text-xs text-muted hover:text-body transition-colors pl-8">
-            +{sortedSteps.length - 5} altri step →
+          <Link href="/dashboard/routines" className="text-[11px] text-muted hover:text-body transition-colors pl-7">
+            +{sortedSteps.length - 5} altri step
           </Link>
         )}
       </div>
@@ -523,43 +525,63 @@ function RoutineWidget() {
   );
 }
 
-export default function DashboardPage() {
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const pathname = usePathname();
+/* ─── Greeting hero ─────────────────────────────────────────────────────── */
 
-  useEffect(() => {
-    const t = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  const hour = currentTime.getHours();
-  const greeting = hour < 12 ? 'Buongiorno' : hour < 18 ? 'Buon pomeriggio' : 'Buonasera';
+function GreetingHero({ now }: { now: Date }) {
+  const hour = now.getHours();
+  const greeting = hour < 5 ? 'Notte fonda' : hour < 12 ? 'Buongiorno' : hour < 18 ? 'Buon pomeriggio' : 'Buonasera';
+  const dateStr = now.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+  const timeStr = now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 
   return (
-    <div className="min-h-screen bg-page text-heading flex">
+    <div className="mb-10">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="status-dot" />
+        <span className="section-label">Sistema operativo</span>
+        <span className="text-[11px] text-muted font-mono-display">· uptime {timeStr}</span>
+      </div>
+      <h1 className="text-3xl sm:text-4xl font-semibold text-heading tracking-tight">
+        {greeting}, <span className="text-accent">Giuseppe</span>
+      </h1>
+      <p className="text-sm text-tertiary mt-2 capitalize">
+        {dateStr}
+        <span className="mx-2 text-muted">·</span>
+        <span className="font-mono-display text-tertiary">root@dashboard:~$</span>
+      </p>
+    </div>
+  );
+}
 
-      {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/70 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />
+/* ─── Sidebar (refined) ──────────────────────────────────────────────────── */
+
+function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const pathname = usePathname();
+  return (
+    <>
+      {open && (
+        <div className="fixed inset-0 bg-black/70 z-30 lg:hidden" onClick={onClose} />
       )}
-
-      {/* Sidebar */}
-      <aside className={`
-        fixed top-0 left-0 h-full w-56 bg-card-solid border-r border-border-default z-40
-        flex flex-col transform transition-transform duration-200
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        lg:translate-x-0 lg:static lg:z-auto
-      `}>
+      <aside
+        className={`
+          fixed top-0 left-0 h-full w-60 z-40
+          flex flex-col transform transition-transform duration-200
+          ${open ? 'translate-x-0' : '-translate-x-full'}
+          lg:translate-x-0 lg:static lg:z-auto
+          bg-card-solid border-r border-border-default
+        `}
+      >
         {/* Logo */}
         <div className="px-5 pt-6 pb-5 border-b border-border-default flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-xs font-bold text-body">
-              G
+          <Link href="/dashboard" className="flex items-center gap-2.5 group">
+            <div className="w-8 h-8 rounded-lg bg-accent-soft border border-accent-soft flex items-center justify-center text-accent">
+              <Terminal size={15} />
             </div>
-            <span className="text-sm font-semibold text-heading">Dashboard</span>
-          </div>
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-tertiary hover:text-body">
+            <div className="leading-none">
+              <p className="text-[13px] font-semibold text-heading">giuseppe.dashboard</p>
+              <p className="text-[10px] text-muted font-mono-display mt-1">v1.0 · stable</p>
+            </div>
+          </Link>
+          <button onClick={onClose} className="lg:hidden text-tertiary hover:text-body">
             <X size={16} />
           </button>
         </div>
@@ -567,191 +589,178 @@ export default function DashboardPage() {
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
           {navSections.map(({ label, href, icon: Icon }) => {
-            const active = pathname === href;
+            const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
             return (
               <Link
                 key={href}
                 href={href}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150 ${
+                onClick={onClose}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150 group relative ${
                   active
                     ? 'bg-surface-hover text-heading'
                     : 'text-tertiary hover:text-body hover:bg-surface-hover'
                 }`}
               >
-                <Icon size={15} className={active ? 'text-body' : 'text-muted'} />
+                {active && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-accent rounded-r-full" />
+                )}
+                <Icon size={15} className={active ? 'text-accent' : 'text-muted group-hover:text-tertiary'} />
                 <span>{label}</span>
               </Link>
             );
           })}
         </nav>
 
-        {/* User */}
-        <div className="px-5 py-4 border-t border-border-default">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs font-medium text-body">G</div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium truncate text-body">Giuseppe</p>
-              <p className="text-[11px] text-muted truncate">Cybersec Student</p>
+        {/* Footer / user */}
+        <div className="px-4 py-4 border-t border-border-default">
+          <Link href="/dashboard/settings" className="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-surface-hover transition-colors group">
+            <div className="w-7 h-7 rounded-full bg-accent-soft flex items-center justify-center text-xs font-semibold text-accent">
+              G
             </div>
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/80" />
-          </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] font-medium truncate text-body">Giuseppe</p>
+              <p className="text-[10px] text-muted truncate font-mono-display">cybersec_student</p>
+            </div>
+            <Settings size={13} className="text-muted group-hover:text-body transition-colors" />
+          </Link>
         </div>
       </aside>
+    </>
+  );
+}
+
+/* ─── Main page ──────────────────────────────────────────────────────────── */
+
+export default function DashboardPage() {
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const t = setInterval(() => setCurrentTime(new Date()), 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-page text-heading flex">
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-
-        {/* Top bar */}
-        <header className="px-8 py-5 border-b border-border-default flex items-center justify-between sticky top-0 bg-page/90 backdrop-blur-sm z-20">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-tertiary hover:text-body">
-              <Menu size={20} />
-            </button>
-            <div>
-              <h1 className="text-xl font-semibold text-heading">
-                {greeting}, Giuseppe
-              </h1>
-              <p className="text-sm text-muted mt-1">
-                {currentTime.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
-                <span className="mx-2 opacity-40">·</span>
-                {currentTime.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-              </p>
-            </div>
-          </div>
+        {/* Top bar (mobile only — desktop hero is enough) */}
+        <header className="lg:hidden px-6 py-4 border-b border-border-default flex items-center justify-between sticky top-0 bg-page/85 backdrop-blur-md z-20">
+          <button onClick={() => setSidebarOpen(true)} className="text-tertiary hover:text-body">
+            <Menu size={20} />
+          </button>
           <Link href="/dashboard/settings" className="text-muted hover:text-tertiary transition-colors">
             <Settings size={18} />
           </Link>
         </header>
 
-        {/* Content */}
-        <main className="flex-1 px-8 py-10 overflow-y-auto">
+        <main className="flex-1 px-6 sm:px-10 py-8 sm:py-12 overflow-y-auto">
 
-          {/* Quick actions row */}
-          <div className="flex items-center gap-3 mb-10 overflow-x-auto pb-1">
+          <GreetingHero now={currentTime} />
+
+          {/* Quick action chips */}
+          <div className="flex items-center gap-2 mb-10 overflow-x-auto pb-1 -mx-1 px-1">
             {[
+              { label: 'Studio CRTP', emoji: '📚', href: '/dashboard/study/today' },
+              { label: 'Pomodoro', emoji: '🍅', href: '/dashboard/study/pomodoro' },
               { label: 'Log umore', emoji: '😊', href: '/dashboard/mood' },
               { label: 'Farmaco', emoji: '💊', href: '/dashboard/habits' },
-              { label: 'Pomodoro', emoji: '🍅', href: '/dashboard/focus' },
-              { label: 'Studio CRTP', emoji: '📚', href: '/dashboard/study/today' },
               { label: 'Spesa', emoji: '💸', href: '/dashboard/budget' },
-              { label: 'Log sensoriale', emoji: '🧠', href: '/dashboard/sensory' },
+              { label: 'Sensoriale', emoji: '🧠', href: '/dashboard/sensory' },
             ].map(a => (
-              <Link key={a.label} href={a.href}
-                className="flex items-center gap-2 px-4 py-2 rounded-full bg-card-inner border border-border-hover text-sm text-body hover:bg-surface-hover hover:text-heading transition-all whitespace-nowrap">
-                <span>{a.emoji}</span>
+              <Link
+                key={a.label}
+                href={a.href}
+                className="chip hover:border-border-hover hover:bg-surface-hover transition-all whitespace-nowrap"
+              >
+                <span className="text-[13px]">{a.emoji}</span>
                 <span>{a.label}</span>
               </Link>
             ))}
           </div>
 
           {/* Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
 
-            {/* Sleep (stile Sleep Cycle) */}
             <SleepWidget />
-
-            {/* Studio CRTP — task del giorno */}
             <StudyWidget />
-
-            {/* Health (dati reali) */}
             <HealthWidget />
 
             {/* Focus score */}
             <Widget href="/dashboard/focus">
-              <WidgetHeader icon={Brain} label="Focus Score" />
-              <div className="flex items-center justify-center py-4">
+              <WidgetHeader icon={Brain} label="Focus Score" iconColor="text-violet-400" />
+              <div className="flex items-center justify-center py-3">
                 <div className="relative w-24 h-24">
                   <svg width="96" height="96" className="-rotate-90">
-                    <circle cx="48" cy="48" r="40" stroke="rgb(var(--border-color))" strokeWidth="6" fill="none" />
+                    <circle cx="48" cy="48" r="40" stroke="rgb(var(--color-border))" strokeWidth="6" fill="none" />
                     <circle cx="48" cy="48" r="40" stroke="#a78bfa" strokeWidth="6" fill="none"
                       strokeDasharray={`${2 * Math.PI * 40 * 0.75} ${2 * Math.PI * 40}`}
                       strokeLinecap="round" />
                   </svg>
-                  <span className="absolute inset-0 flex items-center justify-center text-2xl font-bold text-violet-400">75</span>
+                  <span className="absolute inset-0 flex items-center justify-center text-2xl font-semibold font-mono-display text-violet-400">75</span>
                 </div>
               </div>
-              <p className="text-center text-sm text-muted mt-2">Buona giornata per il deep work</p>
+              <p className="text-center text-xs text-muted mt-2">Buona giornata per il deep work</p>
             </Widget>
 
             {/* Pomodoro */}
-            <Widget href="/dashboard/focus">
-              <WidgetHeader icon={Clock} label="Pomodoro" />
-              <div className="text-center py-4">
-                <p className="text-5xl font-mono font-semibold text-heading tracking-tight">25:00</p>
-                <p className="text-sm text-muted mt-3">Pronto per iniziare</p>
+            <Widget href="/dashboard/study/pomodoro">
+              <WidgetHeader icon={Clock} label="Pomodoro" iconColor="text-rose-400" />
+              <div className="text-center py-3">
+                <p className="text-5xl font-mono-display font-semibold text-heading tracking-tight">45:00</p>
+                <p className="text-xs text-muted mt-2">Pronto per Studio CRTP</p>
               </div>
-              <div className="mt-5 py-2.5 rounded-xl bg-card-inner border border-border-hover text-center text-sm text-body">
+              <div className="mt-4 py-2 rounded-lg bg-card-inner border border-border-default text-center text-xs text-body">
                 Avvia sessione →
               </div>
             </Widget>
 
-            {/* Routine */}
             <RoutineWidget />
-
-            {/* Scadenze (dati reali) */}
             <DeadlinesWidget />
-
-            {/* Calendario */}
-            <Widget href="/dashboard/calendar">
-              <WidgetHeader icon={Calendar} label="Calendario" />
-              <div className="space-y-3">
-                <p className="text-sm text-tertiary">I tuoi prossimi eventi</p>
-                <div className="flex items-center gap-3">
-                  <div className="w-1.5 h-10 rounded-full bg-blue-500" />
-                  <div>
-                    <p className="text-sm text-body">Nessun evento imminente</p>
-                    <p className="text-xs text-muted">Collega Apple Calendar per sincronizzare</p>
-                  </div>
-                </div>
-              </div>
-            </Widget>
 
             {/* CTF */}
             <Widget href="/dashboard/ctf">
-              <WidgetHeader icon={Shield} label="CTF Progress" />
+              <WidgetHeader icon={Shield} label="CTF Progress" iconColor="text-rose-400" />
               <div className="grid grid-cols-2 gap-5">
-                <Stat label="Challenge" value="0" color="#4ade80" />
-                <Stat label="Punti" value="0" color="#4ade80" />
+                <Stat label="Challenge" value="0" color="#34d399" />
+                <Stat label="Punti" value="0" color="#34d399" />
               </div>
-              <p className="text-xs text-muted mt-5">Collega HackTheBox o TryHackMe</p>
+              <p className="text-[11px] text-muted mt-5">Collega HackTheBox o TryHackMe</p>
             </Widget>
 
             {/* Mood */}
             <Widget href="/dashboard/mood">
-              <WidgetHeader icon={TrendingUp} label="Umore" />
-              <p className="text-sm text-tertiary mb-5">Come ti senti oggi?</p>
+              <WidgetHeader icon={TrendingUp} label="Umore" iconColor="text-pink-400" />
+              <p className="text-xs text-tertiary mb-4">Come ti senti oggi?</p>
               <div className="flex justify-between items-center">
                 {['😫', '😕', '😐', '🙂', '😄'].map((e, i) => (
-                  <span key={i} className="text-3xl opacity-50 hover:opacity-100 cursor-pointer transition-opacity">{e}</span>
-                ))}
-              </div>
-            </Widget>
-
-            {/* Habits */}
-            <Widget href="/dashboard/habits">
-              <WidgetHeader icon={Flame} label="Abitudini" />
-              <div className="space-y-3.5">
-                {['Farmaci mattina', 'Idratazione', 'Routine mattino', 'Studio cybersecurity'].map((h, i) => (
-                  <div key={i} className="flex items-center gap-3.5">
-                    <div className="w-4 h-4 rounded-full border border-white/10 shrink-0" />
-                    <span className="text-sm text-body">{h}</span>
-                  </div>
+                  <span key={i} className="text-2xl opacity-50 hover:opacity-100 cursor-pointer transition-opacity">{e}</span>
                 ))}
               </div>
             </Widget>
 
             {/* Budget */}
             <Widget href="/dashboard/budget">
-              <WidgetHeader icon={Wallet} label="Budget" />
+              <WidgetHeader icon={Wallet} label="Budget" iconColor="text-emerald-400" />
               <div className="grid grid-cols-2 gap-5">
-                <Stat label="Entrate" value="—" color="#4ade80" />
-                <Stat label="Uscite" value="—" color="#f87171" />
+                <Stat label="Entrate" value="—" color="#34d399" />
+                <Stat label="Uscite" value="—" color="#fb7185" />
               </div>
-              <p className="text-xs text-muted mt-5">Collega le scadenze per il saldo</p>
+              <p className="text-[11px] text-muted mt-5">Collega le scadenze</p>
             </Widget>
 
           </div>
+
+          {/* Footer "shell prompt" */}
+          <p className="mt-12 text-[11px] text-muted font-mono-display text-center opacity-60">
+            <span className="text-accent">[</span>
+            {' '}giuseppe.dashboard{' '}
+            <span className="text-accent">]</span>
+            <span className="mx-2">·</span>
+            crafted for ADHD-friendly cybersecurity life
+          </p>
         </main>
       </div>
     </div>

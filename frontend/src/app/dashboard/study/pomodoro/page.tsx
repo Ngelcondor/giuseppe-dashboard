@@ -1,9 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import Link from 'next/link';
 import {
-  ArrowLeft,
   Play,
   Pause,
   RotateCcw,
@@ -11,8 +9,9 @@ import {
   Settings,
   X,
   Timer as TimerIcon,
-  CheckCircle2,
 } from 'lucide-react';
+import { PageShell } from '@/components/ui/PageShell';
+import { Surface, Tabs } from '@/components/ui/Surface';
 import { loadState, getTodayDay, StudyDay } from '@/lib/studyPlanState';
 
 type Mode = 'work' | 'short' | 'long';
@@ -34,17 +33,16 @@ interface Config {
 
 const MODE_LABELS: Record<Mode, string> = {
   work: 'Studio',
-  short: 'Pausa breve',
+  short: 'Pausa',
   long: 'Pausa lunga',
 };
 
 const MODE_COLORS: Record<Mode, string> = {
-  work: '#2dd4bf',  // teal-400 (study theme)
-  short: '#34d399',
-  long: '#60a5fa',
+  work: '#10b981',     // emerald accent
+  short: '#06b6d4',    // cyan
+  long: '#a78bfa',     // violet
 };
 
-// ADHD-friendly defaults: 45/15 invece di 25/5
 const DEFAULT_CONFIG: Config = { work: 45, short: 15, long: 30, longAfter: 4 };
 const STORAGE_CONFIG = 'study-pomodoro-config';
 const STORAGE_SESSIONS = 'study-pomodoro-sessions';
@@ -161,193 +159,188 @@ export default function StudyPomodoroPage() {
 
   const todayTasks = today?.tasks.filter(t => !t.completed && !t.skipped) || [];
 
-  return (
-    <div className="min-h-screen bg-page text-heading">
-      <header className="px-6 py-5 border-b border-border-default flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard/study" className="text-tertiary hover:text-body transition-colors">
-            <ArrowLeft size={18} />
-          </Link>
-          <TimerIcon size={18} className="text-violet-400" />
-          <h1 className="text-base font-semibold">Pomodoro Studio</h1>
-        </div>
-        <button
-          onClick={() => { setDraftConfig(config); setShowConfig(true); }}
-          className="text-muted hover:text-body transition-colors"
-        >
-          <Settings size={16} />
-        </button>
-      </header>
+  const headerActions = (
+    <button
+      onClick={() => { setDraftConfig(config); setShowConfig(true); }}
+      className="p-2 text-tertiary hover:text-body transition-colors rounded-lg hover:bg-card-inner"
+      title="Configura timer"
+    >
+      <Settings size={14} />
+    </button>
+  );
 
-      <main className="max-w-md mx-auto px-6 py-10">
-        {/* Mode selector */}
-        <div className="flex justify-center mb-8">
-          <div className="flex gap-1 p-1 rounded-xl bg-card border border-border-default">
-            {(['work', 'short', 'long'] as Mode[]).map(m => (
-              <button
-                key={m}
-                onClick={() => switchMode(m)}
-                className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                  mode === m ? 'bg-surface-hover text-heading' : 'text-tertiary hover:text-body'
-                }`}
-              >
-                {m === 'work' ? 'Studio' : m === 'short' ? 'Pausa' : 'Lunga'}
-              </button>
+  return (
+    <PageShell
+      title="Pomodoro · Studio"
+      eyebrow="ADHD-friendly 45/15"
+      icon={TimerIcon}
+      iconColor="text-violet-400"
+      back="/dashboard/study"
+      width="md"
+      actions={headerActions}
+    >
+      {/* Mode tabs */}
+      <div className="flex justify-center mb-8">
+        <Tabs<Mode>
+          options={[
+            { value: 'work', label: 'Studio' },
+            { value: 'short', label: 'Pausa' },
+            { value: 'long', label: 'Lunga' },
+          ]}
+          value={mode}
+          onChange={switchMode}
+        />
+      </div>
+
+      {/* Timer */}
+      <div className="flex flex-col items-center mb-8">
+        <div className="relative w-64 h-64 mb-6">
+          <svg width="256" height="256" className="-rotate-90">
+            <circle cx="128" cy="128" r={R} stroke="rgb(var(--color-border))" strokeWidth="8" fill="none" />
+            <circle
+              cx="128" cy="128" r={R}
+              stroke={color} strokeWidth="8" fill="none"
+              strokeLinecap="round"
+              strokeDasharray={C}
+              strokeDashoffset={C * (1 - progress)}
+              style={{ transition: 'stroke-dashoffset 0.5s ease, stroke 0.6s ease' }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-[60px] font-mono-display font-semibold tracking-tight leading-none" style={{ color }}>
+              {mm}:{ss}
+            </span>
+            <span className="text-[11px] text-muted mt-3 tracking-uppercase">{MODE_LABELS[mode]}</span>
+          </div>
+        </div>
+
+        {/* Task selector */}
+        <div className="w-full mb-6">
+          <button
+            onClick={() => setShowTaskPicker(v => !v)}
+            className="w-full text-left px-3.5 py-2.5 rounded-xl bg-card-inner border border-border-default text-xs text-tertiary hover:bg-surface-hover transition-colors flex items-center justify-between"
+          >
+            <span className="truncate">{taskLabel || 'Su cosa stai studiando?'}</span>
+            <span className="text-muted text-[10px]">{showTaskPicker ? '▲' : '▼'}</span>
+          </button>
+          {showTaskPicker && (
+            <div className="mt-2 rounded-xl bg-card-solid border border-border-default overflow-hidden">
+              <input
+                type="text"
+                value={taskLabel}
+                onChange={e => setTaskLabel(e.target.value)}
+                placeholder="Inserisci manualmente..."
+                className="w-full bg-transparent border-none px-3.5 py-2.5 text-xs text-body placeholder-muted focus:outline-none focus:ring-0"
+              />
+              {todayTasks.length > 0 && (
+                <>
+                  <p className="px-3.5 pt-2 pb-1 text-[10px] tracking-uppercase text-muted border-t border-border-default">
+                    Task di oggi
+                  </p>
+                  <div className="max-h-40 overflow-y-auto divide-y divide-white/[0.04]">
+                    {todayTasks.map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => { setTaskLabel(t.text); setShowTaskPicker(false); }}
+                        className="w-full text-left px-3.5 py-2 text-xs text-body hover:bg-surface-hover transition-colors"
+                      >
+                        {t.text}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Controls */}
+        <div className="flex items-center gap-5">
+          <button
+            onClick={() => { setRunning(false); setSeconds(config[mode] * 60); }}
+            className="p-3 rounded-xl bg-card-inner border border-border-default text-tertiary hover:text-body transition-all"
+            title="Reset"
+          >
+            <RotateCcw size={18} />
+          </button>
+          <button
+            onClick={() => setRunning(r => !r)}
+            className="w-16 h-16 rounded-full border-2 flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+            style={{ borderColor: color + '60', backgroundColor: color + '15' }}
+          >
+            {running
+              ? <Pause size={22} style={{ color }} />
+              : <Play size={22} style={{ color }} className="ml-0.5" />}
+          </button>
+          <button
+            onClick={() => completeSession()}
+            className="p-3 rounded-xl bg-card-inner border border-border-default text-tertiary hover:text-body transition-all"
+            title="Skip"
+          >
+            <SkipForward size={18} />
+          </button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        {[
+          { label: 'Pomodori', value: String(todayPomodoros) },
+          { label: 'Minuti', value: String(todayMinutes) },
+          { label: 'Al lungo', value: `${pomodoroCount % config.longAfter}/${config.longAfter}` },
+        ].map(s => (
+          <Surface key={s.label} padding="sm" className="text-center">
+            <p className="text-xl font-semibold font-mono-display text-heading">{s.value}</p>
+            <p className="text-[10px] text-muted mt-1 tracking-uppercase">{s.label}</p>
+          </Surface>
+        ))}
+      </div>
+
+      {/* ADHD note */}
+      <Surface padding="sm" className="mb-6 bg-violet-500/5 border-violet-500/20">
+        <p className="text-[11px] text-violet-300/80 leading-relaxed">
+          <span className="font-mono-display text-violet-400">// </span>
+          Default 45/15 ADHD-friendly. Se senti hyperfocus, continua oltre il timer — non spezzare il flow.
+        </p>
+      </Surface>
+
+      {/* History */}
+      {sessions.length > 0 && (
+        <Surface padding="none" className="overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-border-default">
+            <p className="section-label">Sessioni recenti</p>
+          </div>
+          <div className="divide-y divide-white/[0.04] max-h-52 overflow-y-auto">
+            {sessions.slice(0, 15).map(s => (
+              <div key={s.id} className="flex items-start gap-3 px-5 py-3">
+                <span className="text-base shrink-0">{s.type === 'work' ? '🍅' : s.type === 'short' ? '☕' : '🌙'}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-body">{MODE_LABELS[s.type]}</span>
+                    <span className="text-[11px] text-muted font-mono-display">{s.duration}m</span>
+                  </div>
+                  {s.task && <p className="text-[11px] text-tertiary truncate mt-0.5">{s.task}</p>}
+                </div>
+                <span className="text-[11px] text-muted shrink-0 font-mono-display">
+                  {new Date(s.completedAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
             ))}
           </div>
-        </div>
-
-        {/* Timer */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="relative w-64 h-64 mb-6">
-            <svg width="256" height="256" className="-rotate-90">
-              <circle cx="128" cy="128" r={R} stroke="#1a1f2e" strokeWidth="8" fill="none" />
-              <circle
-                cx="128" cy="128" r={R}
-                stroke={color} strokeWidth="8" fill="none"
-                strokeLinecap="round"
-                strokeDasharray={C}
-                strokeDashoffset={C * (1 - progress)}
-                style={{ transition: 'stroke-dashoffset 0.5s ease, stroke 0.6s ease' }}
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-5xl font-mono font-semibold tracking-tight" style={{ color }}>
-                {mm}:{ss}
-              </span>
-              <span className="text-xs text-muted mt-2 uppercase tracking-widest">{MODE_LABELS[mode]}</span>
-            </div>
-          </div>
-
-          {/* Task selector */}
-          <div className="w-full mb-6">
-            <button
-              onClick={() => setShowTaskPicker(v => !v)}
-              className="w-full text-left px-3 py-2 rounded-xl bg-card border border-border-default text-xs text-tertiary hover:bg-surface-hover transition-colors flex items-center justify-between"
-            >
-              <span className="truncate">
-                {taskLabel || 'Su cosa stai studiando?'}
-              </span>
-              <span className="text-muted">{showTaskPicker ? '▲' : '▼'}</span>
-            </button>
-            {showTaskPicker && (
-              <div className="mt-2 rounded-xl bg-card border border-border-default overflow-hidden">
-                <input
-                  type="text"
-                  value={taskLabel}
-                  onChange={e => setTaskLabel(e.target.value)}
-                  placeholder="Inserisci manualmente..."
-                  className="w-full bg-transparent border-b border-border-default px-3 py-2 text-xs text-body placeholder-muted focus:outline-none"
-                />
-                {todayTasks.length > 0 && (
-                  <>
-                    <p className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-widest text-muted">
-                      Task di oggi
-                    </p>
-                    <div className="max-h-40 overflow-y-auto divide-y divide-white/5">
-                      {todayTasks.map(t => (
-                        <button
-                          key={t.id}
-                          onClick={() => { setTaskLabel(t.text); setShowTaskPicker(false); }}
-                          className="w-full text-left px-3 py-2 text-xs text-body hover:bg-surface-hover transition-colors"
-                        >
-                          {t.text}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Controls */}
-          <div className="flex items-center gap-5">
-            <button
-              onClick={() => { setRunning(false); setSeconds(config[mode] * 60); }}
-              className="p-3 rounded-xl bg-card-inner border border-border-default text-tertiary hover:text-body transition-all"
-            >
-              <RotateCcw size={18} />
-            </button>
-            <button
-              onClick={() => setRunning(r => !r)}
-              className="w-16 h-16 rounded-full border-2 flex items-center justify-center transition-all hover:scale-105 active:scale-95"
-              style={{ borderColor: color + '60', backgroundColor: color + '15' }}
-            >
-              {running
-                ? <Pause size={22} style={{ color }} />
-                : <Play size={22} style={{ color }} className="ml-0.5" />}
-            </button>
-            <button
-              onClick={() => completeSession()}
-              className="p-3 rounded-xl bg-card-inner border border-border-default text-tertiary hover:text-body transition-all"
-            >
-              <SkipForward size={18} />
-            </button>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          {[
-            { label: 'Pomodori oggi', value: String(todayPomodoros) },
-            { label: 'Minuti studio', value: String(todayMinutes) },
-            { label: 'Al lungo', value: `${pomodoroCount % config.longAfter}/${config.longAfter}` },
-          ].map(s => (
-            <div key={s.label} className="p-3 rounded-xl bg-card border border-border-default text-center">
-              <p className="text-xl font-semibold text-heading">{s.value}</p>
-              <p className="text-[11px] text-muted mt-0.5">{s.label}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* ADHD note */}
-        <div className="p-3 rounded-xl bg-violet-500/5 border border-violet-500/20 mb-6">
-          <p className="text-[11px] text-violet-300/80 leading-relaxed">
-            💡 Default 45/15 ADHD-friendly. Se senti hyperfocus, continua oltre il timer — non spezzare il flow.
-          </p>
-        </div>
-
-        {/* History */}
-        {sessions.length > 0 && (
-          <div className="rounded-2xl bg-card border border-border-default overflow-hidden">
-            <div className="px-5 py-4 border-b border-border-default">
-              <p className="text-xs font-medium text-tertiary uppercase tracking-widest">Sessioni recenti</p>
-            </div>
-            <div className="divide-y divide-white/5 max-h-52 overflow-y-auto">
-              {sessions.slice(0, 15).map(s => (
-                <div key={s.id} className="flex items-start gap-2.5 px-5 py-3">
-                  <span className="text-sm shrink-0">{s.type === 'work' ? '🍅' : s.type === 'short' ? '☕' : '🌙'}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-body">{MODE_LABELS[s.type]}</span>
-                      <span className="text-[11px] text-muted">{s.duration} min</span>
-                    </div>
-                    {s.task && (
-                      <p className="text-[11px] text-tertiary truncate mt-0.5">{s.task}</p>
-                    )}
-                  </div>
-                  <span className="text-[11px] text-muted shrink-0">
-                    {new Date(s.completedAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </main>
+        </Surface>
+      )}
 
       {/* Config modal */}
       {showConfig && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-          <div className="bg-card-solid rounded-2xl border border-border-hover p-6 w-full max-w-xs">
-            <div className="flex items-center justify-between mb-6">
+        <div className="modal-backdrop z-50 flex items-center justify-center p-4">
+          <Surface variant="accent" padding="lg" className="w-full max-w-xs">
+            <div className="flex items-center justify-between mb-5">
               <p className="text-sm font-semibold">Configura timer</p>
               <button onClick={() => setShowConfig(false)} className="text-tertiary hover:text-body">
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-3.5">
               {([
                 ['work', 'Studio (minuti)'],
                 ['short', 'Pausa breve (minuti)'],
@@ -355,29 +348,29 @@ export default function StudyPomodoroPage() {
                 ['longAfter', 'Pausa lunga ogni N pomodori'],
               ] as [keyof Config, string][]).map(([key, label]) => (
                 <div key={key}>
-                  <label className="text-xs text-tertiary mb-1.5 block">{label}</label>
+                  <label className="text-[11px] text-tertiary mb-1.5 block tracking-uppercase">{label}</label>
                   <input
                     type="number" min={1} max={120}
                     value={draftConfig[key]}
                     onChange={e => setDraftConfig(d => ({ ...d, [key]: Number(e.target.value) }))}
-                    className="w-full bg-card-inner border border-border-hover rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-white/20 transition-colors"
+                    className="w-full bg-card-inner border border-border-default rounded-lg px-3.5 py-2 text-sm font-mono-display focus:outline-none focus:border-accent transition-colors"
                   />
                 </div>
               ))}
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={() => setShowConfig(false)}
-                className="flex-1 py-2 rounded-xl border border-border-hover text-tertiary text-sm hover:bg-card-inner transition-colors">
+                className="flex-1 py-2 rounded-lg border border-border-default text-tertiary text-sm hover:bg-card-inner transition-colors">
                 Annulla
               </button>
               <button onClick={saveConfig}
-                className="flex-1 py-2 rounded-xl bg-surface-hover text-heading text-sm font-medium hover:bg-white/15 transition-colors">
+                className="flex-1 py-2 rounded-lg bg-accent-soft border border-accent-soft text-accent text-sm font-medium hover:bg-accent transition-colors">
                 Salva
               </button>
             </div>
-          </div>
+          </Surface>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

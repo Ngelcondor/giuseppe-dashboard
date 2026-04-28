@@ -1,84 +1,78 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, Heart, Pill, Moon, Activity, Watch, Dumbbell } from 'lucide-react';
+import { Heart, Pill, Moon, Activity, Watch, Dumbbell, ChevronRight } from 'lucide-react';
+import { PageShell } from '@/components/ui/PageShell';
 
 const sections = [
   {
     id: 'medications',
     label: 'Farmaci',
     description: 'Gestisci terapia, registra assunzioni e PRN',
-    icon: <Pill size={22} />,
+    icon: Pill,
     href: '/dashboard/health/medications',
-    color: 'text-indigo-400',
-    bg: 'bg-indigo-500/10 border-indigo-500/20',
+    accent: 'text-indigo-400',
+    bg: 'bg-indigo-500/8 border-indigo-500/20',
   },
   {
     id: 'sleep',
     label: 'Sonno',
     description: 'Fasi del sonno, Sleep Cycle e report mattutino',
-    icon: <Moon size={22} />,
+    icon: Moon,
     href: '/dashboard/health/sleep',
-    color: 'text-blue-400',
-    bg: 'bg-blue-500/10 border-blue-500/20',
+    accent: 'text-blue-400',
+    bg: 'bg-blue-500/8 border-blue-500/20',
   },
   {
     id: 'metrics',
     label: 'Metriche',
     description: 'Frequenza cardiaca, passi, peso, calorie e altro',
-    icon: <Activity size={22} />,
+    icon: Activity,
     href: '/dashboard/health/metrics',
-    color: 'text-emerald-400',
-    bg: 'bg-emerald-500/10 border-emerald-500/20',
+    accent: 'text-emerald-400',
+    bg: 'bg-emerald-500/8 border-emerald-500/20',
   },
   {
     id: 'workouts',
     label: 'Allenamenti',
     description: 'Traccia tipo, durata, calorie e intensità',
-    icon: <Dumbbell size={22} />,
+    icon: Dumbbell,
     href: '/dashboard/health/workouts',
-    color: 'text-violet-400',
-    bg: 'bg-violet-500/10 border-violet-500/20',
+    accent: 'text-violet-400',
+    bg: 'bg-violet-500/8 border-violet-500/20',
   },
   {
     id: 'apple-health',
     label: 'Apple Health',
     description: 'Importa dati da Apple Watch / Health',
-    icon: <Watch size={22} />,
+    icon: Watch,
     href: '/dashboard/health/apple',
-    color: 'text-pink-400',
-    bg: 'bg-pink-500/10 border-pink-500/20',
+    accent: 'text-pink-400',
+    bg: 'bg-pink-500/8 border-pink-500/20',
   },
 ];
 
 export default function HealthPage() {
   return (
-    <div className="min-h-screen bg-page text-heading">
-      <header className="px-6 py-5 border-b border-border-default flex items-center gap-3">
-        <Link href="/dashboard" className="text-tertiary hover:text-body transition-colors">
-          <ArrowLeft size={18} />
-        </Link>
-        <Heart size={18} className="text-red-400" />
-        <h1 className="text-base font-semibold">Salute</h1>
-      </header>
-
-      <main className="max-w-xl mx-auto px-6 py-8">
-        <div className="grid gap-3">
-          {sections.map((s) => (
-            <Link
-              key={s.id}
-              href={s.href}
-              className={`flex items-center gap-4 px-5 py-4 rounded-xl border transition-all duration-200 ${s.bg} hover:scale-[1.01] cursor-pointer`}
-            >
-              <div className={`flex-shrink-0 ${s.color}`}>{s.icon}</div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-heading">{s.label}</p>
-                <p className="text-xs text-tertiary mt-0.5">{s.description}</p>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </main>
-    </div>
+    <PageShell title="Salute" eyebrow="Body & Mind" icon={Heart} iconColor="text-rose-400" width="md">
+      <div className="space-y-3">
+        {sections.map((s) => (
+          <Link
+            key={s.id}
+            href={s.href}
+            className={`group flex items-center gap-4 px-5 py-4 rounded-2xl border transition-all duration-200 ${s.bg} hover:bg-card-solid`}
+          >
+            <div className={`flex-shrink-0 w-10 h-10 rounded-xl bg-card-solid border border-border-default flex items-center justify-center ${s.accent}`}>
+              <s.icon size={18} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-heading">{s.label}</p>
+              <p className="text-xs text-tertiary mt-0.5">{s.description}</p>
+            </div>
+            <ChevronRight size={16} className="text-muted group-hover:text-tertiary group-hover:translate-x-0.5 transition-all" />
+          </Link>
+        ))}
+      </div>
+    </PageShell>
   );
 }

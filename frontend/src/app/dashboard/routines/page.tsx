@@ -1290,30 +1290,32 @@ export default function RoutinesPage() {
 
   return (
     <div className="min-h-screen bg-page text-heading">
-      {/* Header fisso */}
-      <header className="px-6 py-4 border-b border-border-default flex items-center justify-between sticky top-0 bg-page/90 backdrop-blur-sm z-20">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="p-1.5 rounded-xl text-muted hover:text-body hover:bg-surface-hover transition-colors" aria-label="Torna alla dashboard">
-            <ArrowLeft size={18} />
-          </Link>
-          <div>
-            <h1 className="text-base font-semibold flex items-center gap-2">
-              Le mie routine
-              {streak > 0 && (
-                <span className="flex items-center gap-1 text-xs font-semibold text-orange-400">
-                  <Flame size={14} /> {streak}
-                </span>
-              )}
-            </h1>
+      {/* Header */}
+      <header className="sticky top-0 z-30 px-6 py-4 border-b border-border-default bg-page/85 backdrop-blur-md">
+        <div className="max-w-3xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard" className="flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-tertiary hover:text-heading hover:border-border-hover transition-colors">
+              <ArrowLeft size={15} />
+            </Link>
+            <div>
+              <p className="section-label leading-none mb-0.5">Daily structure</p>
+              <h1 className="text-[15px] font-semibold tracking-tight flex items-center gap-2">
+                Routine
+                {streak > 0 && (
+                  <span className="flex items-center gap-1 text-xs font-semibold text-orange-400 font-mono-display">
+                    <Flame size={12} /> {streak}
+                  </span>
+                )}
+              </h1>
+            </div>
           </div>
+          <button
+            onClick={() => { setEditingRoutine(null); setShowForm(true); }}
+            className="chip border-blue-500/30 bg-blue-500/10 text-blue-300 hover:bg-blue-500/20"
+          >
+            <Plus size={12} /> Nuova
+          </button>
         </div>
-        <button
-          onClick={() => { setEditingRoutine(null); setShowForm(true); }}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium transition-all hover:scale-[1.02] active:scale-[0.98]"
-          style={{ background: 'rgba(96, 165, 250, 0.12)', color: '#60a5fa', border: '1px solid rgba(96, 165, 250, 0.2)' }}
-        >
-          <Plus size={14} /> Nuova
-        </button>
       </header>
 
       <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
