@@ -126,13 +126,17 @@ async def list_habits(db: AsyncSession = Depends(get_db)):
 
 
 async def _ensure_system_user(db: AsyncSession):
-    """Create the system user if it doesn't exist yet."""
+    """Create the system user if it doesn't exist yet.
+
+    Note: username is 'system' (not 'giuseppe') to avoid colliding with the
+    real admin user created by seed_admin_user() at app startup.
+    """
     result = await db.execute(select(User).where(User.id == DEFAULT_USER))
     if not result.scalars().first():
         db.add(User(
             id=DEFAULT_USER,
             email="system@dashboard.local",
-            username="giuseppe",
+            username="system",
             hashed_password="disabled",
             is_active=True,
             is_verified=True,
