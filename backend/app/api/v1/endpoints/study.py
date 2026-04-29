@@ -1,14 +1,15 @@
 """Study plan endpoints — sync per-task state across devices.
 
-Auth disabled (matches habits_api / mood_api convention): a fixed DEFAULT_USER
-is used until auth is re-enabled. The static study plan lives in the frontend;
-this endpoint only persists user-mutable per-task state.
+Auth disabled. We reuse the admin user (created by seed_admin_user at startup)
+as the single owner of all study state, since this is a personal dashboard.
+The static study plan lives in the frontend; this endpoint only persists
+user-mutable per-task state.
 """
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -20,33 +21,32 @@ from app.schemas.study import StudyBatchEntry, StudyTaskStateOut, StudyTaskUpser
 
 router = APIRouter(prefix="/study", tags=["study"])
 
-DEFAULT_USER = UUID("00000000-0000-0000-0000-000000000001")
+_cached_user_id: Optional[UUID] = None
 
 
-async def _ensure_system_user(db: AsyncSession) -> None:
-    result = await db.execute(select(User).where(User.id == DEFAULT_USER))
-    if not result.scalars().first():
-        db.add(User(
-            id=DEFAULT_USER,
-            email="system@dashboard.local",
-            username="giuseppe",
-            hashed_password="disabled",
-            is_active=True,
-            is_verified=True,
-        ))
-        await db.commit()
+async def _get_user_id(db: AsyncSession) -> UUID:
+    """Return the UUID of the single dashboard user. Cached after first lookup."""
+    global _cached_user_id
+    if _cached_user_id is not None:
+        return _cached_user_id
+    result = await db.execute(select(User).order_by(User.created_at).limit(1))
+    user = result.scalars().first()
+    if user is None:
+        raise HTTPException(503, "No user in database — admin seed has not run yet")
+    _cached_user_id = user.id
+    return _cached_user_id
 
 
-async def _get_or_create(db: AsyncSession, task_id: str) -> StudyTaskState:
+async def _get_or_create(db: AsyncSession, user_id: UUID, task_id: str) -> StudyTaskState:
     result = await db.execute(
         select(StudyTaskState).where(
-            StudyTaskState.user_id == DEFAULT_USER,
+            StudyTaskState.user_id == user_id,
             StudyTaskState.task_id == task_id,
         )
     )
     row = result.scalars().first()
     if row is None:
-        row = StudyTaskState(user_id=DEFAULT_USER, task_id=task_id)
+        row = StudyTaskState(user_id=user_id, task_id=task_id)
         db.add(row)
     return row
 
@@ -69,8 +69,9 @@ def _apply(row: StudyTaskState, upd: StudyTaskUpsert) -> None:
 @router.get("/state", response_model=List[StudyTaskStateOut])
 async def get_state(db: AsyncSession = Depends(get_db)):
     """Return all task states for the current user."""
+    user_id = await _get_user_id(db)
     result = await db.execute(
-        select(StudyTaskState).where(StudyTaskState.user_id == DEFAULT_USER)
+        select(StudyTaskState).where(StudyTaskState.user_id == user_id)
     )
     return list(result.scalars().all())
 
@@ -82,8 +83,8 @@ async def upsert_task(
     db: AsyncSession = Depends(get_db),
 ):
     """Upsert state for a single task."""
-    await _ensure_system_user(db)
-    row = await _get_or_create(db, task_id)
+    user_id = await _get_user_id(db)
+    row = await _get_or_create(db, user_id, task_id)
     _apply(row, body)
     await db.commit()
     await db.refresh(row)
@@ -96,10 +97,10 @@ async def upsert_batch(
     db: AsyncSession = Depends(get_db),
 ):
     """Bulk upsert — used for reschedule operations that touch many tasks at once."""
-    await _ensure_system_user(db)
+    user_id = await _get_user_id(db)
     out: List[StudyTaskState] = []
     for e in entries:
-        row = await _get_or_create(db, e.task_id)
+        row = await _get_or_create(db, user_id, e.task_id)
         _apply(row, StudyTaskUpsert(completed=e.completed, skipped=e.skipped, moved_to_date=e.moved_to_date))
         out.append(row)
     await db.commit()
@@ -111,7 +112,8 @@ async def upsert_batch(
 @router.delete("/state", status_code=204)
 async def reset_state(db: AsyncSession = Depends(get_db)):
     """Wipe all study task state for the current user."""
+    user_id = await _get_user_id(db)
     await db.execute(
-        delete(StudyTaskState).where(StudyTaskState.user_id == DEFAULT_USER)
+        delete(StudyTaskState).where(StudyTaskState.user_id == user_id)
     )
     await db.commit()
