@@ -12,7 +12,7 @@ import { BottomDock } from '@/components/ui/AppShell';
 import {
   loadState, toggleTask, getTodayDay, getDayProgress,
   getPendingPastTasks, getOverallProgress, getDayContext,
-  type StudyDay, type DayContext,
+  type StudyPlanState, type StudyDay, type DayContext,
 } from '@/lib/studyPlanState';
 import { buildClaudeStudyPrompt } from '@/lib/studyClaudePrompt';
 import { CopyPromptButton } from '@/components/ui/CopyPromptButton';
@@ -119,30 +119,34 @@ function Hero({ now }: { now: Date }) {
 /* ─────────────────────────────────────────────────────── HERO TILE: Studio CRTP */
 
 function StudioHeroTile() {
+  const [state, setState] = useState<StudyPlanState | null>(null);
   const [today, setToday] = useState<StudyDay | undefined>(undefined);
   const [ctx, setCtx] = useState<DayContext | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [overall, setOverall] = useState({ done: 0, total: 0, pct: 0 });
-  const [, force] = useState(0);
 
   useEffect(() => {
-    const s = loadState();
-    const t = getTodayDay(s);
-    setToday(t);
-    setCtx(t ? getDayContext(s, t.date) : null);
-    setPendingCount(getPendingPastTasks(s).length);
-    setOverall(getOverallProgress(s));
+    let cancelled = false;
+    loadState().then((s) => {
+      if (cancelled) return;
+      setState(s);
+      const t = getTodayDay(s);
+      setToday(t);
+      setCtx(t ? getDayContext(s, t.date) : null);
+      setPendingCount(getPendingPastTasks(s).length);
+      setOverall(getOverallProgress(s));
+    });
+    return () => { cancelled = true; };
   }, []);
 
   const handleToggle = (e: React.MouseEvent, taskId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!today) return;
-    const s = loadState();
-    const next = toggleTask(s, today.date, taskId);
+    if (!today || !state) return;
+    const next = toggleTask(state, today.date, taskId);
+    setState(next);
     setToday(getTodayDay(next));
     setOverall(getOverallProgress(next));
-    force((n) => n + 1);
   };
 
   const progress = today ? getDayProgress(today) : { done: 0, total: 0, pct: 0 };

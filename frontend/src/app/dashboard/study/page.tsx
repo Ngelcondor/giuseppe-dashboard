@@ -51,14 +51,18 @@ export default function StudyHubPage() {
   const [todayLabel, setTodayLabel] = useState<string | null>(null);
 
   useEffect(() => {
-    const state = loadState();
-    setOverall(getOverallProgress(state));
-    const today = getTodayDay(state);
-    if (today) {
-      setTodayDone(getDayProgress(today));
-      setTodayLabel(today.label);
-    }
-    setPendingCount(getPendingPastTasks(state).length);
+    let cancelled = false;
+    loadState().then((state) => {
+      if (cancelled) return;
+      setOverall(getOverallProgress(state));
+      const today = getTodayDay(state);
+      if (today) {
+        setTodayDone(getDayProgress(today));
+        setTodayLabel(today.label);
+      }
+      setPendingCount(getPendingPastTasks(state).length);
+    });
+    return () => { cancelled = true; };
   }, []);
 
   return (

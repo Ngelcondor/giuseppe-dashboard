@@ -72,8 +72,12 @@ export default function StudyPomodoroPage() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const s = loadState();
-    setToday(getTodayDay(s));
+    let cancelled = false;
+    loadState().then((s) => {
+      if (cancelled) return;
+      setToday(getTodayDay(s));
+    });
+    return () => { cancelled = true; };
   }, []);
 
   const totalSeconds = config[mode] * 60;

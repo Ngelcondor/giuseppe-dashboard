@@ -64,12 +64,16 @@ export default function TodayPage() {
   const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
-    const s = loadState();
-    setState(s);
-    const t = getTodayDay(s);
-    setToday(t);
-    setCtx(t ? getDayContext(s, t.date) : null);
-    setPendingCount(getPendingPastTasks(s).length);
+    let cancelled = false;
+    loadState().then((s) => {
+      if (cancelled) return;
+      setState(s);
+      const t = getTodayDay(s);
+      setToday(t);
+      setCtx(t ? getDayContext(s, t.date) : null);
+      setPendingCount(getPendingPastTasks(s).length);
+    });
+    return () => { cancelled = true; };
   }, []);
 
   if (!state) {

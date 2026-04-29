@@ -13,6 +13,7 @@ from app.models.budget import Transaction, BudgetGoal, BankConnection
 from app.models.ctf import CTFPlatform, CTFChallenge
 from app.models.meal import MealPlan
 from app.models.notification import PushSubscription, Notification
+from app.models.study import StudyTaskState
 
 __all__ = [
     "User",
@@ -43,4 +44,5 @@ __all__ = [
     "MealPlan",
     "PushSubscription",
     "Notification",
+    "StudyTaskState",
 ]

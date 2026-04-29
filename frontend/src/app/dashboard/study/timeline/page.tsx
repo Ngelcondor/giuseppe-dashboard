@@ -58,26 +58,30 @@ export default function TimelinePage() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   useEffect(() => {
-    const s = loadState();
-    setState(s);
+    let cancelled = false;
+    loadState().then((s) => {
+      if (cancelled) return;
+      setState(s);
 
-    const today = todayISO();
-    const initialOpenPhases: Record<string, boolean> = {};
-    const initialOpenWeeks: Record<string, boolean> = {};
-    for (const p of s.phases) {
-      for (const w of p.weeks) {
-        const inRange = w.days.some((d) => d.date === today);
-        if (inRange) {
-          initialOpenPhases[p.id] = true;
-          initialOpenWeeks[w.id] = true;
+      const today = todayISO();
+      const initialOpenPhases: Record<string, boolean> = {};
+      const initialOpenWeeks: Record<string, boolean> = {};
+      for (const p of s.phases) {
+        for (const w of p.weeks) {
+          const inRange = w.days.some((d) => d.date === today);
+          if (inRange) {
+            initialOpenPhases[p.id] = true;
+            initialOpenWeeks[w.id] = true;
+          }
         }
       }
-    }
-    setOpenPhases(initialOpenPhases);
-    setOpenWeeks(initialOpenWeeks);
+      setOpenPhases(initialOpenPhases);
+      setOpenWeeks(initialOpenWeeks);
 
-    const pending = getPendingPastTasks(s);
-    if (pending.length > 0) setShowRescheduleModal(true);
+      const pending = getPendingPastTasks(s);
+      if (pending.length > 0) setShowRescheduleModal(true);
+    });
+    return () => { cancelled = true; };
   }, []);
 
   const pendingTasks = useMemo(() => (state ? getPendingPastTasks(state) : []), [state]);

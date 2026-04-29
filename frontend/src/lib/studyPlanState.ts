@@ -1,13 +1,16 @@
-// CRTP Study Plan — gestione stato + rescheduling logic con localStorage
+// CRTP Study Plan — state synced via backend API (cross-device).
+// Static plan lives in studyPlanData.ts; this module rebuilds it
+// fresh and overlays the user's per-task state from the backend.
 
 import { CRTP_PLAN, StudyPhaseSeed } from './studyPlanData';
+import { API_BASE_URL } from './constants';
 
 export interface StudyTask {
   id: string;
   text: string;
   completed: boolean;
   completedAt?: string;
-  rescheduledFrom?: string; // ISO date originale
+  rescheduledFrom?: string;
   skipped?: boolean;
 }
 
@@ -43,20 +46,23 @@ export interface StudyPhase {
 export interface StudyPlanState {
   phases: StudyPhase[];
   lastUpdated: string;
-  pendingReschedule?: {
-    fromDate: string;
-    taskCount: number;
-  } | null;
+  pendingReschedule?: { fromDate: string; taskCount: number } | null;
 }
 
-const STORAGE_KEY = 'crtp-study-plan-v1';
+interface BackendRow {
+  task_id: string;
+  completed: boolean;
+  completed_at: string | null;
+  skipped: boolean;
+  moved_to_date: string | null;
+}
 
 function generateTaskId(date: string, idx: number): string {
   return `${date}-${idx}`;
 }
 
-export function buildInitialState(): StudyPlanState {
-  const phases: StudyPhase[] = CRTP_PLAN.map((p: StudyPhaseSeed) => ({
+function freshPlan(): StudyPhase[] {
+  return CRTP_PLAN.map((p: StudyPhaseSeed) => ({
     id: p.id,
     label: p.label,
     shortLabel: p.shortLabel,
@@ -84,6 +90,44 @@ export function buildInitialState(): StudyPlanState {
       })),
     })),
   }));
+}
+
+function applyBackendRows(rows: BackendRow[]): StudyPlanState {
+  const phases = freshPlan();
+  const byId = new Map<string, BackendRow>(rows.map((r) => [r.task_id, r]));
+
+  // 1) Apply completed/skipped flags
+  for (const p of phases) {
+    for (const w of p.weeks) {
+      for (const d of w.days) {
+        for (const t of d.tasks) {
+          const r = byId.get(t.id);
+          if (!r) continue;
+          t.completed = r.completed;
+          t.skipped = r.skipped;
+          if (r.completed_at) t.completedAt = r.completed_at;
+        }
+      }
+    }
+  }
+
+  // 2) Apply moves (rescheduling): pull tasks from their original day, push to moved_to_date
+  const dayByDate = new Map<string, StudyDay>();
+  for (const p of phases) for (const w of p.weeks) for (const d of w.days) dayByDate.set(d.date, d);
+
+  for (const r of rows) {
+    if (!r.moved_to_date) continue;
+    const fromDate = r.task_id.substring(0, 10);
+    if (fromDate === r.moved_to_date) continue;
+    const fromDay = dayByDate.get(fromDate);
+    const toDay = dayByDate.get(r.moved_to_date);
+    if (!fromDay || !toDay) continue;
+    const idx = fromDay.tasks.findIndex((t) => t.id === r.task_id);
+    if (idx < 0) continue;
+    const [task] = fromDay.tasks.splice(idx, 1);
+    task.rescheduledFrom = fromDate;
+    toDay.tasks.push(task);
+  }
 
   return {
     phases,
@@ -92,32 +136,62 @@ export function buildInitialState(): StudyPlanState {
   };
 }
 
-export function loadState(): StudyPlanState {
-  if (typeof window === 'undefined') return buildInitialState();
+// ── API calls ───────────────────────────────────────────────────────────────
+
+async function fetchState(): Promise<BackendRow[]> {
+  const res = await fetch(`${API_BASE_URL}/study/state`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+interface UpsertBody {
+  completed?: boolean;
+  skipped?: boolean;
+  moved_to_date?: string; // empty string clears
+}
+
+function pushUpdate(taskId: string, body: UpsertBody): void {
+  fetch(`${API_BASE_URL}/study/task/${taskId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).catch((e) => console.warn(`[study] sync failed for ${taskId}`, e));
+}
+
+interface BatchEntry extends UpsertBody { task_id: string; }
+
+function pushBatch(entries: BatchEntry[]): void {
+  if (entries.length === 0) return;
+  fetch(`${API_BASE_URL}/study/state/batch`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(entries),
+  }).catch((e) => console.warn('[study] batch sync failed', e));
+}
+
+function pushReset(): void {
+  fetch(`${API_BASE_URL}/study/state`, { method: 'DELETE' })
+    .catch((e) => console.warn('[study] reset sync failed', e));
+}
+
+// ── Public API ──────────────────────────────────────────────────────────────
+
+export async function loadState(): Promise<StudyPlanState> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return buildInitialState();
-    const parsed = JSON.parse(raw) as StudyPlanState;
-    if (!parsed.phases || !Array.isArray(parsed.phases)) return buildInitialState();
-    return parsed;
-  } catch {
-    return buildInitialState();
+    const rows = await fetchState();
+    return applyBackendRows(rows);
+  } catch (e) {
+    console.warn('[study] fetch state failed, returning empty plan', e);
+    return applyBackendRows([]);
   }
 }
 
-export function saveState(state: StudyPlanState): void {
-  if (typeof window === 'undefined') return;
-  state.lastUpdated = new Date().toISOString();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-}
-
 export function resetState(): StudyPlanState {
-  const fresh = buildInitialState();
-  saveState(fresh);
-  return fresh;
+  pushReset();
+  return applyBackendRows([]);
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── Helpers (pure, sync) ────────────────────────────────────────────────────
 
 export function getAllDays(state: StudyPlanState): StudyDay[] {
   return state.phases.flatMap((p) => p.weeks.flatMap((w) => w.days));
@@ -129,7 +203,6 @@ export interface DayContext {
   phase: StudyPhase;
 }
 
-/** Resolve the phase and week that contain a given day. */
 export function getDayContext(state: StudyPlanState, date: string): DayContext | null {
   for (const phase of state.phases) {
     for (const week of phase.weeks) {
@@ -158,27 +231,27 @@ export function findUpcomingNonRestDays(state: StudyPlanState, fromDate: string,
   return all.filter((d) => d.date >= fromDate && !d.isRest).slice(0, count);
 }
 
-// ── Mutations ───────────────────────────────────────────────────────────────
+// ── Mutations (optimistic local update + fire-and-forget API push) ──────────
 
 export function toggleTask(state: StudyPlanState, dayDate: string, taskId: string): StudyPlanState {
   const next: StudyPlanState = JSON.parse(JSON.stringify(state));
+  let newCompleted = false;
   for (const p of next.phases) {
     for (const w of p.weeks) {
       for (const d of w.days) {
         if (d.date !== dayDate) continue;
         for (const t of d.tasks) {
-          if (t.id === taskId) {
-            t.completed = !t.completed;
-            t.completedAt = t.completed ? new Date().toISOString() : undefined;
-            if (t.completed) t.skipped = false;
-            saveState(next);
-            return next;
-          }
+          if (t.id !== taskId) continue;
+          t.completed = !t.completed;
+          t.completedAt = t.completed ? new Date().toISOString() : undefined;
+          if (t.completed) t.skipped = false;
+          newCompleted = t.completed;
         }
       }
     }
   }
-  return state;
+  pushUpdate(taskId, { completed: newCompleted, skipped: false });
+  return next;
 }
 
 export function markTaskSkipped(state: StudyPlanState, dayDate: string, taskId: string): StudyPlanState {
@@ -188,17 +261,16 @@ export function markTaskSkipped(state: StudyPlanState, dayDate: string, taskId: 
       for (const d of w.days) {
         if (d.date !== dayDate) continue;
         for (const t of d.tasks) {
-          if (t.id === taskId) {
-            t.skipped = true;
-            t.completed = false;
-            saveState(next);
-            return next;
-          }
+          if (t.id !== taskId) continue;
+          t.skipped = true;
+          t.completed = false;
+          t.completedAt = undefined;
         }
       }
     }
   }
-  return state;
+  pushUpdate(taskId, { skipped: true, completed: false });
+  return next;
 }
 
 // ── Rescheduling ────────────────────────────────────────────────────────────
@@ -227,18 +299,17 @@ export function getPendingPastTasks(state: StudyPlanState, today: string = today
   return pending;
 }
 
-// Sposta tutti i task in pending al giorno di oggi (o primo non-rest disponibile)
+/** Move all pending past tasks onto today (or first non-rest upcoming day). */
 export function rescheduleToToday(state: StudyPlanState): StudyPlanState {
   const next: StudyPlanState = JSON.parse(JSON.stringify(state));
   const today = todayISO();
   const pending = getPendingPastTasks(next, today);
   if (pending.length === 0) return next;
 
-  // Trova target day (oggi o prossimo non-rest)
-  const targetDay = findUpcomingNonRestDays(next, today, 1)[0];
-  if (!targetDay) return next;
+  const target = findUpcomingNonRestDays(next, today, 1)[0];
+  if (!target) return next;
 
-  // Per ogni task pending: rimuovi dal giorno originale, aggiungi al target
+  const batch: BatchEntry[] = [];
   for (const p of next.phases) {
     for (const w of p.weeks) {
       for (const d of w.days) {
@@ -247,30 +318,25 @@ export function rescheduleToToday(state: StudyPlanState): StudyPlanState {
         const remaining: StudyTask[] = [];
         const toMove: StudyTask[] = [];
         for (const t of d.tasks) {
-          if (!t.completed && !t.skipped) {
-            toMove.push({ ...t, rescheduledFrom: d.date });
-          } else {
-            remaining.push(t);
-          }
+          if (!t.completed && !t.skipped) toMove.push({ ...t, rescheduledFrom: d.date });
+          else remaining.push(t);
         }
         d.tasks = remaining;
-        // aggiungi al target
-        const target = next.phases
-          .flatMap((pp) => pp.weeks.flatMap((ww) => ww.days))
-          .find((dd) => dd.date === targetDay.date);
-        if (target) {
-          target.tasks.push(...toMove);
+        const targetDay = next.phases.flatMap((pp) => pp.weeks.flatMap((ww) => ww.days)).find((dd) => dd.date === target.date);
+        if (targetDay) targetDay.tasks.push(...toMove);
+        for (const moved of toMove) {
+          batch.push({ task_id: moved.id, moved_to_date: target.date });
         }
       }
     }
   }
 
   next.pendingReschedule = null;
-  saveState(next);
+  pushBatch(batch);
   return next;
 }
 
-// Spalma i task pending nei prossimi N giorni non-rest
+/** Spread pending past tasks across the next N non-rest days (round-robin). */
 export function rescheduleSpread(state: StudyPlanState, daysCount: number = 3): StudyPlanState {
   const next: StudyPlanState = JSON.parse(JSON.stringify(state));
   const today = todayISO();
@@ -280,7 +346,6 @@ export function rescheduleSpread(state: StudyPlanState, daysCount: number = 3): 
   const targetDays = findUpcomingNonRestDays(next, today, daysCount);
   if (targetDays.length === 0) return next;
 
-  // Raccogli i task da spostare
   const tasksToMove: StudyTask[] = [];
   for (const p of next.phases) {
     for (const w of p.weeks) {
@@ -289,34 +354,31 @@ export function rescheduleSpread(state: StudyPlanState, daysCount: number = 3): 
         if (d.isRest) continue;
         const remaining: StudyTask[] = [];
         for (const t of d.tasks) {
-          if (!t.completed && !t.skipped) {
-            tasksToMove.push({ ...t, rescheduledFrom: d.date });
-          } else {
-            remaining.push(t);
-          }
+          if (!t.completed && !t.skipped) tasksToMove.push({ ...t, rescheduledFrom: d.date });
+          else remaining.push(t);
         }
         d.tasks = remaining;
       }
     }
   }
 
-  // Distribuisci round-robin
+  const batch: BatchEntry[] = [];
   tasksToMove.forEach((t, idx) => {
     const target = targetDays[idx % targetDays.length];
-    const realTarget = next.phases
-      .flatMap((p) => p.weeks.flatMap((w) => w.days))
-      .find((d) => d.date === target.date);
+    const realTarget = next.phases.flatMap((p) => p.weeks.flatMap((w) => w.days)).find((d) => d.date === target.date);
     if (realTarget) realTarget.tasks.push(t);
+    batch.push({ task_id: t.id, moved_to_date: target.date });
   });
 
   next.pendingReschedule = null;
-  saveState(next);
+  pushBatch(batch);
   return next;
 }
 
 export function markAllPendingSkipped(state: StudyPlanState): StudyPlanState {
   const next: StudyPlanState = JSON.parse(JSON.stringify(state));
   const today = todayISO();
+  const batch: BatchEntry[] = [];
   for (const p of next.phases) {
     for (const w of p.weeks) {
       for (const d of w.days) {
@@ -325,21 +387,20 @@ export function markAllPendingSkipped(state: StudyPlanState): StudyPlanState {
         for (const t of d.tasks) {
           if (!t.completed && !t.skipped) {
             t.skipped = true;
+            batch.push({ task_id: t.id, skipped: true });
           }
         }
       }
     }
   }
   next.pendingReschedule = null;
-  saveState(next);
+  pushBatch(batch);
   return next;
 }
 
 export function dismissReschedulePrompt(state: StudyPlanState): StudyPlanState {
-  const next: StudyPlanState = JSON.parse(JSON.stringify(state));
-  next.pendingReschedule = null;
-  saveState(next);
-  return next;
+  // Local-only — the prompt is a UI hint, not persisted.
+  return { ...state, pendingReschedule: null };
 }
 
 // ── Stats ───────────────────────────────────────────────────────────────────
