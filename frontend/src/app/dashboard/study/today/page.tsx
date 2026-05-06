@@ -142,7 +142,7 @@ export default function TodayPage() {
   return (
     <PageShell
       title="Cosa fare oggi"
-      eyebrow="Studio CRTP"
+      eyebrow="Studio CPTS"
       icon={Sun}
       iconColor="text-amber-400"
       back="/dashboard/study"
@@ -189,7 +189,7 @@ export default function TodayPage() {
           <EmptyState
             icon={CalendarIcon}
             title="Nessun giorno pianificato per oggi"
-            description={`${dateLabel} · La roadmap CRTP va dal 28 Aprile 2026 al 22 Settembre 2026.`}
+            description={`${dateLabel} · La roadmap CPTS va dal 6 Maggio 2026 al 4 Agosto 2026 (esame Lab 22-28 Lug, Report 29 Lug-4 Ago).`}
           />
         </Surface>
       )}

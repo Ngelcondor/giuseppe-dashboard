@@ -147,7 +147,7 @@ export default function FocusPage() {
       eyebrow="Deep Work"
       title="Focus"
       titleAccent="presente"
-      description="Pomodoro classico per le sessioni di lavoro non-CRTP."
+      description="Pomodoro classico per le sessioni di lavoro non-CPTS."
       width="sm"
       actions={settingsBtn}
     >

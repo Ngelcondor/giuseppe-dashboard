@@ -45,6 +45,7 @@ function formatItalianDate(iso: string): string {
 const PHASE_BAR_COLORS: Record<string, string> = {
   'text-slate-300': '#cbd5e1',
   'text-emerald-400': '#34d399',
+  'text-sky-400': '#38bdf8',
   'text-amber-400': '#fbbf24',
   'text-orange-400': '#fb923c',
   'text-rose-400': '#fb7185',
@@ -127,7 +128,7 @@ export default function TimelinePage() {
 
   return (
     <PageShell
-      title="Timeline CRTP"
+      title="Timeline CPTS"
       eyebrow="Roadmap completa"
       icon={Calendar}
       iconColor="text-accent"

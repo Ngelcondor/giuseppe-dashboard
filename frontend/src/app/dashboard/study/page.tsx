@@ -26,7 +26,7 @@ const sections = [
   },
   {
     id: 'timeline',
-    label: 'Timeline CRTP',
+    label: 'Timeline CPTS',
     description: 'Roadmap completa con checklist e progress per fase',
     icon: Calendar,
     href: '/dashboard/study/timeline',
@@ -66,7 +66,7 @@ export default function StudyHubPage() {
   }, []);
 
   return (
-    <PageShell title="Studio · CRTP" eyebrow="Programma di Studio" icon={BookOpen} iconColor="text-accent" width="md">
+    <PageShell title="Studio · CPTS" eyebrow="Programma di Studio" icon={BookOpen} iconColor="text-accent" width="md">
       {/* Hero stat block */}
       <Surface variant="accent" padding="lg" className="mb-6">
         <div className="flex items-center justify-between mb-5">
@@ -76,7 +76,7 @@ export default function StudyHubPage() {
               {overall.pct}<span className="text-lg text-tertiary">%</span>
             </p>
             <p className="text-[11px] text-muted mt-1.5 font-mono-display">
-              {overall.done} / {overall.total} task · target esame 17 Ago
+              {overall.done} / {overall.total} task · target esame 31 Lug (lab) · report 4 Ago
             </p>
           </div>
           <div className="text-right">
@@ -132,7 +132,7 @@ export default function StudyHubPage() {
 
       <p className="mt-10 text-[11px] text-muted font-mono-display text-center opacity-70">
         <span className="text-accent">// </span>
-        roadmap basata su CRTP_Study_Plan_Complete.md
+        roadmap basata su CPTS_Study_Plan_12_Weeks.md
       </p>
     </PageShell>
   );

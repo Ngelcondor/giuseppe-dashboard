@@ -109,14 +109,14 @@ function Hero({ now }: { now: Date }) {
       </h1>
 
       <p className="mt-6 max-w-2xl text-[17px] sm:text-[19px] leading-relaxed text-tertiary">
-        <span className="text-body">Day 0 di CRTP.</span>{' '}
-        Setup ambiente attivo. Esame target — <span className="font-serif italic text-body">17 agosto</span>.
+        <span className="text-body">CPTS · 12 settimane.</span>{' '}
+        HTB Penetration Tester Path. Esame target — <span className="font-serif italic text-body">31 luglio</span>.
       </p>
     </header>
   );
 }
 
-/* ─────────────────────────────────────────────────────── HERO TILE: Studio CRTP */
+/* ─────────────────────────────────────────────────────── HERO TILE: Studio CPTS */
 
 function StudioHeroTile() {
   const [state, setState] = useState<StudyPlanState | null>(null);
@@ -158,7 +158,7 @@ function StudioHeroTile() {
     >
       <div className="flex items-start justify-between mb-8">
         <div>
-          <Eyebrow accent>Mission · CRTP</Eyebrow>
+          <Eyebrow accent>Mission · CPTS</Eyebrow>
           <p className="mt-2 font-display font-extrabold text-[28px] sm:text-[34px] leading-[1.05] tracking-[-0.025em] text-heading max-w-md">
             {today?.label ?? 'Nessun giorno pianificato'}
           </p>

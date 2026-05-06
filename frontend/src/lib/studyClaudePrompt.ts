@@ -20,7 +20,7 @@ export interface PromptInput {
 
 /**
  * Build the prompt that gets pasted into a fresh Claude conversation
- * to start (or continue) studying a specific CRTP task.
+ * to start (or continue) studying a specific CPTS task.
  *
  * The prompt is intentionally:
  * - Italian (matches the user's working language)
@@ -30,7 +30,7 @@ export interface PromptInput {
  */
 export function buildClaudeStudyPrompt({ taskText, ctx }: PromptInput): string {
   const { day, week, phase } = ctx;
-  return `Sono Giuseppe, sto preparando l'esame CRTP (Certified Red Team Professional).
+  return `Sono Giuseppe, sto preparando l'esame HTB CPTS (Certified Penetration Testing Specialist).
 
 Oggi (${formatItalianDate(day.date)}) lavoro su questo task:
 
@@ -45,8 +45,8 @@ Mio profilo da tenere a mente:
 - ADHD + ASD: spiegazioni step-by-step concrete, niente "in generale"
 - Hands-on > teoria: dammi comandi pronti da copiare, non descrizioni astratte
 - Pomodoro 45/15 (non 25/5)
-- Note in markdown, screenshot massivi
-- Setup: MacBook M3 + Parallels (Kali + Win11), GOAD lab disponibile, lab CRTP Altered Security
+- Note in markdown in ~/cpts-notes/, screenshot massivi
+- Setup: MacBook M3 + Parallels (Kali + Win11), GOAD lab disponibile, HTB Academy Penetration Tester Path, HTB main platform per CTF
 
 Aiutami a portare a termine questo task.
 - Se è teoria → essenziale + un comando da provare subito in lab.

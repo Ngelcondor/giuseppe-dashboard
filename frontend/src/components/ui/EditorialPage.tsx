@@ -7,7 +7,7 @@ import { BottomDock } from './AppShell';
 import { cn } from '@/lib/utils';
 
 interface EditorialPageProps {
-  /** Small uppercase mono label above the title (e.g. "MISSION CRTP") */
+  /** Small uppercase mono label above the title (e.g. "MISSION CPTS") */
   eyebrow?: string;
   /** The page title — rendered as a big editorial display */
   title: string;

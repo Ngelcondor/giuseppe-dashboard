@@ -1,8 +1,8 @@
-// CRTP Study Plan — state synced via backend API (cross-device).
+// CPTS Study Plan — state synced via backend API (cross-device).
 // Static plan lives in studyPlanData.ts; this module rebuilds it
 // fresh and overlays the user's per-task state from the backend.
 
-import { CRTP_PLAN, StudyPhaseSeed } from './studyPlanData';
+import { CPTS_PLAN, StudyPhaseSeed } from './studyPlanData';
 import { API_BASE_URL } from './constants';
 
 export interface StudyTask {
@@ -62,7 +62,7 @@ function generateTaskId(date: string, idx: number): string {
 }
 
 function freshPlan(): StudyPhase[] {
-  return CRTP_PLAN.map((p: StudyPhaseSeed) => ({
+  return CPTS_PLAN.map((p: StudyPhaseSeed) => ({
     id: p.id,
     label: p.label,
     shortLabel: p.shortLabel,
