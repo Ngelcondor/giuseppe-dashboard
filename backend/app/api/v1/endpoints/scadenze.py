@@ -1,4 +1,4 @@
-"""Scadenze budget endpoints — no auth required (auth disabled temporarily)."""
+"""Scadenze budget endpoints — authenticated."""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -7,10 +7,15 @@ from typing import List
 from uuid import UUID
 
 from app.core.database import get_db
+from app.core.security import get_current_user
 from app.models.scadenza import Scadenza, TipoScadenza
 from app.schemas.scadenza import ScadenzaCreate, ScadenzaResponse, ScadenzaUpdate
 
-router = APIRouter(prefix="/scadenze", tags=["scadenze"])
+router = APIRouter(
+    prefix="/scadenze",
+    tags=["scadenze"],
+    dependencies=[Depends(get_current_user)],
+)
 
 INITIAL_DATA = [
     {"desc":"Affitto","mese":"Marzo","scadenza_gg_mm":"01/03","importo":-1410,"tipo":"Ricorrente","pagato":True},
