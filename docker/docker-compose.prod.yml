@@ -57,6 +57,8 @@ services:
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/2
       DISABLE_DOCS: "true"
       ALLOW_ADMIN_INIT: "false"
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
