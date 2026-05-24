@@ -14,8 +14,6 @@ from app.api.v1.endpoints import (
     deadlines,
     routines,
     focus,
-    habits,
-    mood,
     budget,
     ctf,
     meals,
@@ -45,8 +43,6 @@ router.include_router(calendar_sync.router)
 router.include_router(deadlines.router)
 router.include_router(routines.router)
 router.include_router(focus.router)
-router.include_router(habits.router)
-router.include_router(mood.router)
 router.include_router(budget.router)
 router.include_router(ctf.router)
 router.include_router(meals.router)
