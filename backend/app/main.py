@@ -1,4 +1,5 @@
 """FastAPI main application."""
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -74,12 +75,24 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Redis close failed: {e}")
 
 
+# Disable OpenAPI docs in production to avoid information disclosure.
+_docs_disabled = (
+    os.getenv("DISABLE_DOCS", "").lower() == "true"
+    or os.getenv("ENVIRONMENT", "").lower() == "production"
+)
+_docs_kwargs = (
+    {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    if _docs_disabled
+    else {}
+)
+
 # Create FastAPI app
 app = FastAPI(
     title=settings.APP_NAME,
     description="Personal dashboard API for Giuseppe - ADHD/ASD cybersecurity student",
     version=settings.APP_VERSION,
     lifespan=lifespan,
+    **_docs_kwargs,
 )
 
 # Add CORS middleware - configured via settings/environment variables
