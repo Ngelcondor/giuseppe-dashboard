@@ -6,8 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-logger = logging.getLogger(__name__)
-
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import (
     hash_password,
@@ -35,10 +34,9 @@ from app.schemas.user import (
     PasswordChangeResponse,
 )
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+logger = logging.getLogger(__name__)
 
-_ADMIN_EMAIL = "giuseppe.dianasr@hotmail.it"
-_ADMIN_PWD   = "***REMOVED***"
+router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/init", status_code=201)
@@ -53,6 +51,12 @@ async def init_admin(request: Request, db: AsyncSession = Depends(get_db)):
             detail="Admin init disabled, use CLI",
         )
 
+    if not settings.ADMIN_EMAIL or not settings.ADMIN_PASSWORD:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="ADMIN_EMAIL or ADMIN_PASSWORD not configured",
+        )
+
     result = await db.execute(select(User))
     existing = result.scalars().first()
     if existing:
@@ -62,9 +66,9 @@ async def init_admin(request: Request, db: AsyncSession = Depends(get_db)):
         )
 
     admin = User(
-        email=_ADMIN_EMAIL,
+        email=settings.ADMIN_EMAIL,
         username="giuseppe",
-        hashed_password=hash_password(_ADMIN_PWD),
+        hashed_password=hash_password(settings.ADMIN_PASSWORD),
         is_active=True,
     )
     db.add(admin)
