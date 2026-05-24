@@ -2,7 +2,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import delete
 from datetime import date, timedelta
 from typing import List, Optional
 from uuid import UUID
@@ -11,16 +10,12 @@ from pydantic import BaseModel
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.habit import Habit, HabitLog
-from app.models.user import User
 
 router = APIRouter(
     prefix="/habits-api",
     tags=["habits-api"],
     dependencies=[Depends(get_current_user)],
 )
-
-# Fixed placeholder user until auth is re-enabled
-DEFAULT_USER = UUID("00000000-0000-0000-0000-000000000001")
 
 # ADHD/ASD-friendly default habits
 DEFAULT_HABITS = [
@@ -104,16 +99,19 @@ async def _compute_streaks(habit_id: UUID, db: AsyncSession):
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("", response_model=List[HabitOut])
-async def list_habits(db: AsyncSession = Depends(get_db)):
+async def list_habits(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = UUID(current_user["sub"])
     result = await db.execute(
-        select(Habit).where(Habit.user_id == DEFAULT_USER, Habit.is_active == True)
+        select(Habit).where(Habit.user_id == user_id, Habit.is_active == True)
     )
     habits = result.scalars().all()
     today = date.today()
 
     out = []
     for h in habits:
-        # Check done today
         log_res = await db.execute(
             select(HabitLog).where(
                 HabitLog.habit_id == h.id,
@@ -130,41 +128,29 @@ async def list_habits(db: AsyncSession = Depends(get_db)):
     return out
 
 
-async def _ensure_system_user(db: AsyncSession):
-    """Create the system user if it doesn't exist yet.
-
-    Note: username is 'system' (not 'giuseppe') to avoid colliding with the
-    real admin user created by seed_admin_user() at app startup.
-    """
-    result = await db.execute(select(User).where(User.id == DEFAULT_USER))
-    if not result.scalars().first():
-        db.add(User(
-            id=DEFAULT_USER,
-            email="system@dashboard.local",
-            username="system",
-            hashed_password="disabled",
-            is_active=True,
-            is_verified=True,
-        ))
-        await db.commit()
-
-
 @router.post("/seed", status_code=201)
-async def seed_habits(db: AsyncSession = Depends(get_db)):
-    await _ensure_system_user(db)
-    result = await db.execute(select(Habit).where(Habit.user_id == DEFAULT_USER))
+async def seed_habits(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = UUID(current_user["sub"])
+    result = await db.execute(select(Habit).where(Habit.user_id == user_id))
     if result.scalars().first():
         return {"message": "Already seeded"}
     for d in DEFAULT_HABITS:
-        db.add(Habit(user_id=DEFAULT_USER, name=d["name"], icon=d["icon"], color=d["color"]))
+        db.add(Habit(user_id=user_id, name=d["name"], icon=d["icon"], color=d["color"]))
     await db.commit()
     return {"message": "Seeded", "count": len(DEFAULT_HABITS)}
 
 
 @router.post("", response_model=HabitOut, status_code=201)
-async def create_habit(body: HabitCreate, db: AsyncSession = Depends(get_db)):
-    await _ensure_system_user(db)
-    h = Habit(user_id=DEFAULT_USER, name=body.name, icon=body.icon, color=body.color or "#10B981")
+async def create_habit(
+    body: HabitCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = UUID(current_user["sub"])
+    h = Habit(user_id=user_id, name=body.name, icon=body.icon, color=body.color or "#10B981")
     db.add(h)
     await db.commit()
     await db.refresh(h)
@@ -172,8 +158,15 @@ async def create_habit(body: HabitCreate, db: AsyncSession = Depends(get_db)):
 
 
 @router.delete("/{habit_id}", status_code=204)
-async def delete_habit(habit_id: UUID, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Habit).where(Habit.id == habit_id))
+async def delete_habit(
+    habit_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = UUID(current_user["sub"])
+    result = await db.execute(
+        select(Habit).where(Habit.id == habit_id, Habit.user_id == user_id)
+    )
     h = result.scalars().first()
     if not h:
         raise HTTPException(404, "Not found")
@@ -182,9 +175,22 @@ async def delete_habit(habit_id: UUID, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/{habit_id}/toggle")
-async def toggle_habit(habit_id: UUID, db: AsyncSession = Depends(get_db)):
+async def toggle_habit(
+    habit_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     """Toggle today's completion for a habit."""
+    user_id = UUID(current_user["sub"])
     today = date.today()
+
+    # Verify habit belongs to current user
+    habit_check = await db.execute(
+        select(Habit).where(Habit.id == habit_id, Habit.user_id == user_id)
+    )
+    if not habit_check.scalars().first():
+        raise HTTPException(404, "Not found")
+
     result = await db.execute(
         select(HabitLog).where(HabitLog.habit_id == habit_id, HabitLog.date == today)
     )
@@ -193,7 +199,7 @@ async def toggle_habit(habit_id: UUID, db: AsyncSession = Depends(get_db)):
     if log:
         log.completed = not log.completed
     else:
-        log = HabitLog(habit_id=habit_id, user_id=DEFAULT_USER, date=today, completed=True)
+        log = HabitLog(habit_id=habit_id, user_id=user_id, date=today, completed=True)
         db.add(log)
 
     await db.commit()
@@ -203,8 +209,22 @@ async def toggle_habit(habit_id: UUID, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{habit_id}/heatmap", response_model=List[HeatmapDay])
-async def get_heatmap(habit_id: UUID, days: int = 365, db: AsyncSession = Depends(get_db)):
+async def get_heatmap(
+    habit_id: UUID,
+    days: int = 365,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     """Return day-by-day completion for heatmap (last N days)."""
+    user_id = UUID(current_user["sub"])
+
+    # Verify habit belongs to current user
+    habit_check = await db.execute(
+        select(Habit).where(Habit.id == habit_id, Habit.user_id == user_id)
+    )
+    if not habit_check.scalars().first():
+        raise HTTPException(404, "Not found")
+
     end = date.today()
     start = end - timedelta(days=days - 1)
 
