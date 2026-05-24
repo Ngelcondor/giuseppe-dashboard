@@ -55,9 +55,10 @@ services:
       CALDAV_SYNC_ENABLED: ${CALDAV_SYNC_ENABLED:-true}
       CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
       CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/2
+      DISABLE_DOCS: "true"
+      ALLOW_ADMIN_INIT: "false"
     ports:
       - "127.0.0.1:8000:8000"
-      - "0.0.0.0:8888:8000"    # Accesso diretto per iOS Shortcuts (bypassa nginx)
     depends_on:
       postgres:
         condition: service_healthy
