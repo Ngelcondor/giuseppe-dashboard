@@ -1,7 +1,12 @@
 """Authentication endpoints — single-user, no registration."""
-from fastapi import APIRouter, Depends, HTTPException, status
+import logging
+import os
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+
+logger = logging.getLogger(__name__)
 
 from app.core.database import get_db
 from app.core.security import (
@@ -37,18 +42,25 @@ _ADMIN_PWD   = "***REMOVED***"
 
 
 @router.post("/init", status_code=201)
-async def init_admin(db: AsyncSession = Depends(get_db)):
-    """Create admin user if no user exists, or update credentials if user already exists."""
+async def init_admin(request: Request, db: AsyncSession = Depends(get_db)):
+    """Create admin user — only if no admin exists and ALLOW_ADMIN_INIT is enabled."""
+    client_host = request.client.host if request.client else "unknown"
+    logger.warning(f"Admin init attempted from {client_host}")
+
+    if os.getenv("ALLOW_ADMIN_INIT", "").lower() != "true":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin init disabled, use CLI",
+        )
+
     result = await db.execute(select(User))
     existing = result.scalars().first()
     if existing:
-        existing.email = _ADMIN_EMAIL
-        existing.username = "giuseppe"
-        existing.hashed_password = hash_password(_ADMIN_PWD)
-        existing.is_active = True
-        db.add(existing)
-        await db.commit()
-        return {"message": "Admin credentials updated"}
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin already initialized",
+        )
+
     admin = User(
         email=_ADMIN_EMAIL,
         username="giuseppe",
