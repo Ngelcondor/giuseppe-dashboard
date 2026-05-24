@@ -156,7 +156,6 @@ async def root():
     """Root endpoint."""
     return {
         "message": "Welcome to Giuseppe Dashboard API",
-        "docs": "/docs",
         "health": "/health",
     }
 
