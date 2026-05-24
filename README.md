@@ -320,6 +320,39 @@ docker-compose -f docker/docker-compose.yml up -d
 - Configura il firewall correttamente
 - Abilita i backup automatici del database
 
+## Security
+
+Procedure operative di hardening per il deployment in produzione.
+
+### Bootstrap iniziale dell'admin
+
+L'endpoint `POST /api/v1/auth/init` è disabilitato di default in produzione
+(`ALLOW_ADMIN_INIT=false`). Per il primo setup:
+
+1. Setta temporaneamente `ALLOW_ADMIN_INIT=true` nel file env di produzione
+2. Riavvia il backend
+3. Chiama `POST /api/v1/auth/init` una sola volta per creare l'admin
+4. Rimetti `ALLOW_ADMIN_INIT=false` e riavvia il backend
+
+L'endpoint è idempotente: se un admin esiste già, ritorna 403 anche con il flag
+attivo. Ogni tentativo di init viene loggato come `warning` con l'IP del client.
+
+### API docs disabilitati in produzione
+
+`/docs`, `/redoc` e `/openapi.json` sono disattivati quando
+`DISABLE_DOCS=true` o `ENVIRONMENT=production`, per evitare information
+disclosure dello schema API. In sviluppo restano accessibili.
+
+### Schemi di autenticazione
+
+Coesistono due schemi distinti:
+
+- **OAuth2 Password Bearer** (token JWT): per tutti gli endpoint utente
+  (`/scadenze`, `/habits-api`, `/mood-api`, `/health/sleep`, `/study`, ecc.).
+- **HTTPBearer** con secret fisso (`APPLE_HEALTH_WEBHOOK_SECRET`): solo per i
+  webhook chiamati da iOS Shortcuts (`/health/sleep/sync/*`). Non confondere i
+  due token — gli Shortcuts NON devono usare JWT.
+
 ## Contributing
 
 Le contribuzioni sono benvenute! Per favore:
