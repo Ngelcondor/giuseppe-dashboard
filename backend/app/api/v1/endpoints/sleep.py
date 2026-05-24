@@ -1,4 +1,4 @@
-"""Sleep tracking endpoints."""
+"""Sleep tracking endpoints — authenticated."""
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -8,9 +8,10 @@ from datetime import datetime, timedelta, date
 from typing import List
 
 from app.core.database import get_db
+from app.core.security import get_current_user
 from app.models.health import SleepSession, SleepPhaseEntry
 
-# Dashboard personale — utente singolo, niente auth
+# Dashboard personale — utente singolo
 DEFAULT_USER_ID = "686859db-326c-4a2a-847e-99042c35eafc"
 from app.schemas.health import (
     SleepSessionCreate,
@@ -21,7 +22,11 @@ from app.schemas.health import (
     SleepPhaseEntryResponse,
 )
 
-router = APIRouter(prefix="/health/sleep", tags=["sleep"])
+router = APIRouter(
+    prefix="/health/sleep",
+    tags=["sleep"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @router.post("", response_model=SleepSessionResponse, status_code=status.HTTP_201_CREATED)
