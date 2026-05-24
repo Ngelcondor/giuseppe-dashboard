@@ -14,7 +14,7 @@ Una dashboard personale completa per monitorare salute, attività fisica, dati m
 - **Tema Scuro/Chiaro**: Scegli il tema che preferisci
 - **Responsive Design**: Perfetto su desktop, tablet e mobile
 - **Autenticazione Sicura**: JWT-based authentication
-- **API REST Completa**: Documentazione completa su `/docs`
+- **API REST Completa**: Documentazione OpenAPI su `/docs` (solo in development — disabilitata in production)
 
 ## Stack Tecnologico
 
@@ -67,8 +67,8 @@ docker-compose -f docker/docker-compose.yml up -d
 
 ### 4. Accedi all'Applicazione
 - **Frontend**: http://localhost:3000
-- **API Docs**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+- **API Docs** (solo development): http://localhost:8000/docs
+- **ReDoc** (solo development): http://localhost:8000/redoc
 
 ## Setup Iniziale
 
@@ -269,7 +269,7 @@ docker-compose -f docker/docker-compose.yml exec backend env
 - `PUT /api/v1/goals/{id}` - Modifica obiettivo
 - `DELETE /api/v1/goals/{id}` - Elimina obiettivo
 
-Documentazione completa: http://localhost:8000/docs
+Documentazione OpenAPI: http://localhost:8000/docs (solo in development — disabilitata in production, vedi sezione [Security](#security))
 
 ## Hosting e Deploy
 
@@ -403,7 +403,7 @@ Questo progetto è distribuito sotto la licenza MIT. Vedi il file [`LICENSE`](LI
 
 Per problemi e domande:
 - Apri un issue su GitHub
-- Leggi la documentazione in `/docs`
+- Leggi la documentazione nella cartella [`docs/`](docs/)
 - Consulta i log Docker per errori specifici
 - Contatta l'autore via email
 
