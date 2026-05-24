@@ -693,6 +693,7 @@ async def _verify_webhook_token_or_query(
 @router.get(
     "/shortcut",
     response_model=SleepCycleSyncResponse,
+    dependencies=[Depends(_verify_webhook_token_or_query)],
 )
 async def shortcut_sleep_get(
     request: Request,
@@ -707,10 +708,6 @@ async def shortcut_sleep_get(
     Il base64 decodificato deve essere testo pipe-delimited (start|end|value|source per riga).
     """
     import base64
-
-    secret = settings.APPLE_HEALTH_WEBHOOK_SECRET
-    if not secret or token != secret:
-        raise HTTPException(status_code=401, detail="Token non valido.")
 
     if not data:
         raise HTTPException(status_code=422, detail="Parametro 'data' mancante")
@@ -1081,7 +1078,10 @@ async def shortcut_sleep_webhook(
     )
 
 
-@router.get("/sleep-cycle/status")
+@router.get(
+    "/sleep-cycle/status",
+    dependencies=[Depends(_verify_webhook_token)],
+)
 async def sleep_cycle_status(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
