@@ -1,6 +1,6 @@
 """Study plan endpoints — sync per-task state across devices.
 
-Auth disabled. We reuse the admin user (created by seed_admin_user at startup)
+Authenticated. We reuse the admin user (created by seed_admin_user at startup)
 as the single owner of all study state, since this is a personal dashboard.
 The static study plan lives in the frontend; this endpoint only persists
 user-mutable per-task state.
@@ -15,11 +15,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.core.database import get_db
+from app.core.security import get_current_user
 from app.models.study import StudyTaskState
 from app.models.user import User
 from app.schemas.study import StudyBatchEntry, StudyTaskStateOut, StudyTaskUpsert
 
-router = APIRouter(prefix="/study", tags=["study"])
+router = APIRouter(
+    prefix="/study",
+    tags=["study"],
+    dependencies=[Depends(get_current_user)],
+)
 
 _cached_user_id: Optional[UUID] = None
 
