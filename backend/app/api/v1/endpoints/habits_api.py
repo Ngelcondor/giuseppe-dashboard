@@ -1,4 +1,4 @@
-"""Public habits endpoints — no auth required (auth disabled temporarily)."""
+"""Habits endpoints — authenticated."""
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -9,10 +9,15 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from app.core.database import get_db
+from app.core.security import get_current_user
 from app.models.habit import Habit, HabitLog
 from app.models.user import User
 
-router = APIRouter(prefix="/habits-api", tags=["habits-api"])
+router = APIRouter(
+    prefix="/habits-api",
+    tags=["habits-api"],
+    dependencies=[Depends(get_current_user)],
+)
 
 # Fixed placeholder user until auth is re-enabled
 DEFAULT_USER = UUID("00000000-0000-0000-0000-000000000001")
