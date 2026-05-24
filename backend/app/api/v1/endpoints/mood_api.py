@@ -1,4 +1,4 @@
-"""No-auth mood endpoints."""
+"""Mood endpoints — authenticated."""
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -9,9 +9,14 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from app.core.database import get_db
+from app.core.security import get_current_user
 from app.models.mood import MoodLog
 
-router = APIRouter(prefix="/mood-api", tags=["mood-api"])
+router = APIRouter(
+    prefix="/mood-api",
+    tags=["mood-api"],
+    dependencies=[Depends(get_current_user)],
+)
 
 TAGS_DEFAULT = [
     "Farmaci presi", "Buon sonno", "Poco sonno", "Esercizio",
