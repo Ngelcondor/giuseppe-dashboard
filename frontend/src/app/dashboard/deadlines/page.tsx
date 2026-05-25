@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { Plus, X, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
-import { API_BASE_URL } from '@/lib/constants';
+import api from '@/lib/api';
 import { EditorialPage } from '@/components/ui/EditorialPage';
 
 type Tipo = 'Uscita' | 'Entrata' | 'Abbonamento' | 'Rata' | 'Ricorrente';
@@ -18,7 +18,6 @@ interface Scadenza {
   pagato: boolean;
 }
 
-const API = `${API_BASE_URL}/scadenze`;
 const MESI = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 const MESI_NUM: Record<string,number> = {Gennaio:1,Febbraio:2,Marzo:3,Aprile:4,Maggio:5,Giugno:6,Luglio:7,Agosto:8,Settembre:9,Ottobre:10,Novembre:11,Dicembre:12};
 
@@ -44,15 +43,10 @@ export default function DeadlinesPage() {
 
   const fetchData = useCallback(async () => {
     try { setLoading(true); setError('');
-      const res = await fetch(API);
-      if (!res.ok) throw new Error();
-      setData(await res.json());
+      const { data } = await api.get<Scadenza[]>('/scadenze');
+      setData(data);
     } catch { setError('Backend non raggiungibile.'); } finally { setLoading(false); }
   }, []);
-
-  const seedData = async () => {
-    try { await fetch(`${API}/seed`, { method: 'POST' }); await fetchData(); } catch { setError('Errore seed.'); }
-  };
 
   useEffect(() => {
     const now = new Date();
@@ -64,23 +58,23 @@ export default function DeadlinesPage() {
   const togglePagato = async (id: string, current: boolean) => {
     setData(prev => prev.map(x => x.id === id ? { ...x, pagato: !current } : x));
     try {
-      await fetch(`${API}/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pagato: !current }) });
+      await api.patch(`/scadenze/${id}`, { pagato: !current });
     } catch { setData(prev => prev.map(x => x.id === id ? { ...x, pagato: current } : x)); }
   };
 
   const elimina = async (id: string) => {
     setData(prev => prev.filter(x => x.id !== id));
-    try { await fetch(`${API}/${id}`, { method: 'DELETE' }); } catch { await fetchData(); }
+    try { await api.delete(`/scadenze/${id}`); } catch { await fetchData(); }
   };
 
   const aggiungi = async () => {
     const importo = parseFloat(form.importo.replace(',', '.'));
     if (!form.desc || isNaN(importo) || !form.scadenza_gg_mm) { setMsg('Compila tutti i campi obbligatori'); return; }
     try {
-      const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ desc: form.desc, mese: form.mese, scadenza_gg_mm: form.scadenza_gg_mm, importo, tipo: form.tipo, note: form.note }) });
-      if (!res.ok) throw new Error();
-      const newItem = await res.json();
+      const { data: newItem } = await api.post<Scadenza>('/scadenze', {
+        desc: form.desc, mese: form.mese, scadenza_gg_mm: form.scadenza_gg_mm,
+        importo, tipo: form.tipo, note: form.note,
+      });
       setData(prev => [...prev, newItem]);
       setForm(f => ({ ...f, desc: '', importo: '', scadenza_gg_mm: '', note: '' }));
       setMsg('Aggiunto'); setTimeout(() => setMsg(''), 2000);
@@ -202,11 +196,8 @@ export default function DeadlinesPage() {
 
         {/* Error */}
         {error && (
-          <div className="flex items-center justify-between p-4 rounded-xl bg-red-500/5 border border-red-500/20 text-red-400 text-sm">
-            <span>{error}</span>
-            <button onClick={seedData} className="ml-4 text-xs px-3 py-1.5 rounded-lg bg-card hover:bg-surface-hover text-heading whitespace-nowrap">
-              Importa dati
-            </button>
+          <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/20 text-red-400 text-sm">
+            {error}
           </div>
         )}
 
@@ -220,10 +211,8 @@ export default function DeadlinesPage() {
         {/* Empty */}
         {!loading && !error && data.length === 0 && (
           <div className="text-center py-16">
-            <p className="text-tertiary text-sm mb-5">Nessun dato nel database.</p>
-            <button onClick={seedData} className="px-4 py-2 rounded-xl text-sm bg-card hover:bg-surface-hover text-heading border border-border-default">
-              Importa Budget 2026
-            </button>
+            <p className="text-tertiary text-sm mb-2">Nessuna scadenza ancora.</p>
+            <p className="text-muted text-xs">Usa il bottone <strong>+ Nuova</strong> per aggiungerne una.</p>
           </div>
         )}
 

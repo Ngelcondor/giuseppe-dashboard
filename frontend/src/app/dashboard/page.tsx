@@ -7,7 +7,6 @@ import {
   Coffee, Moon,
 } from 'lucide-react';
 import api from '@/lib/api';
-import { API_BASE_URL } from '@/lib/constants';
 import { BottomDock } from '@/components/ui/AppShell';
 import {
   loadState, toggleTask, getTodayDay, getDayProgress,
@@ -501,9 +500,8 @@ function DeadlinesTile() {
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/scadenze`)
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d: Scadenza[]) => setItems(Array.isArray(d) ? d : []))
+    api.get<Scadenza[]>('/scadenze')
+      .then((r) => setItems(Array.isArray(r.data) ? r.data : []))
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, []);

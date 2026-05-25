@@ -2,10 +2,8 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { Plus, X, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
-import { API_BASE_URL } from '@/lib/constants';
+import api from '@/lib/api';
 import { EditorialPage } from '@/components/ui/EditorialPage';
-
-const API = `${API_BASE_URL}/mood-api`;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -222,11 +220,11 @@ export default function MoodPage() {
     try {
       setLoading(true);
       const [lr, hr] = await Promise.all([
-        fetch(API),
-        fetch(`${API}/history?days=14`),
+        api.get<MoodLog[]>('/mood-api'),
+        api.get<HistoryPoint[]>('/mood-api/history', { params: { days: 14 } }),
       ]);
-      if (lr.ok) setLogs(await lr.json());
-      if (hr.ok) setHistory(await hr.json());
+      setLogs(lr.data);
+      setHistory(hr.data);
     } finally { setLoading(false); }
   }, []);
 
@@ -246,24 +244,20 @@ export default function MoodPage() {
   const submit = async () => {
     setSaving(true);
     try {
-      const res = await fetch(API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mood, energy, anxiety, stimming, notes: notes || null, tags: selTags }),
+      const { data: newLog } = await api.post<MoodLog>('/mood-api', {
+        mood, energy, anxiety, stimming, notes: notes || null, tags: selTags,
       });
-      if (!res.ok) return;
-      const newLog = await res.json();
       setLogs(prev => [newLog, ...prev]);
       setNotes(''); setSelTags([]); setMood(3); setEnergy(3); setAnxiety(2); setStimming(1);
       setShowForm(false);
-      const h = await fetch(`${API}/history?days=14`);
-      if (h.ok) setHistory(await h.json());
-    } finally { setSaving(false); }
+      const h = await api.get<HistoryPoint[]>('/mood-api/history', { params: { days: 14 } });
+      setHistory(h.data);
+    } catch {} finally { setSaving(false); }
   };
 
   const deleteLog = async (id: string) => {
     setLogs(prev => prev.filter(l => l.id !== id));
-    await fetch(`${API}/${id}`, { method: 'DELETE' });
+    try { await api.delete(`/mood-api/${id}`); } catch {}
   };
 
   // Today's averages

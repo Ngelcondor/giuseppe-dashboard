@@ -2,10 +2,8 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { Flame, Plus, X, RefreshCw, Trophy, ChevronDown, ChevronUp } from 'lucide-react';
-import { API_BASE_URL } from '@/lib/constants';
+import api from '@/lib/api';
 import { EditorialPage } from '@/components/ui/EditorialPage';
-
-const API = `${API_BASE_URL}/habits-api`;
 
 interface Habit {
   id: string;
@@ -59,9 +57,8 @@ function Heatmap({ habitId, color }: { habitId: string; color: string }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API}/${habitId}/heatmap?days=365`)
-      .then(r => r.json())
-      .then(d => { setDays(d); setLoading(false); })
+    api.get<HeatmapDay[]>(`/habits-api/${habitId}/heatmap`, { params: { days: 365 } })
+      .then(r => { setDays(r.data); setLoading(false); })
       .catch(() => setLoading(false));
   }, [habitId]);
 
@@ -120,9 +117,8 @@ export default function HabitsPage() {
     try {
       setLoading(true);
       setError('');
-      const res = await fetch(API);
-      if (!res.ok) throw new Error();
-      setHabits(await res.json());
+      const { data } = await api.get<Habit[]>('/habits-api');
+      setHabits(data);
     } catch {
       setError('Backend non raggiungibile.');
     } finally {
@@ -133,7 +129,7 @@ export default function HabitsPage() {
   useEffect(() => { fetchHabits(); }, [fetchHabits]);
 
   const seed = async () => {
-    await fetch(`${API}/seed`, { method: 'POST' });
+    await api.post('/habits-api/seed');
     await fetchHabits();
   };
 
@@ -141,9 +137,7 @@ export default function HabitsPage() {
     if (!id || id === 'undefined') return;
     setToggling(id);
     try {
-      const res = await fetch(`${API}/${id}/toggle`, { method: 'POST' });
-      if (!res.ok) return;
-      const data = await res.json();
+      const { data } = await api.post<{ done: boolean; current_streak: number; longest_streak: number }>(`/habits-api/${id}/toggle`);
       setHabits(prev => prev.map(h =>
         h.id === id ? { ...h, done_today: data.done, current_streak: data.current_streak, longest_streak: data.longest_streak } : h
       ));
@@ -154,12 +148,7 @@ export default function HabitsPage() {
   const addHabit = async () => {
     if (!form.name.trim()) return;
     try {
-      const res = await fetch(API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
-      const newH = await res.json();
+      const { data: newH } = await api.post<Habit>('/habits-api', form);
       setHabits(prev => [...prev, newH]);
       setForm({ name: '', icon: '⭐', color: '#10B981' });
       setShowAdd(false);
@@ -169,7 +158,7 @@ export default function HabitsPage() {
   const deleteHabit = async (id: string) => {
     if (!id || id === 'undefined') return;
     setHabits(prev => prev.filter(h => h.id !== id));
-    await fetch(`${API}/${id}`, { method: 'DELETE' });
+    try { await api.delete(`/habits-api/${id}`); } catch {}
   };
 
   const todayDone = habits.filter(h => h.done_today).length;
