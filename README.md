@@ -353,6 +353,31 @@ Coesistono due schemi distinti:
   webhook chiamati da iOS Shortcuts (`/health/sleep/sync/*`). Non confondere i
   due token — gli Shortcuts NON devono usare JWT.
 
+### TLS / HTTPS
+
+Il dominio di produzione (`dashboard.elcondor.dev`) usa Let's Encrypt via
+`certbot` installato sull'host. Il `docker-compose.prod.yml` monta i cert da
+`/etc/letsencrypt/live/dashboard.elcondor.dev/` dentro il container nginx.
+Setup iniziale:
+
+```sh
+sudo apt install -y certbot
+docker compose -f docker/docker-compose.prod.yml stop nginx
+sudo certbot certonly --standalone -d dashboard.elcondor.dev \
+  --email your@email --agree-tos -n
+docker compose -f docker/docker-compose.prod.yml up -d nginx
+```
+
+Auto-renewal via crontab (Let's Encrypt cert dura 90 giorni):
+
+```sh
+sudo crontab -e
+# 0 3 * * * certbot renew --webroot -w /var/www/certbot --quiet && docker compose -f /home/giuseppe/apps/giuseppe-dashboard/docker/docker-compose.prod.yml exec nginx nginx -s reload
+```
+
+`nginx.conf` redirige tutto HTTP (80) → HTTPS (443), imposta HSTS un anno,
+e una baseline CSP.
+
 ## Contributing
 
 Le contribuzioni sono benvenute! Per favore:

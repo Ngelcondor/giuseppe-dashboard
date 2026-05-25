@@ -146,9 +146,13 @@ services:
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      # Decommenta quando hai i certificati SSL:
-      # - /etc/letsencrypt/live/tuodominio.com/fullchain.pem:/etc/nginx/ssl/cert.pem:ro
-      # - /etc/letsencrypt/live/tuodominio.com/privkey.pem:/etc/nginx/ssl/key.pem:ro
+      # TLS certs issued by certbot on the host (see docs/SECURITY.md):
+      - /etc/letsencrypt/live/dashboard.elcondor.dev/fullchain.pem:/etc/nginx/ssl/cert.pem:ro
+      - /etc/letsencrypt/live/dashboard.elcondor.dev/privkey.pem:/etc/nginx/ssl/key.pem:ro
+      # Chain dir certbot needs to resolve the symlinks above:
+      - /etc/letsencrypt/archive/dashboard.elcondor.dev:/etc/letsencrypt/archive/dashboard.elcondor.dev:ro
+      # Webroot for certbot --webroot HTTP-01 renewals (no nginx restart needed):
+      - /var/www/certbot:/var/www/certbot:ro
     depends_on:
       - frontend
       - backend
