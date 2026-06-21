@@ -92,7 +92,7 @@ function freshPlan(): StudyPhase[] {
   }));
 }
 
-function applyBackendRows(rows: BackendRow[]): StudyPlanState {
+export function applyBackendRows(rows: BackendRow[]): StudyPlanState {
   const phases = freshPlan();
   const byId = new Map<string, BackendRow>(rows.map((r) => [r.task_id, r]));
 

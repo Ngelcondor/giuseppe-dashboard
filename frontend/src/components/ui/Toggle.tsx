@@ -17,7 +17,8 @@ export const Toggle = React.forwardRef<HTMLInputElement, ToggleProps>(
     },
     ref
   ) => {
-    const toggleId = id || `toggle-${Math.random().toString(36).slice(2, 9)}`;
+    const generatedId = React.useId();
+    const toggleId = id || generatedId;
 
     return (
       <div className="flex items-center gap-3">
@@ -80,7 +81,8 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
     },
     ref
   ) => {
-    const checkboxId = id || `checkbox-${Math.random().toString(36).slice(2, 9)}`;
+    const generatedId = React.useId();
+    const checkboxId = id || generatedId;
 
     return (
       <div className="flex items-center gap-2">

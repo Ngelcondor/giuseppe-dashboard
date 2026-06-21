@@ -25,6 +25,7 @@ from app.api.v1.endpoints import (
     mood_api,
     api_tokens,
     study,
+    university,
 )
 
 # Create main router
@@ -54,3 +55,4 @@ router.include_router(habits_api.router)
 router.include_router(mood_api.router)
 router.include_router(api_tokens.router)
 router.include_router(study.router)
+router.include_router(university.router)

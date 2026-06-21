@@ -59,6 +59,8 @@ services:
       APPLE_HEALTH_WEBHOOK_SECRET: ${APPLE_HEALTH_WEBHOOK_SECRET}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
       CALDAV_SYNC_ENABLED: ${CALDAV_SYNC_ENABLED:-true}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-giuseppe.diansr@hotmail.it}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:

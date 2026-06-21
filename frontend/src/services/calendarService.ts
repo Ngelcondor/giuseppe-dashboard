@@ -56,8 +56,23 @@ export interface ConnectionTestResult {
 
 // ─── Events API ─────────────────────────────────────────────────────────────
 
+// Raw event shape as returned by the backend (camelCase via response_model_by_alias).
+export interface CalendarEventDTO {
+  id: string;
+  userId: string;
+  title: string;
+  description?: string | null;
+  startTime: string;
+  endTime: string;
+  location?: string | null;
+  color: string;
+  isAllDay?: boolean;
+  source?: string | null;
+  calendarName?: string | null;
+}
+
 export const calendarEvents = {
-  list: async (): Promise<CalendarEvent[]> => {
+  list: async (): Promise<CalendarEventDTO[]> => {
     const { data } = await api.get('/calendar/events');
     return data;
   },
