@@ -1,7 +1,10 @@
 import api from '@/lib/api';
 import { getScadenzeAccademiche, type UniEvento } from '@/services/universitaService';
 
-// A non-academic deadline (certifications / CTF) coming from /deadlines.
+export type RecurrenceType = 'none' | 'installments' | 'subscription';
+export type RecurrenceInterval = 'monthly' | 'quarterly' | 'yearly';
+
+// A non-academic deadline (certifications / CTF / rate / abbonamenti) from /deadlines.
 export interface Deadline {
   id: string;
   title: string;
@@ -10,6 +13,12 @@ export interface Deadline {
   category: string; // e.g. 'ctf' | 'certification'
   priority: string; // e.g. 'high' | 'medium' | 'low'
   is_completed: boolean;
+  // Recurrence (rate / abbonamento)
+  recurrence_type: RecurrenceType;
+  installments_total: number | null;
+  installments_paid: number | null;
+  recurrence_interval: RecurrenceInterval | null;
+  amount: number | string | null; // numeric serialized; coerce before formatting
 }
 
 // Unified item rendered by the Scadenze page (academic + certifications).
@@ -24,6 +33,25 @@ export interface ScadenzaItem {
   source: 'academic' | 'deadline';
   // Original deadline, carried so an edit form can prefill its fields.
   raw?: Deadline;
+}
+
+// A computed (non-persisted) occurrence of a recurring deadline.
+export interface DeadlineOccurrence {
+  deadline_id: string;
+  title: string;
+  category: string;
+  priority: string;
+  recurrence_type: RecurrenceType;
+  date: string; // ISO date
+  amount: number | string | null;
+  occurrence_index: number | null; // 1-based rata number
+  occurrence_total: number | null; // installments_total
+}
+
+export interface DeadlineOccurrencesResponse {
+  months: number;
+  horizon_end: string;
+  occurrences: DeadlineOccurrence[];
 }
 
 async function getDeadlines(): Promise<Deadline[]> {
@@ -71,6 +99,16 @@ export async function getScadenze(): Promise<ScadenzaItem[]> {
   );
 }
 
+// Expanded recurring/installment occurrences for the next N months (computed
+// server-side, not persisted). Subscriptions -> recurring dates; installments
+// -> remaining unpaid rate.
+export async function getUpcomingOccurrences(months = 6): Promise<DeadlineOccurrencesResponse> {
+  const { data } = await api.get<DeadlineOccurrencesResponse>('/deadlines/occurrences/upcoming', {
+    params: { months },
+  });
+  return data;
+}
+
 // ── Deadline mutations (only the editable, non-academic items) ──
 export interface DeadlineInput {
   title: string;
@@ -78,6 +116,12 @@ export interface DeadlineInput {
   due_date: string;
   category: string;
   priority: string;
+  // Recurrence (rate / abbonamento). Send 'none' for a single deadline.
+  recurrence_type?: RecurrenceType;
+  installments_total?: number | null;
+  installments_paid?: number | null;
+  recurrence_interval?: RecurrenceInterval | null;
+  amount?: number | null;
 }
 
 export async function createDeadline(b: DeadlineInput): Promise<Deadline> {
@@ -90,4 +134,26 @@ export async function updateDeadline(id: string, b: Partial<DeadlineInput>): Pro
 }
 export async function deleteDeadline(id: string): Promise<void> {
   await api.delete(`/deadlines/${id}`);
+}
+
+// Mark the next rata of an installment plan as paid (increments installments_paid).
+export async function payInstallment(id: string): Promise<Deadline> {
+  const { data } = await api.patch(`/deadlines/${id}/pay-installment`);
+  return data;
+}
+
+// ── Current-user role (for hiding mutation controls for guests) ──
+export interface CurrentUser {
+  email: string;
+  role: 'admin' | 'guest';
+  full_name?: string;
+}
+
+export async function getCurrentUserRole(): Promise<CurrentUser | null> {
+  try {
+    const { data } = await api.get<CurrentUser>('/auth/me');
+    return data;
+  } catch {
+    return null;
+  }
 }

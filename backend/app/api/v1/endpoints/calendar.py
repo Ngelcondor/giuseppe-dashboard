@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import List
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_editor
 from app.models.calendar_event import CalendarEvent
 from app.schemas.calendar_event import (
     CalendarEventCreate,
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/calendar", tags=["calendar"])
 )
 async def create_event(
     event: CalendarEventCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> CalendarEventResponse:
     """Create a calendar event."""
@@ -90,7 +90,7 @@ async def get_event(
 async def update_event(
     event_id: str,
     event_update: CalendarEventUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> CalendarEventResponse:
     """Update an event."""
@@ -118,7 +118,7 @@ async def update_event(
 @router.delete("/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_event(
     event_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete an event."""

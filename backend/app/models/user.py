@@ -25,6 +25,11 @@ class User(Base):
     is_active = Column(Boolean, default=True, index=True)
     is_verified = Column(Boolean, default=False)
 
+    # Role-based access: 'admin' (full editor) | 'guest' (read-only).
+    # Nullable + server_default so _sync_missing_columns can backfill existing
+    # rows to 'admin' on dev startup; the seeded admin stays admin.
+    role = Column(String(16), nullable=True, default="admin", server_default="admin")
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

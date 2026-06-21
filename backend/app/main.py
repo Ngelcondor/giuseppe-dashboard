@@ -14,6 +14,7 @@ from app.models import (  # noqa: F401
     user, budget, deadline, scadenza, habit, mood,
 )
 from app.models import health, notification, api_token, study, university  # noqa: F401
+from app.models import app_settings  # noqa: F401
 from app.core.redis import init_redis, close_redis
 from app.api.v1.router import router as api_v1_router
 
@@ -65,21 +66,21 @@ async def seed_university() -> None:
 
         db.add(UniProfile(
             corso_laurea="Ingegneria Informatica",
-            semestre="2º semestre · 2025–26",
+            semestre="1° semestre 26/27",
             cfu_totali=240, cfu_superati=138, cfu_in_corso=24,
         ))
         db.add_all([
             Corso(codice="SO.302", nome="Sistemi Operativi", cfu=6, docente="prof. Vidal",
-                  semestre="2º sem", progress=72, stato=StatoCorso.IN_ESAME,
+                  semestre="1° semestre 26/27", progress=72, stato=StatoCorso.IN_ESAME,
                   prossimo="Esame · 8 luglio", ordine=0),
             Corso(codice="BD.118", nome="Basi di Dati", cfu=6, docente="prof. Roca",
-                  semestre="2º sem", progress=60, stato=StatoCorso.CONSEGNA,
+                  semestre="1° semestre 26/27", progress=60, stato=StatoCorso.CONSEGNA,
                   prossimo="PEC2 · 26 giugno", ordine=1),
             Corso(codice="RC.214", nome="Reti di Calcolatori", cfu=6, docente="prof. Soler",
-                  semestre="2º sem", progress=45, stato=StatoCorso.IN_CORSO,
+                  semestre="1° semestre 26/27", progress=45, stato=StatoCorso.IN_CORSO,
                   prossimo="PEC3 · 4 luglio", ordine=2),
             Corso(codice="IS.330", nome="Ingegneria del Software", cfu=6, docente="prof. Ferrer",
-                  semestre="2º sem", progress=30, stato=StatoCorso.IN_CORSO,
+                  semestre="1° semestre 26/27", progress=30, stato=StatoCorso.IN_CORSO,
                   prossimo="lab UML · 2 luglio", ordine=3),
         ])
         db.add_all([

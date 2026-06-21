@@ -6,7 +6,7 @@ from datetime import date, timedelta
 from typing import List
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_editor
 from app.models.meal import MealPlan
 from app.schemas.meal import (
     MealPlanCreate, MealPlanResponse, MealPlanUpdate,
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/meals", tags=["meals"])
 @router.post("", response_model=MealPlanResponse, status_code=status.HTTP_201_CREATED)
 async def create_meal_plan(
     meal: MealPlanCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> MealPlanResponse:
     """Create a meal plan."""
@@ -73,7 +73,7 @@ async def get_meal_plan(
 async def update_meal_plan(
     meal_id: str,
     meal_update: MealPlanUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> MealPlanResponse:
     """Update a meal plan."""
@@ -101,7 +101,7 @@ async def update_meal_plan(
 @router.delete("/{meal_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_meal_plan(
     meal_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete a meal plan."""

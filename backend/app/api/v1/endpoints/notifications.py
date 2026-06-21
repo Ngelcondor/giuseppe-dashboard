@@ -9,7 +9,7 @@ from pydantic import BaseModel
 import uuid as uuid_mod
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_editor
 from app.models.notification import PushSubscription, Notification
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
@@ -76,7 +76,7 @@ async def get_vapid_public_key() -> dict:
 @router.post("/push/subscribe", response_model=PushSubscriptionResponse, status_code=status.HTTP_201_CREATED)
 async def subscribe_push(
     sub: PushSubscriptionCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> PushSubscriptionResponse:
     """Register a push notification subscription."""
@@ -110,7 +110,7 @@ async def subscribe_push(
 @router.delete("/push/unsubscribe")
 async def unsubscribe_push(
     endpoint: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Unsubscribe from push notifications."""
@@ -169,7 +169,7 @@ async def get_unread_count(
 @router.put("/{notification_id}/read")
 async def mark_as_read(
     notification_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Mark a notification as read."""
@@ -191,7 +191,7 @@ async def mark_as_read(
 
 @router.put("/read-all")
 async def mark_all_as_read(
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Mark all notifications as read."""
@@ -210,7 +210,7 @@ async def mark_all_as_read(
 @router.delete("/{notification_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_notification(
     notification_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete a notification."""

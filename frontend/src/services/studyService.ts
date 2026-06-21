@@ -72,3 +72,79 @@ export async function getStudyOverview(): Promise<StudyOverview> {
   const state = await getStudyPlanState();
   return buildStudyOverview(state);
 }
+
+// ── CPTS plan (server-persisted modules) ─────────────────────────────────────
+// The Studio page drives the real, resettable CPTS curriculum from these. The
+// plan + modules live server-side (one per user); progress starts at zero on
+// reset and Obsidian links are empty until the user pastes them.
+
+export interface StudyModule {
+  id: string;
+  order_index: number;
+  title: string;
+  completed: boolean;
+  completed_at: string | null;
+  obsidian_link: string | null;
+}
+
+export interface StudyPlan {
+  start_date: string; // ISO date
+  current_week: number;
+  total_weeks: number;
+  modules: StudyModule[];
+  completed_count: number;
+  total_count: number;
+}
+
+// Real HTB profile/stats, or an honest not-connected payload. Never fabricated.
+export interface HTBProfile {
+  connected: boolean;
+  name?: string | null;
+  rank?: string | null;
+  points?: number | null;
+  user_owns?: number | null;
+  system_owns?: number | null;
+  ranking?: number | null;
+  user_bloods?: number | null;
+  system_bloods?: number | null;
+  avatar?: string | null;
+  country?: string | null;
+  detail?: string | null;
+}
+
+export async function getStudyPlan(): Promise<StudyPlan> {
+  const { data } = await api.get<StudyPlan>('/study/plan');
+  return data;
+}
+
+// Reinitialise the plan to the canonical CPTS module list (editor-only).
+export async function resetStudyPlan(startDate: string): Promise<StudyPlan> {
+  const { data } = await api.post<StudyPlan>('/study/reset', { start_date: startDate });
+  return data;
+}
+
+// Update a module's completion flag and/or Obsidian link (editor-only).
+// Pass obsidian_link: '' to clear it.
+export async function updateStudyModule(
+  id: string,
+  body: { completed?: boolean; obsidian_link?: string },
+): Promise<StudyModule> {
+  const { data } = await api.put<StudyModule>(`/study/modules/${id}`, body);
+  return data;
+}
+
+export async function getHTBProfile(): Promise<HTBProfile> {
+  const { data } = await api.get<HTBProfile>('/study/htb/profile');
+  return data;
+}
+
+// Lightweight role probe for hiding mutation controls. Treats a missing/unknown
+// role as editor (default role is 'admin'); only an explicit 'guest' is read-only.
+export async function getIsEditor(): Promise<boolean> {
+  try {
+    const { data } = await api.get<{ role?: string }>('/auth/me');
+    return (data?.role ?? 'admin') !== 'guest';
+  } catch {
+    return false;
+  }
+}

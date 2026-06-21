@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from typing import List
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_editor
 from app.models.health import Workout
 from app.schemas.health import (
     WorkoutCreate,
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/health/workouts", tags=["workouts"])
 @router.post("", response_model=WorkoutResponse, status_code=status.HTTP_201_CREATED)
 async def create_workout(
     workout_data: WorkoutCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> WorkoutResponse:
     """Create a new workout."""
@@ -133,7 +133,7 @@ async def get_workout(
 async def update_workout(
     workout_id: str,
     update_data: WorkoutUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> WorkoutResponse:
     """Update a workout."""
@@ -161,7 +161,7 @@ async def update_workout(
 @router.delete("/{workout_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_workout(
     workout_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete a workout."""

@@ -128,6 +128,36 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> Dict[str, Any
     return payload
 
 
+async def require_editor(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Dependency that rejects read-only ('guest') users with 403.
+
+    Resolves the role from the DB by the token's `sub`. Use on mutating
+    endpoints that guests must not reach. Returns the token payload on success.
+    """
+    from app.core.database import AsyncSessionLocal as async_session_factory
+    from sqlalchemy.future import select
+    from app.models.user import User
+
+    user_id = current_user.get("sub")
+    async with async_session_factory() as db:
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalars().first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+        )
+    if (user.role or "admin") == "guest":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account in sola lettura: operazione non consentita",
+        )
+    return current_user
+
+
 async def _verify_api_token(token: str) -> Dict[str, Any]:
     """Verify an API token against the database."""
     import hashlib

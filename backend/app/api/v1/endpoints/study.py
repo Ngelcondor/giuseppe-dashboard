@@ -1,7 +1,11 @@
-"""Study plan endpoints — sync per-task state across devices.
+"""Study plan endpoints.
 
-Authenticated. The static study plan lives in the frontend; this endpoint
-only persists user-mutable per-task state, scoped to the authenticated user.
+Authenticated. Two concerns live here:
+
+* Legacy per-task state sync (``/study/state`` etc.) for the old day-based plan.
+* The CPTS curriculum: a server-persisted, resettable module list with Obsidian
+  links + completion toggles, plus a real HTB profile panel that reads the
+  ``htb`` integration setting. No fabricated stats or completion anywhere.
 """
 from datetime import datetime
 from typing import List
@@ -13,9 +17,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.core.database import get_db
-from app.core.security import get_current_user
-from app.models.study import StudyTaskState
-from app.schemas.study import StudyBatchEntry, StudyTaskStateOut, StudyTaskUpsert
+from app.core.security import get_current_user, require_editor
+from app.models.study import (
+    StudyTaskState,
+    StudyPlan,
+    StudyModule,
+    CPTS_MODULES,
+    CPTS_TOTAL_WEEKS,
+)
+from app.schemas.study import (
+    StudyBatchEntry,
+    StudyTaskStateOut,
+    StudyTaskUpsert,
+    StudyPlanOut,
+    StudyModuleOut,
+    StudyModuleUpdate,
+    StudyResetRequest,
+    HTBProfile,
+)
+from app.services import settings_store
+from app.services.htb_service import fetch_htb_profile
 
 router = APIRouter(
     prefix="/study",
@@ -71,7 +92,7 @@ async def upsert_task(
     task_id: str,
     body: StudyTaskUpsert,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
 ):
     """Upsert state for a single task."""
     user_id = UUID(current_user["sub"])
@@ -86,7 +107,7 @@ async def upsert_task(
 async def upsert_batch(
     entries: List[StudyBatchEntry],
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
 ):
     """Bulk upsert — used for reschedule operations that touch many tasks at once."""
     user_id = UUID(current_user["sub"])
@@ -104,7 +125,7 @@ async def upsert_batch(
 @router.delete("/state", status_code=204)
 async def reset_state(
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
 ):
     """Wipe all study task state for the current user."""
     user_id = UUID(current_user["sub"])
@@ -112,3 +133,155 @@ async def reset_state(
         delete(StudyTaskState).where(StudyTaskState.user_id == user_id)
     )
     await db.commit()
+
+
+# ── CPTS plan (server-persisted modules) ──────────────────────────────────────
+
+
+async def _serialize_plan(db: AsyncSession, plan: StudyPlan) -> StudyPlanOut:
+    """Build the StudyPlanOut for a plan, loading its ordered modules."""
+    rows = (
+        await db.execute(
+            select(StudyModule)
+            .where(StudyModule.plan_id == plan.id)
+            .order_by(StudyModule.order_index)
+        )
+    ).scalars().all()
+    modules = [StudyModuleOut.model_validate(r) for r in rows]
+    completed = sum(1 for r in rows if r.completed)
+    return StudyPlanOut(
+        start_date=plan.start_date,
+        current_week=plan.current_week,
+        total_weeks=CPTS_TOTAL_WEEKS,
+        modules=modules,
+        completed_count=completed,
+        total_count=len(modules),
+    )
+
+
+@router.get("/plan", response_model=StudyPlanOut)
+async def get_plan(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> StudyPlanOut:
+    """Return the current user's CPTS plan.
+
+    If the user has never initialised a plan, returns an empty plan (no modules)
+    — the Studio page shows a 'Reset percorso' CTA. No fabricated rows.
+    """
+    user_id = UUID(current_user["sub"])
+    plan = (
+        await db.execute(select(StudyPlan).where(StudyPlan.user_id == user_id))
+    ).scalars().first()
+    if plan is None:
+        from datetime import date as _date
+
+        return StudyPlanOut(
+            start_date=_date(2026, 6, 22),
+            current_week=1,
+            total_weeks=CPTS_TOTAL_WEEKS,
+            modules=[],
+            completed_count=0,
+            total_count=0,
+        )
+    return await _serialize_plan(db, plan)
+
+
+@router.post("/reset", response_model=StudyPlanOut)
+async def reset_plan(
+    body: StudyResetRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_editor),
+) -> StudyPlanOut:
+    """(Re)initialise the CPTS plan to the canonical module sequence.
+
+    Wipes the existing plan + modules for the user, recreates the plan at week 1
+    with the given start_date, and seeds every CPTS module NOT done with no
+    Obsidian link. Editor-only.
+    """
+    user_id = UUID(current_user["sub"])
+
+    # Drop existing modules + plan for a clean slate.
+    await db.execute(delete(StudyModule).where(StudyModule.user_id == user_id))
+    await db.execute(delete(StudyPlan).where(StudyPlan.user_id == user_id))
+    await db.flush()
+
+    plan = StudyPlan(
+        user_id=user_id,
+        start_date=body.start_date,
+        current_week=1,
+    )
+    db.add(plan)
+    await db.flush()  # assign plan.id
+
+    for idx, title in enumerate(CPTS_MODULES):
+        db.add(
+            StudyModule(
+                user_id=user_id,
+                plan_id=plan.id,
+                order_index=idx,
+                title=title,
+                completed=False,
+                obsidian_link=None,
+            )
+        )
+
+    await db.commit()
+    await db.refresh(plan)
+    return await _serialize_plan(db, plan)
+
+
+@router.put("/modules/{module_id}", response_model=StudyModuleOut)
+async def update_module(
+    module_id: UUID,
+    body: StudyModuleUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_editor),
+) -> StudyModuleOut:
+    """Update a module's completion flag and/or Obsidian link. Editor-only."""
+    user_id = UUID(current_user["sub"])
+    module = (
+        await db.execute(
+            select(StudyModule).where(
+                StudyModule.id == module_id,
+                StudyModule.user_id == user_id,
+            )
+        )
+    ).scalars().first()
+    if module is None:
+        raise HTTPException(status_code=404, detail="Modulo non trovato")
+
+    if body.completed is not None:
+        module.completed = body.completed
+        module.completed_at = datetime.utcnow() if body.completed else None
+    if body.obsidian_link is not None:
+        # Empty string clears; trimmed value otherwise.
+        module.obsidian_link = body.obsidian_link.strip() or None
+
+    await db.commit()
+    await db.refresh(module)
+    return StudyModuleOut.model_validate(module)
+
+
+# ── HTB profile (real stats or honest not_connected) ──────────────────────────
+
+
+@router.get("/htb/profile", response_model=HTBProfile)
+async def htb_profile(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> HTBProfile:
+    """Return the user's real HTB stats, or ``connected=False`` if not configured.
+
+    Reads the ``htb`` integration setting ({api_token}) via the shared store. If
+    absent/empty, or if the HTB API call fails, returns an honest not_connected
+    payload — never fabricated stats.
+    """
+    user_id = UUID(current_user["sub"])
+    cfg = await settings_store.get_setting(db, user_id, "htb")
+    token = (cfg or {}).get("api_token") if isinstance(cfg, dict) else None
+    if not token:
+        return HTBProfile(connected=False, detail="HTB non collegato.")
+
+    data = await fetch_htb_profile(token)
+    return HTBProfile(**data)

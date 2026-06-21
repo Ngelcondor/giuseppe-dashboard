@@ -12,12 +12,10 @@ import {
   Link2,
 } from 'lucide-react';
 import { CalendarEvent } from '@/types';
-import { calendarEvents, calendarConnections, CalendarConnection, SyncResult } from '@/services/calendarService';
+import { calendarEvents, calendarConnections, CalendarConnection, CalendarEventDTO } from '@/services/calendarService';
 import { COLORS } from '@/lib/constants';
 import EventModal from './EventModal';
 import ConnectionSetup from './ConnectionSetup';
-
-type ViewMode = 'month' | 'week' | 'day';
 
 interface DayCell {
   date: Date;
@@ -32,12 +30,27 @@ const MONTHS_IT = [
   'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
 ];
 
+// Map the API DTO onto the richer CalendarEvent shape used in the UI.
+function dtoToCalendarEvent(dto: CalendarEventDTO): CalendarEvent {
+  return {
+    id: dto.id,
+    userId: dto.userId,
+    title: dto.title,
+    description: dto.description ?? undefined,
+    startTime: dto.startTime,
+    endTime: dto.endTime,
+    location: dto.location ?? undefined,
+    color: dto.color,
+    calendar: dto.source ?? 'manual',
+    reminders: [],
+    createdAt: dto.startTime,
+  };
+}
+
 export default function CalendarView() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [connections, setConnections] = useState<CalendarConnection[]>([]);
-  const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
@@ -48,13 +61,10 @@ export default function CalendarView() {
 
   const fetchEvents = useCallback(async () => {
     try {
-      setLoading(true);
       const data = await calendarEvents.list();
-      setEvents(data);
+      setEvents(data.map(dtoToCalendarEvent));
     } catch (err) {
       console.error('Errore nel caricamento eventi:', err);
-    } finally {
-      setLoading(false);
     }
   }, []);
 

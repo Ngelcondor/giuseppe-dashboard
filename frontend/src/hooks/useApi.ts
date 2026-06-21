@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useAuthStore } from '@/stores/authStore';
-import { ApiResponse, ApiError } from '@/types';
+import { ApiError } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -60,7 +60,7 @@ export function useApi<T>(
   const [loading, setLoading] = useState(false);
   const { token, logout } = useAuthStore();
 
-  const execute = useCallback(async (...args: any[]): Promise<T | null> => {
+  const execute = useCallback(async (..._args: any[]): Promise<T | null> => {
     setLoading(true);
     setError(null);
 

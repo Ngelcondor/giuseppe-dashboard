@@ -8,7 +8,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_editor
 from app.models.habit import Habit, HabitLog
 
 router = APIRouter(
@@ -131,7 +131,7 @@ async def list_habits(
 @router.post("/seed", status_code=201)
 async def seed_habits(
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
 ):
     user_id = UUID(current_user["sub"])
     result = await db.execute(select(Habit).where(Habit.user_id == user_id))
@@ -147,7 +147,7 @@ async def seed_habits(
 async def create_habit(
     body: HabitCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
 ):
     user_id = UUID(current_user["sub"])
     h = Habit(user_id=user_id, name=body.name, icon=body.icon, color=body.color or "#10B981")
@@ -161,7 +161,7 @@ async def create_habit(
 async def delete_habit(
     habit_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
 ):
     user_id = UUID(current_user["sub"])
     result = await db.execute(
@@ -178,7 +178,7 @@ async def delete_habit(
 async def toggle_habit(
     habit_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
 ):
     """Toggle today's completion for a habit."""
     user_id = UUID(current_user["sub"])

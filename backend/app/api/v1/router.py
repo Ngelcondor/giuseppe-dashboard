@@ -17,7 +17,6 @@ from app.api.v1.endpoints import (
     budget,
     ctf,
     meals,
-    weather,
     feed,
     dashboard,
     scadenze,
@@ -26,12 +25,22 @@ from app.api.v1.endpoints import (
     api_tokens,
     study,
     university,
+    accounts,
+    smarthome,
+    family_weather,
+    banking,
+    calendar_integration,
 )
+from app.api.v1.endpoints import settings as settings_endpoint
 
 # Create main router
 router = APIRouter(prefix="/api/v1")
 
 # Include all endpoint routers
+# NOTE: accounts.me_router MUST precede auth.router so its GET /auth/me
+# (returning {email, role, full_name}) wins FastAPI's first-match precedence
+# over auth.py's legacy /auth/me handler.
+router.include_router(accounts.me_router)
 router.include_router(auth.router)
 router.include_router(health.router)
 router.include_router(sleep.router)
@@ -47,7 +56,6 @@ router.include_router(focus.router)
 router.include_router(budget.router)
 router.include_router(ctf.router)
 router.include_router(meals.router)
-router.include_router(weather.router)
 router.include_router(feed.router)
 router.include_router(dashboard.router)
 router.include_router(scadenze.router)
@@ -56,3 +64,9 @@ router.include_router(mood_api.router)
 router.include_router(api_tokens.router)
 router.include_router(study.router)
 router.include_router(university.router)
+router.include_router(settings_endpoint.router)
+router.include_router(accounts.router)
+router.include_router(smarthome.router)
+router.include_router(family_weather.router)
+router.include_router(calendar_integration.router)
+router.include_router(banking.router)

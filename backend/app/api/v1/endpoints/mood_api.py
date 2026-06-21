@@ -9,7 +9,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_editor
 from app.models.mood import MoodLog
 
 router = APIRouter(
@@ -118,7 +118,7 @@ async def get_tags():
 
 
 @router.post("", response_model=MoodOut, status_code=201)
-async def create_log(body: MoodCreate, db: AsyncSession = Depends(get_db)):
+async def create_log(body: MoodCreate, db: AsyncSession = Depends(get_db), _: dict = Depends(require_editor)):
     for field, val in [("mood", body.mood), ("energy", body.energy),
                        ("anxiety", body.anxiety), ("stimming", body.stimming)]:
         if not 1 <= val <= 5:
@@ -136,7 +136,7 @@ async def create_log(body: MoodCreate, db: AsyncSession = Depends(get_db)):
 
 
 @router.delete("/{log_id}", status_code=204)
-async def delete_log(log_id: UUID, db: AsyncSession = Depends(get_db)):
+async def delete_log(log_id: UUID, db: AsyncSession = Depends(get_db), _: dict = Depends(require_editor)):
     result = await db.execute(select(MoodLog).where(MoodLog.id == log_id))
     entry = result.scalars().first()
     if not entry:

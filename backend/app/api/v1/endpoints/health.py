@@ -11,7 +11,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_editor
 from app.models.health import HealthMetric, Medication, MedicationLog, MetricType
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ router = APIRouter(prefix="/health", tags=["health"])
 @router.post("/metrics", response_model=HealthMetricResponse, status_code=status.HTTP_201_CREATED)
 async def create_health_metric(
     metric: HealthMetricCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> HealthMetricResponse:
     """Create a new health metric."""
@@ -100,7 +100,7 @@ async def get_health_metric(
 async def update_health_metric(
     metric_id: str,
     metric_update: HealthMetricUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> HealthMetricResponse:
     """Update a health metric."""
@@ -128,7 +128,7 @@ async def update_health_metric(
 @router.delete("/metrics/{metric_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_health_metric(
     metric_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete a health metric."""
@@ -192,7 +192,7 @@ async def get_health_summary(
 @router.post("/medications", response_model=MedicationResponse, status_code=status.HTTP_201_CREATED)
 async def create_medication(
     medication: MedicationCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> MedicationResponse:
     """Create a new medication."""
@@ -473,7 +473,7 @@ async def _ensure_medication_columns(db: AsyncSession) -> None:
 
 @router.post("/medications/seed", response_model=List[MedicationResponse], status_code=status.HTTP_201_CREATED)
 async def seed_medications(
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> List[MedicationResponse]:
     """Seed Giuseppe's medications. Auto-repairs DB schema if needed."""
@@ -605,7 +605,7 @@ async def seed_medications(
 async def update_medication(
     medication_id: str,
     medication_update: MedicationUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> MedicationResponse:
     """Update a medication."""
@@ -633,7 +633,7 @@ async def update_medication(
 @router.delete("/medications/{medication_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_medication(
     medication_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete a medication."""
@@ -656,7 +656,7 @@ async def delete_medication(
 async def log_medication(
     medication_id: str,
     log_data: MedicationLogCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> MedicationLogResponse:
     """Log medication taken or skipped."""

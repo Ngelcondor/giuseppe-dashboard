@@ -7,7 +7,7 @@ from uuid import UUID
 from datetime import date
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_editor
 from app.models.university import Corso, EventoUni, UniProfile, TipoEvento
 from app.schemas.university import (
     CorsoCreate, CorsoUpdate, CorsoResponse,
@@ -73,7 +73,7 @@ async def list_corsi(db: AsyncSession = Depends(get_db)) -> List[CorsoResponse]:
 
 
 @router.post("/corsi", response_model=CorsoResponse, status_code=201)
-async def create_corso(body: CorsoCreate, db: AsyncSession = Depends(get_db)) -> CorsoResponse:
+async def create_corso(body: CorsoCreate, db: AsyncSession = Depends(get_db), _: dict = Depends(require_editor)) -> CorsoResponse:
     c = Corso(**body.model_dump())
     db.add(c)
     await db.commit()
@@ -82,7 +82,7 @@ async def create_corso(body: CorsoCreate, db: AsyncSession = Depends(get_db)) ->
 
 
 @router.patch("/corsi/{corso_id}", response_model=CorsoResponse)
-async def update_corso(corso_id: UUID, body: CorsoUpdate, db: AsyncSession = Depends(get_db)) -> CorsoResponse:
+async def update_corso(corso_id: UUID, body: CorsoUpdate, db: AsyncSession = Depends(get_db), _: dict = Depends(require_editor)) -> CorsoResponse:
     c = (await db.execute(select(Corso).where(Corso.id == corso_id))).scalars().first()
     if not c:
         raise HTTPException(status_code=404, detail="Corso non trovato")
@@ -94,7 +94,7 @@ async def update_corso(corso_id: UUID, body: CorsoUpdate, db: AsyncSession = Dep
 
 
 @router.delete("/corsi/{corso_id}", status_code=204)
-async def delete_corso(corso_id: UUID, db: AsyncSession = Depends(get_db)):
+async def delete_corso(corso_id: UUID, db: AsyncSession = Depends(get_db), _: dict = Depends(require_editor)):
     c = (await db.execute(select(Corso).where(Corso.id == corso_id))).scalars().first()
     if not c:
         raise HTTPException(status_code=404, detail="Corso non trovato")
@@ -104,7 +104,7 @@ async def delete_corso(corso_id: UUID, db: AsyncSession = Depends(get_db)):
 
 # ── Eventi (esami/consegne) CRUD ──
 @router.post("/eventi", response_model=EventoResponse, status_code=201)
-async def create_evento(body: EventoCreate, db: AsyncSession = Depends(get_db)) -> EventoResponse:
+async def create_evento(body: EventoCreate, db: AsyncSession = Depends(get_db), _: dict = Depends(require_editor)) -> EventoResponse:
     e = EventoUni(**body.model_dump())
     db.add(e)
     await db.commit()
@@ -113,7 +113,7 @@ async def create_evento(body: EventoCreate, db: AsyncSession = Depends(get_db)) 
 
 
 @router.patch("/eventi/{evento_id}", response_model=EventoResponse)
-async def update_evento(evento_id: UUID, body: EventoUpdate, db: AsyncSession = Depends(get_db)) -> EventoResponse:
+async def update_evento(evento_id: UUID, body: EventoUpdate, db: AsyncSession = Depends(get_db), _: dict = Depends(require_editor)) -> EventoResponse:
     e = (await db.execute(select(EventoUni).where(EventoUni.id == evento_id))).scalars().first()
     if not e:
         raise HTTPException(status_code=404, detail="Evento non trovato")
@@ -125,7 +125,7 @@ async def update_evento(evento_id: UUID, body: EventoUpdate, db: AsyncSession = 
 
 
 @router.delete("/eventi/{evento_id}", status_code=204)
-async def delete_evento(evento_id: UUID, db: AsyncSession = Depends(get_db)):
+async def delete_evento(evento_id: UUID, db: AsyncSession = Depends(get_db), _: dict = Depends(require_editor)):
     e = (await db.execute(select(EventoUni).where(EventoUni.id == evento_id))).scalars().first()
     if not e:
         raise HTTPException(status_code=404, detail="Evento non trovato")
@@ -140,7 +140,7 @@ async def get_profilo(db: AsyncSession = Depends(get_db)) -> ProfiloResponse:
 
 
 @router.patch("/profilo", response_model=ProfiloResponse)
-async def update_profilo(body: ProfiloUpdate, db: AsyncSession = Depends(get_db)) -> ProfiloResponse:
+async def update_profilo(body: ProfiloUpdate, db: AsyncSession = Depends(get_db), _: dict = Depends(require_editor)) -> ProfiloResponse:
     profile = await _get_or_create_profile(db)
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(profile, field, value)

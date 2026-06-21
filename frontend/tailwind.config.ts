@@ -83,7 +83,7 @@ const config: Config = {
     },
   },
   plugins: [
-    function ({ addVariant, e }: any) {
+    function ({ addVariant }: any) {
       addVariant('prefers-reduced-motion', '@media (prefers-reduced-motion: reduce)');
     },
   ],

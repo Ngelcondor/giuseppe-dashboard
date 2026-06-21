@@ -67,7 +67,7 @@ class UniProfile(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     corso_laurea = Column(String(120), nullable=False, default="Ingegneria Informatica")
-    semestre = Column(String(60), nullable=False, default="2º semestre · 2025–26")
+    semestre = Column(String(60), nullable=False, default="1° semestre 26/27")
     cfu_totali = Column(Integer, nullable=False, default=240)
     cfu_superati = Column(Integer, nullable=False, default=0)
     cfu_in_corso = Column(Integer, nullable=False, default=0)

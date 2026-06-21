@@ -1,9 +1,15 @@
 """Deadline schemas."""
 from pydantic import BaseModel
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Optional, List
 import uuid
-from app.models.deadline import DeadlineCategory, DeadlinePriority
+from app.models.deadline import (
+    DeadlineCategory,
+    DeadlinePriority,
+    RecurrenceType,
+    RecurrenceInterval,
+)
 
 
 class DeadlineBase(BaseModel):
@@ -17,6 +23,12 @@ class DeadlineBase(BaseModel):
     reminder_days_before: int = 1
     notes: Optional[str] = None
     external_url: Optional[str] = None
+    # Recurrence (rate / abbonamento)
+    recurrence_type: RecurrenceType = RecurrenceType.NONE
+    installments_total: Optional[int] = None
+    installments_paid: Optional[int] = 0
+    recurrence_interval: Optional[RecurrenceInterval] = None
+    amount: Optional[Decimal] = None
 
 
 class DeadlineCreate(DeadlineBase):
@@ -38,6 +50,12 @@ class DeadlineUpdate(BaseModel):
     external_url: Optional[str] = None
     is_completed: Optional[bool] = None
     completion_notes: Optional[str] = None
+    # Recurrence
+    recurrence_type: Optional[RecurrenceType] = None
+    installments_total: Optional[int] = None
+    installments_paid: Optional[int] = None
+    recurrence_interval: Optional[RecurrenceInterval] = None
+    amount: Optional[Decimal] = None
 
 
 class DeadlineResponse(DeadlineBase):
@@ -66,3 +84,32 @@ class DeadlineUpcomingResponse(BaseModel):
 
     upcoming: List[DeadlineResponse]
     overdue: List[DeadlineResponse]
+
+
+# ── Expanded recurring occurrences ──
+class DeadlineOccurrence(BaseModel):
+    """A single computed (non-persisted) occurrence of a deadline.
+
+    For installments this is one remaining unpaid rata; for subscriptions one
+    upcoming period; for one-off deadlines the deadline itself.
+    """
+
+    deadline_id: uuid.UUID
+    title: str
+    category: DeadlineCategory
+    priority: DeadlinePriority
+    recurrence_type: RecurrenceType
+    date: date
+    amount: Optional[Decimal] = None
+    # 1-based index within the series (installment number), null for one-off
+    occurrence_index: Optional[int] = None
+    # total in the series (installments_total), null for subscriptions/one-off
+    occurrence_total: Optional[int] = None
+
+
+class DeadlineOccurrencesResponse(BaseModel):
+    """Expanded occurrences for the next N months."""
+
+    months: int
+    horizon_end: date
+    occurrences: List[DeadlineOccurrence]
