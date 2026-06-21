@@ -1,0 +1,43 @@
+/* ─── Sync-time reconstructions ───────────────────────────────────────────
+   These classes are referenced by src/components/ui/Surface.tsx
+   (Surface default/accent, SectionHeader, StatusDot) but are NOT defined
+   anywhere in src/app/globals.css — a refactor (.panel/.chip/.eyebrow) left
+   them behind, so in the live app those bits render largely unstyled.
+   Defined here so the synced previews render on-brand. Mirror these into
+   globals.css to fix the app itself. */
+
+@layer components {
+  .card-glass {
+    background-color: rgb(var(--color-card));
+    border: 1px solid rgb(var(--color-border));
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  }
+  .card-accent {
+    background-color: rgb(var(--accent-primary) / 0.08);
+    border: 1px solid rgb(var(--accent-primary) / 0.28);
+  }
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgb(var(--color-tertiary));
+  }
+  .status-dot {
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background-color: rgb(var(--accent-success));
+    box-shadow: 0 0 0 3px rgb(var(--accent-success) / 0.18);
+  }
+}
+
+/* Brand vocabulary defined in globals.css but unused by the synced components,
+   so Tailwind's JIT purges them. Emitted here as plain CSS (outside @layer, not
+   content-gated) so the full design language ships for the design agent. */
+.text-display { font-weight: 800; letter-spacing: -0.04em; line-height: 0.95; }
+.text-name { color: rgb(var(--color-heading)); }
+.border-accent { border-color: rgb(var(--accent-primary)); }
+.scrollbar-hidden { scrollbar-width: none; }
+.scrollbar-hidden::-webkit-scrollbar { display: none; }

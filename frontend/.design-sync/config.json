@@ -1,0 +1,36 @@
+{
+  "projectId": "1a392c28-94fa-4e20-8bdb-197dd910b995",
+  "shape": "package",
+  "pkg": "giuseppe-dashboard",
+  "globalName": "GiuseppeDS",
+  "srcDir": "src/components",
+  "tsconfig": ".design-sync/tsconfig.sync.json",
+  "cssEntry": ".design-sync/build/ds.css",
+  "readmeHeader": ".design-sync/conventions.md",
+  "extraEntries": [
+    "./.design-sync/shims/process-polyfill.ts",
+    "./.design-sync/shims/default-exports.ts"
+  ],
+  "libOverrides": {
+    "dts.mjs": "synth-entry mode: load src/*.tsx into the ts-morph project so <Name>Props interfaces resolve"
+  },
+  "componentSrcMap": {
+    "Providers": null
+  },
+  "overrides": {
+    "Modal": { "cardMode": "single", "viewport": "560x540" },
+    "ConfirmModal": { "cardMode": "single", "viewport": "480x440" },
+    "EventModal": { "cardMode": "single", "viewport": "600x880" },
+    "ConnectionSetup": { "cardMode": "single", "viewport": "560x760" },
+    "PageShell": { "cardMode": "single", "viewport": "1024x768" },
+    "EditorialPage": { "cardMode": "single", "viewport": "1024x900" },
+    "AppShell": { "cardMode": "single", "viewport": "1024x768" },
+    "Sidebar": { "cardMode": "single", "viewport": "300x720" },
+    "BottomDock": { "cardMode": "single", "viewport": "520x200" },
+    "Button": { "cardMode": "column" },
+    "CompactWidget": { "cardMode": "column" },
+    "Stepper": { "cardMode": "column" },
+    "Header": { "cardMode": "column" },
+    "WidgetWrapper": { "cardMode": "column" }
+  }
+}

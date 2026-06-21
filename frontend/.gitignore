@@ -54,3 +54,13 @@ Thumbs.db
 
 # TypeScript
 *.tsbuildinfo
+
+# design-sync (claude.ai/design import) — staged scripts, build output, machine state
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+.design-sync/build/input.css
+.design-sync/build/ds.css
+# durable (committed): config.json, NOTES.md, conventions.md, previews/, shims/, tsconfig.sync.json, _extra.css
