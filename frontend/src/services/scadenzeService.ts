@@ -20,6 +20,10 @@ export interface ScadenzaItem {
   sottotitolo: string;
   // 'esame' / 'consegna' (academic) or 'ctf' / 'certification' (deadlines)
   kind: 'esame' | 'consegna' | 'ctf' | 'certification' | 'altro';
+  // 'academic' (read-only here, managed in Università) or 'deadline' (editable here).
+  source: 'academic' | 'deadline';
+  // Original deadline, carried so an edit form can prefill its fields.
+  raw?: Deadline;
 }
 
 async function getDeadlines(): Promise<Deadline[]> {
@@ -45,6 +49,7 @@ const academicToItem = (e: UniEvento): ScadenzaItem => ({
   titolo: e.titolo,
   sottotitolo: academicSubtitle(e),
   kind: e.tipo,
+  source: 'academic',
 });
 
 const deadlineToItem = (d: Deadline): ScadenzaItem => ({
@@ -53,6 +58,8 @@ const deadlineToItem = (d: Deadline): ScadenzaItem => ({
   titolo: d.title,
   sottotitolo: d.description ?? '',
   kind: d.category === 'certification' ? 'certification' : d.category === 'ctf' ? 'ctf' : 'altro',
+  source: 'deadline',
+  raw: d,
 });
 
 // Aggregates academic scadenze (from /university) with certification / CTF
@@ -62,4 +69,25 @@ export async function getScadenze(): Promise<ScadenzaItem[]> {
   return [...academic.map(academicToItem), ...deadlines.map(deadlineToItem)].sort(
     (a, b) => a.data.localeCompare(b.data),
   );
+}
+
+// ── Deadline mutations (only the editable, non-academic items) ──
+export interface DeadlineInput {
+  title: string;
+  description?: string;
+  due_date: string;
+  category: string;
+  priority: string;
+}
+
+export async function createDeadline(b: DeadlineInput): Promise<Deadline> {
+  const { data } = await api.post('/deadlines', b);
+  return data;
+}
+export async function updateDeadline(id: string, b: Partial<DeadlineInput>): Promise<Deadline> {
+  const { data } = await api.put(`/deadlines/${id}`, b);
+  return data;
+}
+export async function deleteDeadline(id: string): Promise<void> {
+  await api.delete(`/deadlines/${id}`);
 }

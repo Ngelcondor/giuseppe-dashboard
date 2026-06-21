@@ -613,3 +613,35 @@ input[type='checkbox'], input[type='radio'] {
 [data-stim="on"] .sd-now { animation: none !important; }
 [data-stim="on"] .sd-accent { color: rgb(120 122 134) !important; }
 [data-stim="on"] .sd-shadow { box-shadow: none !important; }
+
+/* ── Apple-style sheet + form fields (CRUD) ── */
+@keyframes sdFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sdSheetIn { from { opacity: 0; transform: translateY(10px) scale(.975); } to { opacity: 1; transform: none; } }
+.sd-sheet-backdrop { animation: sdFade .18s ease; }
+.sd-sheet { animation: sdSheetIn .24s cubic-bezier(.32,.72,0,1); }
+@media (prefers-reduced-motion: reduce) { .sd-sheet, .sd-sheet-backdrop { animation: none; } }
+[data-stim="on"] .sd-sheet, [data-stim="on"] .sd-sheet-backdrop { animation: none !important; }
+
+.sd-input, .sd-select, .sd-textarea {
+  width: 100%; box-sizing: border-box; padding: 10px 12px;
+  font-size: 14px; font-family: inherit; line-height: 1.4;
+  color: rgb(var(--color-heading));
+  background: rgb(var(--color-card-inner));
+  border: 1px solid rgb(var(--color-border));
+  border-radius: 11px; outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+  -webkit-appearance: none; appearance: none;
+}
+.sd-textarea { resize: vertical; min-height: 74px; }
+.sd-input:focus, .sd-select:focus, .sd-textarea:focus {
+  border-color: rgb(99 102 241);
+  box-shadow: 0 0 0 3px rgb(99 102 241 / 0.16);
+  background: rgb(var(--color-card));
+}
+.sd-input::placeholder, .sd-textarea::placeholder { color: rgb(var(--color-muted)); }
+.sd-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center; padding-right: 34px; cursor: pointer;
+}
+.sd-iconbtn { display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; cursor: pointer; color: rgb(var(--color-tertiary)); border-radius: 8px; padding: 6px; transition: background .15s ease, color .15s ease; }
+.sd-iconbtn:hover { background: rgb(0 0 0 / 0.06); color: rgb(var(--color-heading)); }

@@ -41,23 +41,14 @@ const baseDays: Omit<Day, 'dot'>[] = [
   { n: 29 }, { n: 30 },
 ];
 
-// dayNumber -> dot color, matching the approved static design / DB seed.
-const FALLBACK_DOTS: Record<number, DotColor> = {
-  23: 'green',
-  25: 'green',
-  26: 'amber',
-  27: 'green',
-  28: 'indigo',
-};
+// Honest empty state — no fabricated data. Dots/events are populated from the
+// API on fetch; the grid shows no dots and the list shows an empty-state until
+// real data arrives.
+const FALLBACK_DOTS: Record<number, DotColor> = {};
 
 type UpcomingEvent = { id: string; dot: string; title: string; sub: string; date: string };
 
-const FALLBACK_UPCOMING: UpcomingEvent[] = [
-  { id: 'f1', dot: 'rgb(245 158 11)', title: 'PEC2 · Basi di Dati', sub: 'Consegna', date: '26 giu' },
-  { id: 'f2', dot: 'rgb(16 185 129)', title: 'Ripasso SO · scheduling', sub: 'Sessione · 2h', date: '27 giu' },
-  { id: 'f3', dot: 'rgb(99 102 241)', title: 'Esame · Sistemi Operativi', sub: 'Aula 3.1 · 09:00', date: '8 lug' },
-  { id: 'f4', dot: 'rgb(99 102 241)', title: 'Esame · CPTS', sub: 'Hack The Box', date: '31 lug' },
-];
+const FALLBACK_UPCOMING: UpcomingEvent[] = [];
 
 const dotColor: Record<DotColor, string> = {
   green: 'rgb(16 185 129)',
@@ -217,11 +208,15 @@ export default function CalendarPage() {
         {/* Prossimi eventi */}
         <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: 2, ...card, padding: '22px 24px' }}>
           <h3 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>Prossimi eventi</h3>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {upcoming.map((e, idx) => (
-              <EventRow key={e.id} dot={e.dot} title={e.title} sub={e.sub} date={e.date} last={idx === upcoming.length - 1} />
-            ))}
-          </div>
+          {upcoming.length === 0 ? (
+            <div style={{ padding: '16px 0 6px', fontSize: 13, color: 'rgb(var(--color-muted))' }}>Nessun evento in calendario.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {upcoming.map((e, idx) => (
+                <EventRow key={e.id} dot={e.dot} title={e.title} sub={e.sub} date={e.date} last={idx === upcoming.length - 1} />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

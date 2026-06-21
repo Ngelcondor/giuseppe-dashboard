@@ -301,11 +301,14 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing database...")
     await init_db()
     await seed_admin_user()
-    await seed_university()
-    await seed_budget()
-    await seed_calendar()
-    await seed_scadenze()
-    await seed_deadlines()
+    # Demo/design placeholder content — DEV ONLY. Never auto-populate production
+    # with fabricated rows; real data is entered by the user.
+    if os.getenv("ENVIRONMENT", "").lower() != "production":
+        await seed_university()
+        await seed_budget()
+        await seed_calendar()
+        await seed_scadenze()
+        await seed_deadlines()
 
     logger.info("Connecting to Redis...")
     try:

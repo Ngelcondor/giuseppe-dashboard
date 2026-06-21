@@ -8,6 +8,8 @@ import { CircularProgress } from '@/components/ui/ProgressBar';
 import { Checkbox } from '@/components/ui/Toggle';
 import { getUniversitaDashboard, type UniDashboard } from '@/services/universitaService';
 import { getBudgetDashboard, type BudgetDashboard } from '@/services/budgetService';
+import { getScadenze, type ScadenzaItem } from '@/services/scadenzeService';
+import { getStudyOverview, type StudyOverview } from '@/services/studyService';
 
 const card: React.CSSProperties = {
   background: 'rgb(var(--color-card))',
@@ -21,38 +23,25 @@ const eyebrow: React.CSSProperties = {
 };
 const mono = "'JetBrains Mono',monospace";
 
-// ── Seeded fallbacks — match the DB seed so the page renders identically
-// before auth/fetch resolves and never goes blank. ───────────────────────────
-const FALLBACK_UNI: UniDashboard = {
-  profilo: { corso_laurea: 'Ingegneria Informatica', semestre: '2º semestre · 2025–26', cfu_totali: 240, cfu_superati: 138, cfu_in_corso: 24 },
+// ── Empty fallbacks — render an honest empty state before/without data, never
+// fabricated content. Real data is fetched in useEffect. ──────────────────────
+const EMPTY_UNI: UniDashboard = {
+  profilo: { corso_laurea: '', semestre: '', cfu_totali: 0, cfu_superati: 0, cfu_in_corso: 0 },
   corsi: [],
-  prossimo_esame: { id: 'e', tipo: 'esame', corso: 'Sistemi Operativi', titolo: 'Esame — Sistemi Operativi', descrizione: '', data: '2026-07-08', ora: '09:00', aula: 'Aula 3.1', cfu: 6, stato: 'da_fare' },
-  consegne: [
-    { id: 'c1', tipo: 'consegna', corso: 'Basi di Dati', titolo: 'PEC2 — Basi di Dati', descrizione: 'Consegna · UOC', data: '2026-06-26', ora: '', aula: '', cfu: null, stato: 'da_fare' },
-  ],
+  prossimo_esame: null,
+  consegne: [],
 };
 
-const FALLBACK_BUDGET: Pick<BudgetDashboard, 'total_expenses' | 'categories'> = {
-  total_expenses: 642,
-  categories: [
-    { category: 'Affitto · Barcellona', spent: 420, limit: 420, remaining: 0, percentage: 100 },
-    { category: 'Spesa', spent: 150, limit: 200, remaining: 50, percentage: 75 },
-    { category: 'Studio · HTB + libri', spent: 30, limit: 100, remaining: 70, percentage: 30 },
-    { category: 'Svago', spent: 0, limit: 100, remaining: 100, percentage: 0 },
-    { category: 'Trasporti', spent: 42, limit: 80, remaining: 38, percentage: 52.5 },
-  ],
+const EMPTY_BUDGET: Pick<BudgetDashboard, 'total_expenses' | 'categories'> = {
+  total_expenses: 0,
+  categories: [],
 };
 
-// ── Date helpers (it-IT), today = 2026-06-21 ─────────────────────────────────
+// ── Date helpers (it-IT) ─────────────────────────────────────────────────────
 const fmtDate = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+const fmtDateLong = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'long' });
 const daysTo = (iso: string) => Math.max(0, Math.round((new Date(iso + 'T00:00:00').getTime() - new Date(new Date().toDateString()).getTime()) / 86_400_000));
-
-// Non-academic certification scadenze (no dedicated service for this screen) —
-// kept as the approved static content; their badges are computed by days-to-due.
-const CERT_SCADENZE = [
-  { id: 'cert-cpts-ad', title: 'CPTS — modulo Active Directory', sub: 'Studio · certificazione', data: '2026-06-28' },
-  { id: 'cert-cpts-exam', title: 'Esame CPTS', sub: 'Certificazione · HTB', data: '2026-07-31' },
-];
+const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
 const scadenzaBadge = (d: number) =>
   d <= 6 ? <Badge variant="warning" size="sm">{d} giorni</Badge>
@@ -67,17 +56,30 @@ const scadenzaDot = (d: number) =>
   : 'rgb(var(--color-muted))';
 
 export default function HomePage() {
-  const [uni, setUni] = useState<UniDashboard>(FALLBACK_UNI);
-  const [budget, setBudget] = useState<Pick<BudgetDashboard, 'total_expenses' | 'categories'>>(FALLBACK_BUDGET);
+  const [uni, setUni] = useState<UniDashboard>(EMPTY_UNI);
+  const [budget, setBudget] = useState<Pick<BudgetDashboard, 'total_expenses' | 'categories'>>(EMPTY_BUDGET);
+  const [scadenze, setScadenze] = useState<ScadenzaItem[]>([]);
+  const [study, setStudy] = useState<StudyOverview | null>(null);
+
+  // Dynamic "today" — never hardcode the date.
+  const now = new Date();
+  const todayIso = now.toISOString().slice(0, 10);
+  const headerDate = cap(now.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }));
+  const budgetMonthLabel = cap(now.toLocaleDateString('it-IT', { month: 'long' }));
 
   useEffect(() => {
     let alive = true;
-    getUniversitaDashboard().then((d) => { if (alive) setUni(d); }).catch(() => {/* keep fallback */});
-    getBudgetDashboard(6, 2026).then((d) => { if (alive) setBudget(d); }).catch(() => {/* keep fallback */});
+    const m = now.getMonth() + 1;
+    const y = now.getFullYear();
+    getUniversitaDashboard().then((d) => { if (alive) setUni(d); }).catch(() => {/* keep empty */});
+    getBudgetDashboard(m, y).then((d) => { if (alive) setBudget(d); }).catch(() => {/* keep empty */});
+    getScadenze().then((d) => { if (alive) setScadenze(d); }).catch(() => {/* keep empty */});
+    getStudyOverview().then((d) => { if (alive) setStudy(d); }).catch(() => {/* keep empty */});
     return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const { profilo, prossimo_esame, consegne } = uni;
+  const { profilo, prossimo_esame } = uni;
 
   // At-a-glance · CFU
   const cfuPct = profilo.cfu_totali ? Math.round((profilo.cfu_superati / profilo.cfu_totali) * 100) : 0;
@@ -91,31 +93,24 @@ export default function HomePage() {
   const budgetLeft = Math.max(0, budgetLimit - budgetSpent);
   const budgetPct = budgetLimit ? Math.round((budgetSpent / budgetLimit) * 100) : 0;
 
-  // Scadenze imminenti · curated like the design: the nearest UOC consegna +
-  // the next exam + the two non-academic certification items, sorted by date.
-  const nearestConsegna = [...consegne].sort((a, b) => a.data.localeCompare(b.data))[0];
-  const scadenze = [
-    ...(nearestConsegna ? [{ id: nearestConsegna.id, title: nearestConsegna.titolo, sub: 'Consegna · UOC', data: nearestConsegna.data }] : []),
-    ...(prossimo_esame ? [{ id: prossimo_esame.id, title: `Esame — ${prossimo_esame.corso}`, sub: 'Esame · UOC', data: prossimo_esame.data }] : []),
-    ...CERT_SCADENZE,
-  ]
-    .sort((a, b) => a.data.localeCompare(b.data))
-    .slice(0, 4);
+  // Study overview · today + overall progress (real)
+  const today = study?.today ?? null;
+  const overall = study?.overall ?? { done: 0, total: 0, pct: 0 };
+  const todayHasTasks = !!today && !today.isRest && today.tasks.length > 0;
+
+  // Scadenze imminenti · first 4 upcoming (data >= today), real service data.
+  const upcoming = scadenze.filter((s) => s.data >= todayIso).slice(0, 4);
 
   return (
     <div>
       {/* Header */}
       <header className="sd-reveal" style={{ ['--i' as string]: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap', marginBottom: 30 }}>
         <div>
-          <div style={{ fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgb(var(--color-tertiary))', fontFamily: mono, marginBottom: 12 }}>Domenica 21 giugno · sessione d&apos;esami</div>
+          <div style={{ fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgb(var(--color-tertiary))', fontFamily: mono, marginBottom: 12 }}>{headerDate}</div>
           <h1 style={{ margin: 0, fontSize: 40, lineHeight: 1.04, letterSpacing: '-.02em', color: 'rgb(var(--color-heading))', fontWeight: 600 }}>
             Buongiorno, <span className="sd-accent" style={{ fontFamily: "'Fraunces',serif", fontStyle: 'italic', fontWeight: 500 }}>Giuseppe</span>.
           </h1>
-          <p style={{ margin: '12px 0 0', fontSize: 16, color: 'rgb(var(--color-tertiary))', maxWidth: 540, lineHeight: 1.5 }}>Oggi è giorno di ripasso. Una cosa conta più delle altre — il resto può aspettare.</p>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 11, color: 'rgb(var(--color-tertiary))', textTransform: 'uppercase', letterSpacing: '.12em', whiteSpace: 'nowrap' }}>Streak studio</div>
-          <div style={{ fontFamily: mono, fontSize: 22, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>12<span style={{ fontSize: 13, color: 'rgb(var(--color-tertiary))', fontWeight: 400 }}> giorni</span></div>
+          <p style={{ margin: '12px 0 0', fontSize: 16, color: 'rgb(var(--color-tertiary))', maxWidth: 540, lineHeight: 1.5 }}>Ecco il riepilogo della tua giornata.</p>
         </div>
       </header>
 
@@ -125,29 +120,52 @@ export default function HomePage() {
           <div style={{ padding: '30px 30px 30px 32px', borderRight: '1px solid rgb(var(--color-border))', position: 'relative' }}>
             <span style={{ position: 'absolute', left: 0, top: 30, bottom: 30, width: 4, borderRadius: 4, background: 'rgb(99 102 241)' }} />
             <div style={{ fontSize: 10.5, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgb(99 102 241)', fontWeight: 600, marginBottom: 14 }}>La cosa più importante</div>
-            <h2 style={{ margin: 0, fontSize: 27, lineHeight: 1.12, letterSpacing: '-.01em', color: 'rgb(var(--color-heading))', fontWeight: 600 }}>Ripasso <span style={{ fontFamily: "'Fraunces',serif", fontStyle: 'italic', fontWeight: 500 }}>Sistemi Operativi</span></h2>
-            <p style={{ margin: '12px 0 0', fontSize: 14, color: 'rgb(var(--color-tertiary))', lineHeight: 1.55 }}>Scheduling, gestione della memoria e sincronizzazione. L&apos;esame è il primo banco di prova della sessione.</p>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: '20px 0 22px' }}>
-              <span style={{ fontFamily: mono, fontSize: 30, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{esameDays}</span>
-              <span style={{ fontSize: 13, color: 'rgb(var(--color-tertiary))' }}>giorni all&apos;esame · 8 luglio</span>
-            </div>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <Button variant="primary" size="md">Inizia il ripasso</Button>
-              <Link href="/dashboard/universita"><Button variant="ghost" size="md">Apri il corso</Button></Link>
-            </div>
+            {prossimo_esame ? (
+              <>
+                <h2 style={{ margin: 0, fontSize: 27, lineHeight: 1.12, letterSpacing: '-.01em', color: 'rgb(var(--color-heading))', fontWeight: 600 }}>
+                  <span style={{ fontFamily: "'Fraunces',serif", fontStyle: 'italic', fontWeight: 500 }}>{prossimo_esame.corso}</span>
+                </h2>
+                {prossimo_esame.descrizione && (
+                  <p style={{ margin: '12px 0 0', fontSize: 14, color: 'rgb(var(--color-tertiary))', lineHeight: 1.55 }}>{prossimo_esame.descrizione}</p>
+                )}
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: '20px 0 22px' }}>
+                  <span style={{ fontFamily: mono, fontSize: 30, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{esameDays}</span>
+                  <span style={{ fontSize: 13, color: 'rgb(var(--color-tertiary))' }}>giorni all&apos;esame · {fmtDateLong(prossimo_esame.data)}</span>
+                </div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <Link href="/dashboard/universita"><Button variant="primary" size="md">Apri il corso</Button></Link>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 style={{ margin: 0, fontSize: 27, lineHeight: 1.12, letterSpacing: '-.01em', color: 'rgb(var(--color-heading))', fontWeight: 600 }}>Nessun esame imminente</h2>
+                <p style={{ margin: '12px 0 22px', fontSize: 14, color: 'rgb(var(--color-tertiary))', lineHeight: 1.55 }}>Non ci sono esami in programma al momento.</p>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <Link href="/dashboard/universita"><Button variant="ghost" size="md">Apri il corso</Button></Link>
+                </div>
+              </>
+            )}
           </div>
 
           <div style={{ padding: '30px 32px 30px 30px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <div style={eyebrow}>Il tuo oggi</div>
-              <div className="sd-now" style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11, color: 'rgb(99 102 241)', fontFamily: mono }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: 'rgb(99 102 241)' }} />ORA · 14:20</div>
+              {todayHasTasks && (
+                <span style={{ fontFamily: mono, fontSize: 12, color: 'rgb(16 185 129)' }}>{today!.done} / {today!.total}</span>
+              )}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <TimelineRow time="09:30" bar="rgb(16 185 129)" title="Ripasso SO · scheduling" sub="Completato · 2h" badge={<Badge variant="success" size="sm">Fatto</Badge>} dim />
-              <TimelineRow time="15:00" bar="rgb(99 102 241)" title="CPTS · Active Directory" sub="Lab · lateral movement" badge={<Badge variant="primary" size="sm">Adesso</Badge>} highlight />
-              <TimelineRow time="18:30" bar="rgb(245 158 11)" title="PEC2 · Basi di Dati" sub="Query e normalizzazione" badge={<Badge variant="warning" size="sm">5 giorni</Badge>} />
-              <TimelineRow time="21:00" bar="rgb(var(--color-muted))" title="Chiusura · appunti vault" sub="15 min · review della giornata" />
-            </div>
+            {todayHasTasks ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {today!.tasks.map((t) => (
+                  <Checkbox key={t.id} label={t.text} checked={t.completed} readOnly />
+                ))}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 0' }}>
+                <div style={{ fontSize: 14, fontWeight: 500, color: 'rgb(var(--color-heading))' }}>{today?.isRest ? 'Oggi è riposo' : 'Niente in programma per oggi'}</div>
+                <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>Goditi la pausa o apri il piano di studio.</div>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -163,21 +181,30 @@ export default function HomePage() {
           </div>
         </div>
         <div className="sd-reveal sd-lift" style={{ ['--i' as string]: 3, ...card, padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
-          <CircularProgress value={67} size="md" variant="warning" />
+          <CircularProgress value={overall.pct} size="md" variant="warning" />
           <div>
             <div style={eyebrow}>CPTS</div>
-            <div style={{ fontFamily: mono, fontSize: 21, fontWeight: 600, color: 'rgb(var(--color-heading))', marginTop: 3 }}>8<span style={{ color: 'rgb(var(--color-muted))' }}> / 12</span></div>
-            <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>settimane · esame 31 lug</div>
+            <div style={{ fontFamily: mono, fontSize: 21, fontWeight: 600, color: 'rgb(var(--color-heading))', marginTop: 3 }}>{overall.done}<span style={{ color: 'rgb(var(--color-muted))' }}> / {overall.total}</span></div>
+            <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>task completati</div>
           </div>
         </div>
         <div className="sd-reveal sd-lift" style={{ ['--i' as string]: 4, ...card, padding: 20 }}>
           <div style={{ ...eyebrow, marginBottom: 10 }}>Prossimo esame</div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}><span style={{ fontFamily: mono, fontSize: 28, fontWeight: 600, color: 'rgb(99 102 241)' }}>{esameDays}</span><span style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>giorni</span></div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'rgb(var(--color-heading))', marginTop: 8 }}>{prossimo_esame?.corso ?? 'Sistemi Operativi'}</div>
-          <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))', fontFamily: mono }}>8 lug · {prossimo_esame?.ora || '09:00'}</div>
+          {prossimo_esame ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}><span style={{ fontFamily: mono, fontSize: 28, fontWeight: 600, color: 'rgb(99 102 241)' }}>{esameDays}</span><span style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>giorni</span></div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'rgb(var(--color-heading))', marginTop: 8 }}>{prossimo_esame.corso}</div>
+              <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))', fontFamily: mono }}>{fmtDate(prossimo_esame.data)}{prossimo_esame.ora ? ` · ${prossimo_esame.ora}` : ''}</div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'rgb(var(--color-heading))', marginTop: 4 }}>Nessun esame</div>
+              <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>Niente in programma</div>
+            </>
+          )}
         </div>
         <div className="sd-reveal sd-lift" style={{ ['--i' as string]: 5, ...card, padding: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}><div style={eyebrow}>Budget giugno</div><span style={{ width: 7, height: 7, borderRadius: '50%', background: 'rgb(16 185 129)' }} /></div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}><div style={eyebrow}>Budget {budgetMonthLabel.toLowerCase()}</div><span style={{ width: 7, height: 7, borderRadius: '50%', background: 'rgb(16 185 129)' }} /></div>
           <div style={{ fontFamily: mono, fontSize: 21, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>€{Math.round(budgetSpent)}<span style={{ color: 'rgb(var(--color-muted))', fontSize: 15 }}> / {Math.round(budgetLimit)}</span></div>
           <div style={{ margin: '12px 0 6px' }}><div style={{ height: 8, borderRadius: 8, background: 'rgb(var(--color-card-inner))', overflow: 'hidden' }}><div style={{ height: '100%', width: `${budgetPct}%`, borderRadius: 8, background: 'rgb(16 185 129)' }} /></div></div>
           <div style={{ fontSize: 12, color: 'rgb(16 185 129)' }}>€{Math.round(budgetLeft)} rimasti</div>
@@ -191,44 +218,36 @@ export default function HomePage() {
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>Scadenze imminenti</h3>
             <span style={{ fontSize: 11, color: 'rgb(var(--color-tertiary))', textTransform: 'uppercase', letterSpacing: '.12em', whiteSpace: 'nowrap' }}>Uni + Cert</span>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {scadenze.map((s, idx) => {
-              const d = daysTo(s.data);
-              return (
-                <DeadlineRow key={s.id} dot={scadenzaDot(d)} title={s.title} sub={s.sub} date={fmtDate(s.data)} badge={scadenzaBadge(d)} last={idx === scadenze.length - 1} />
-              );
-            })}
-          </div>
+          {upcoming.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {upcoming.map((s, idx) => {
+                const d = daysTo(s.data);
+                return (
+                  <DeadlineRow key={s.id} dot={scadenzaDot(d)} title={s.titolo} sub={s.sottotitolo} date={fmtDate(s.data)} badge={scadenzaBadge(d)} last={idx === upcoming.length - 1} />
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{ padding: '18px 0 4px', fontSize: 13, color: 'rgb(var(--color-tertiary))' }}>Nessuna scadenza imminente.</div>
+          )}
         </div>
 
         <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: 7, ...card, padding: '22px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>Studio di oggi</h3>
-            <span style={{ fontFamily: mono, fontSize: 12, color: 'rgb(16 185 129)' }}>2 / 5</span>
+            {todayHasTasks && <span style={{ fontFamily: mono, fontSize: 12, color: 'rgb(16 185 129)' }}>{today!.done} / {today!.total}</span>}
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <Checkbox label="Enumerazione AD con BloodHound" defaultChecked />
-            <Checkbox label="Kerberoasting · estrazione TGS" defaultChecked />
-            <Checkbox label="Lateral movement · Pass-the-Hash" />
-            <Checkbox label="Ripasso SO · sincronizzazione" />
-            <Checkbox label="Aggiorna writeup nel vault Obsidian" />
-          </div>
+          {todayHasTasks ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {today!.tasks.map((t) => (
+                <Checkbox key={t.id} label={t.text} checked={t.completed} readOnly />
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: 'rgb(var(--color-tertiary))', padding: '4px 0' }}>{today?.isRest ? 'Oggi è riposo.' : 'Niente in programma per oggi.'}</div>
+          )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function TimelineRow({ time, bar, title, sub, badge, dim, highlight }: { time: string; bar: string; title: string; sub: string; badge?: React.ReactNode; dim?: boolean; highlight?: boolean }) {
-  return (
-    <div style={{ display: 'flex', gap: 14, alignItems: 'stretch', opacity: dim ? 0.6 : 1, ...(highlight ? { background: 'rgb(99 102 241 / 0.06)', margin: '0 -10px', padding: 10, borderRadius: 12 } : {}) }}>
-      <div style={{ fontFamily: mono, fontSize: 12, color: highlight ? 'rgb(99 102 241)' : 'rgb(var(--color-tertiary))', width: 46, flex: 'none', paddingTop: 2 }}>{time}</div>
-      <div style={{ width: 3, borderRadius: 3, background: bar, flex: 'none' }} />
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 14, fontWeight: highlight ? 600 : 500, color: 'rgb(var(--color-heading))' }}>{title}</div>
-        <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{sub}</div>
-      </div>
-      {badge && <div style={{ flex: 'none', width: 'max-content' }}>{badge}</div>}
     </div>
   );
 }
