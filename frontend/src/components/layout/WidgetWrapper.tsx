@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { ChevronUp, ChevronDown, Settings, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 interface WidgetWrapperProps {
   id: string;
@@ -15,7 +14,6 @@ interface WidgetWrapperProps {
 }
 
 export const WidgetWrapper: React.FC<WidgetWrapperProps> = ({
-  id,
   title,
   icon,
   children,

@@ -8,14 +8,12 @@ import {
   AlertCircle,
   Trash2,
   RefreshCw,
-  ChevronDown,
   Shield,
 } from 'lucide-react';
 import {
   calendarConnections,
   CalendarConnection,
   CreateConnectionPayload,
-  ConnectionTestResult,
 } from '@/services/calendarService';
 import { COLORS } from '@/lib/constants';
 

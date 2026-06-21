@@ -5,7 +5,7 @@ from sqlalchemy.future import select
 from datetime import date
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_editor
 from app.models.user import User
 from app.models.deadline import Deadline
 
@@ -36,7 +36,7 @@ async def get_dashboard_widgets(
 @router.put("/layout")
 async def update_dashboard_layout(
     layout_config: dict,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ):
     """Update dashboard layout."""

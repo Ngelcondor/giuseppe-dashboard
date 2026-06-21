@@ -6,13 +6,13 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { useDashboardStore } from '@/stores/dashboardStore';
-import { Card, CardBody, CardHeader, CardFooter } from '@/components/ui/Card';
+import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Input';
 import { Toggle, Checkbox } from '@/components/ui/Toggle';
 import { Badge } from '@/components/ui/Badge';
 import { Modal, ConfirmModal } from '@/components/ui/Modal';
-import { AlertCircle, Lock, Bell, Palette, ToggleRight, Download, RotateCcw } from 'lucide-react';
+import { AlertCircle, Lock, Bell, Palette, Download, RotateCcw } from 'lucide-react';
 
 export default function SettingsPage() {
   const [menuOpen, setMenuOpen] = useState(false);

@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, date
 from typing import List
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_editor
 from app.models.health import SleepSession, SleepPhaseEntry
 from app.schemas.health import (
     SleepSessionCreate,
@@ -30,7 +30,7 @@ router = APIRouter(
 async def create_sleep_session(
     session_data: SleepSessionCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
 ) -> SleepSessionResponse:
     """Create a new sleep session with optional phase data."""
     session = SleepSession(
@@ -251,7 +251,7 @@ async def update_sleep_session(
     session_id: str,
     update_data: SleepSessionUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
 ) -> SleepSessionResponse:
     """Update a sleep session (mood, notes, quality)."""
     user_id = current_user["sub"]
@@ -280,7 +280,7 @@ async def update_sleep_session(
 async def delete_sleep_session(
     session_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
 ) -> None:
     """Delete a sleep session."""
     user_id = current_user["sub"]

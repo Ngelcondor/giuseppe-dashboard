@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import List
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_editor
 from app.models.routine import Routine, RoutineStep, RoutineLog, TimeOfDay
 from app.schemas.routine import (
     RoutineCreate, RoutineResponse, RoutineUpdate,
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/routines", tags=["routines"])
 @router.post("", response_model=RoutineResponse, status_code=status.HTTP_201_CREATED)
 async def create_routine(
     routine: RoutineCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> RoutineResponse:
     """Create a routine."""
@@ -91,7 +91,7 @@ async def get_routine(
 async def update_routine(
     routine_id: str,
     routine_update: RoutineUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> RoutineResponse:
     """Update a routine."""
@@ -121,7 +121,7 @@ async def update_routine(
 @router.delete("/{routine_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_routine(
     routine_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete a routine."""
@@ -143,7 +143,7 @@ async def delete_routine(
 async def add_routine_step(
     routine_id: str,
     step: RoutineStepCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> RoutineStepResponse:
     """Add a step to a routine."""
@@ -198,7 +198,7 @@ async def get_today_routines(
 @router.post("/{routine_id}/start", response_model=RoutineLogResponse, status_code=status.HTTP_201_CREATED)
 async def start_routine(
     routine_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> RoutineLogResponse:
     """Start a routine."""
@@ -228,7 +228,7 @@ async def start_routine(
 async def complete_routine(
     routine_id: str,
     request: RoutineCompleteRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> RoutineLogResponse:
     """Complete a routine."""

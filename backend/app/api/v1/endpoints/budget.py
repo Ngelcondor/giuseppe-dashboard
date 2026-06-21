@@ -9,7 +9,7 @@ from typing import List, Optional
 from calendar import monthrange
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_editor
 from app.models.budget import (
     Transaction,
     BudgetGoal,
@@ -100,7 +100,7 @@ async def list_bank_institutions(
 @router.post("/bank/auth", response_model=BankAuthInitResponse)
 async def initiate_bank_auth(
     request: BankAuthInitRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> BankAuthInitResponse:
     """Start bank authorization flow."""
@@ -139,7 +139,7 @@ async def initiate_bank_auth(
 @router.post("/bank/callback", response_model=BankConnectionResponse)
 async def bank_auth_callback(
     request: BankAuthCallbackRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> BankConnectionResponse:
     """
@@ -250,7 +250,7 @@ async def get_bank_balance(
 @router.post("/bank/sync", response_model=CSVImportResponse)
 async def sync_bank_transactions(
     days_back: int = Query(30, ge=1, le=90),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> CSVImportResponse:
     """
@@ -352,7 +352,7 @@ async def sync_bank_transactions(
 
 @router.delete("/bank/connection")
 async def disconnect_bank(
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ):
     """Disconnect bank account."""
@@ -380,7 +380,7 @@ async def disconnect_bank(
 @router.post("/import/csv", response_model=CSVImportResponse)
 async def import_csv(
     file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> CSVImportResponse:
     """Import transactions from a Revolut CSV export."""
@@ -436,7 +436,7 @@ async def import_csv(
 )
 async def create_transaction(
     transaction: TransactionCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> TransactionResponse:
     """Create a manual transaction."""
@@ -508,7 +508,7 @@ async def get_transaction(
 async def update_transaction(
     transaction_id: str,
     transaction_update: TransactionUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> TransactionResponse:
     """Update a transaction."""
@@ -540,7 +540,7 @@ async def update_transaction(
 )
 async def delete_transaction(
     transaction_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete a transaction."""
@@ -862,7 +862,7 @@ async def get_budget_trends(
 )
 async def create_budget_goal(
     goal: BudgetGoalCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> BudgetGoalResponse:
     """Create a budget goal."""
@@ -893,7 +893,7 @@ async def list_budget_goals(
 async def update_budget_goal(
     goal_id: str,
     goal_update: BudgetGoalUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> BudgetGoalResponse:
     """Update a budget goal."""
@@ -920,7 +920,7 @@ async def update_budget_goal(
 @router.delete("/goals/{goal_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_budget_goal(
     goal_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete a budget goal."""

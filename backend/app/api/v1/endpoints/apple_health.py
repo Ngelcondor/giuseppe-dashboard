@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_editor
 from app.models.health import HealthMetric, MetricType, Medication, MedicationLog
 from app.schemas.health import (
     AppleHealthImportResponse,
@@ -167,7 +167,7 @@ async def apple_health_webhook(
 @router.post("/import/csv", response_model=AppleHealthImportResponse)
 async def import_csv(
     data: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> AppleHealthImportResponse:
     """Import Apple Health data from CSV format."""
@@ -208,7 +208,7 @@ async def import_csv(
 @router.post("/import/xml", response_model=AppleHealthImportResponse)
 async def import_xml(
     file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> AppleHealthImportResponse:
     """Import Apple Health data from XML export file.

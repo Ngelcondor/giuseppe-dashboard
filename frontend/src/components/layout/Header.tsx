@@ -5,7 +5,6 @@ import { Bell, Settings, Menu, X } from 'lucide-react';
 import { formatDate, getGreeting } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
-import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
 
 interface HeaderProps {

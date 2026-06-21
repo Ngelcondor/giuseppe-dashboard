@@ -5,7 +5,7 @@ from sqlalchemy.future import select
 from typing import List
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_editor
 from app.models.ctf import CTFPlatform, CTFChallenge
 from app.schemas.ctf import (
     CTFPlatformCreate, CTFPlatformResponse, CTFPlatformUpdate,
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/ctf", tags=["ctf"])
 @router.post("/platforms", response_model=CTFPlatformResponse, status_code=status.HTTP_201_CREATED)
 async def create_ctf_platform(
     platform: CTFPlatformCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> CTFPlatformResponse:
     """Add a CTF platform."""
@@ -69,7 +69,7 @@ async def get_ctf_platform(
 async def update_ctf_platform(
     platform_id: str,
     platform_update: CTFPlatformUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> CTFPlatformResponse:
     """Update a CTF platform."""
@@ -97,7 +97,7 @@ async def update_ctf_platform(
 @router.delete("/platforms/{platform_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_ctf_platform(
     platform_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete a CTF platform."""
@@ -119,7 +119,7 @@ async def delete_ctf_platform(
 @router.post("/challenges", response_model=CTFChallengeResponse, status_code=status.HTTP_201_CREATED)
 async def create_ctf_challenge(
     challenge: CTFChallengeCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> CTFChallengeResponse:
     """Create a CTF challenge."""
@@ -173,7 +173,7 @@ async def get_ctf_challenge(
 async def update_ctf_challenge(
     challenge_id: str,
     challenge_update: CTFChallengeUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> CTFChallengeResponse:
     """Update a CTF challenge."""
@@ -201,7 +201,7 @@ async def update_ctf_challenge(
 @router.delete("/challenges/{challenge_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_ctf_challenge(
     challenge_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Delete a CTF challenge."""

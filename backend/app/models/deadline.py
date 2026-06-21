@@ -1,5 +1,5 @@
 """Deadline and task tracking model."""
-from sqlalchemy import Column, String, Date, DateTime, Boolean, Integer, Enum as SQLEnum, ForeignKey
+from sqlalchemy import Column, String, Date, DateTime, Boolean, Integer, Numeric, Enum as SQLEnum, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from datetime import datetime
@@ -28,6 +28,22 @@ class DeadlinePriority(str, Enum):
     URGENT = "urgent"
 
 
+class RecurrenceType(str, Enum):
+    """How a deadline repeats."""
+
+    NONE = "none"            # singola — one-off deadline (legacy behaviour)
+    INSTALLMENTS = "installments"  # rate — fixed number of payments
+    SUBSCRIPTION = "subscription"  # abbonamento — recurring forever
+
+
+class RecurrenceInterval(str, Enum):
+    """Cadence of a subscription deadline."""
+
+    MONTHLY = "monthly"
+    QUARTERLY = "quarterly"
+    YEARLY = "yearly"
+
+
 class Deadline(Base):
     """Deadline tracking for coursework, certifications, CTFs, etc."""
 
@@ -51,6 +67,19 @@ class Deadline(Base):
 
     # Reminders
     reminder_days_before = Column(Integer, default=1)
+
+    # Recurrence (rate / abbonamento). All nullable so _sync_missing_columns
+    # can add them to existing 'deadlines' rows without a migration.
+    recurrence_type = Column(
+        SQLEnum(RecurrenceType), nullable=True, default=RecurrenceType.NONE
+    )
+    # installments (rate)
+    installments_total = Column(Integer, nullable=True)
+    installments_paid = Column(Integer, nullable=True, default=0)
+    # subscription (abbonamento)
+    recurrence_interval = Column(SQLEnum(RecurrenceInterval), nullable=True)
+    # amount per rata / per period (numeric, currency-agnostic)
+    amount = Column(Numeric(12, 2), nullable=True)
 
     # Additional info
     notes = Column(String(2000), nullable=True)

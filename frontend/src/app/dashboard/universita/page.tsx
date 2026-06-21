@@ -22,6 +22,9 @@ const card: React.CSSProperties = {
   boxShadow: '0 1px 2px rgba(17,17,26,.04)',
 };
 const mono = "'JetBrains Mono',monospace";
+
+// Opzioni semestre per l'anno accademico 2026/27.
+const SEMESTRE_OPZIONI = ['1° semestre 26/27', '2° semestre 26/27'];
 const errStyle: React.CSSProperties = { margin: '2px 0 0', fontSize: 12.5, color: 'rgb(239 68 68)' };
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
@@ -292,7 +295,13 @@ function CorsoForm({ initial, onSubmit, onCancel }: { initial: UniCorso | null; 
       </FieldRow>
       <FieldRow>
         <Field label="Docente"><input className="sd-input" value={docente} onChange={(e) => setDocente(e.target.value)} placeholder="prof. …" /></Field>
-        <Field label="Semestre"><input className="sd-input" value={semestre} onChange={(e) => setSemestre(e.target.value)} placeholder="2º sem" /></Field>
+        <Field label="Semestre">
+          <select className="sd-select" value={semestre} onChange={(e) => setSemestre(e.target.value)}>
+            <option value="">—</option>
+            {!SEMESTRE_OPZIONI.includes(semestre) && semestre && <option value={semestre}>{semestre}</option>}
+            {SEMESTRE_OPZIONI.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </Field>
       </FieldRow>
       <FieldRow>
         <Field label="Stato">
@@ -399,7 +408,12 @@ function ProfiloForm({ initial, onSubmit, onCancel }: { initial: UniProfilo; onS
   return (
     <form onSubmit={submit}>
       <Field label="Corso di laurea"><input className="sd-input" value={corsoLaurea} onChange={(e) => setCorsoLaurea(e.target.value)} placeholder="Ingegneria Informatica" autoFocus /></Field>
-      <Field label="Semestre"><input className="sd-input" value={semestre} onChange={(e) => setSemestre(e.target.value)} placeholder="2º semestre · 2025–26" /></Field>
+      <Field label="Semestre">
+        <select className="sd-select" value={semestre} onChange={(e) => setSemestre(e.target.value)}>
+          {!SEMESTRE_OPZIONI.includes(semestre) && semestre && <option value={semestre}>{semestre}</option>}
+          {SEMESTRE_OPZIONI.map((o) => <option key={o} value={o}>{o}</option>)}
+        </select>
+      </Field>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
         <Field label="CFU totali"><input className="sd-input" type="number" min={0} value={tot} onChange={(e) => setTot(e.target.value)} /></Field>
         <Field label="Superati"><input className="sd-input" type="number" min={0} value={sup} onChange={(e) => setSup(e.target.value)} /></Field>

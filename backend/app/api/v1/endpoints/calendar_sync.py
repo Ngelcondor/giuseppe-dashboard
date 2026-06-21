@@ -10,7 +10,7 @@ from sqlalchemy.future import select
 from sqlalchemy import delete as sa_delete
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_editor
 from app.models.calendar_connection import CalendarConnection
 from app.models.calendar_event import CalendarEvent
 from app.schemas.calendar_connection import (
@@ -43,7 +43,7 @@ router = APIRouter(prefix="/calendar/connections", tags=["calendar-sync"])
 )
 async def create_connection(
     data: CalendarConnectionCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> CalendarConnectionResponse:
     """
@@ -123,7 +123,7 @@ async def get_connection(
 async def update_connection(
     connection_id: str,
     data: CalendarConnectionUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> CalendarConnectionResponse:
     """Aggiorna una connessione CalDAV."""
@@ -144,7 +144,7 @@ async def update_connection(
 @router.delete("/{connection_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_connection(
     connection_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Elimina una connessione CalDAV e tutti gli eventi sincronizzati."""
@@ -168,7 +168,7 @@ async def delete_connection(
 @router.post("/{connection_id}/test", response_model=CalendarConnectionTestResponse)
 async def test_connection(
     connection_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> CalendarConnectionTestResponse:
     """Testa una connessione CalDAV esistente."""
@@ -239,7 +239,7 @@ async def list_remote_calendars(
 async def trigger_sync(
     connection_id: str,
     sync_req: Optional[CalendarSyncRequest] = None,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> CalendarSyncResponse:
     """

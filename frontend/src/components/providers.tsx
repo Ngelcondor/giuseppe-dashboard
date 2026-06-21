@@ -55,6 +55,8 @@ export function Providers({ children }: { children: ReactNode }) {
       mq.addEventListener('change', handler);
       return () => mq.removeEventListener('change', handler);
     }
+
+    return undefined;
   }, [theme, lowStim]);
 
   return (

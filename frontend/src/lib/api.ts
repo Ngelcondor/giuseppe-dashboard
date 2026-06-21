@@ -96,9 +96,10 @@ api.interceptors.response.use(
       }
     }
 
+    const responseData = error.response?.data as { message?: string } | undefined;
     const apiError = new ApiError(
       error.response?.status || 500,
-      error.response?.data?.message || error.message || 'An error occurred',
+      responseData?.message || error.message || 'An error occurred',
       error.response?.data
     );
 

@@ -10,6 +10,7 @@ import { getUniversitaDashboard, type UniDashboard } from '@/services/universita
 import { getBudgetDashboard, type BudgetDashboard } from '@/services/budgetService';
 import { getScadenze, type ScadenzaItem } from '@/services/scadenzeService';
 import { getStudyOverview, type StudyOverview } from '@/services/studyService';
+import { getFamilyWeather, weatherDescription, weatherIcon, type FamilyWeather } from '@/services/weatherService';
 
 const card: React.CSSProperties = {
   background: 'rgb(var(--color-card))',
@@ -60,6 +61,7 @@ export default function HomePage() {
   const [budget, setBudget] = useState<Pick<BudgetDashboard, 'total_expenses' | 'categories'>>(EMPTY_BUDGET);
   const [scadenze, setScadenze] = useState<ScadenzaItem[]>([]);
   const [study, setStudy] = useState<StudyOverview | null>(null);
+  const [family, setFamily] = useState<FamilyWeather[]>([]);
 
   // Dynamic "today" — never hardcode the date.
   const now = new Date();
@@ -75,6 +77,7 @@ export default function HomePage() {
     getBudgetDashboard(m, y).then((d) => { if (alive) setBudget(d); }).catch(() => {/* keep empty */});
     getScadenze().then((d) => { if (alive) setScadenze(d); }).catch(() => {/* keep empty */});
     getStudyOverview().then((d) => { if (alive) setStudy(d); }).catch(() => {/* keep empty */});
+    getFamilyWeather().then((d) => { if (alive) setFamily(d); }).catch(() => {/* keep empty */});
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -247,6 +250,48 @@ export default function HomePage() {
             <div style={{ fontSize: 13, color: 'rgb(var(--color-tertiary))', padding: '4px 0' }}>{today?.isRest ? 'Oggi è riposo.' : 'Niente in programma per oggi.'}</div>
           )}
         </div>
+      </div>
+
+      {/* Famiglia · meteo reale delle città */}
+      <section className="sd-reveal sd-shadow" style={{ ['--i' as string]: 8, ...card, padding: '22px 24px', marginTop: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>La famiglia</h3>
+          <span style={{ fontSize: 11, color: 'rgb(var(--color-tertiary))', textTransform: 'uppercase', letterSpacing: '.12em', whiteSpace: 'nowrap' }}>Meteo · Open-Meteo</span>
+        </div>
+        <p style={{ margin: '0 0 16px', fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>
+          Posizione live non disponibile (Find My non espone API pubbliche). Mostro la città configurata di ogni familiare.
+        </p>
+        {family.length > 0 ? (
+          <div className="sd-grid4" style={{ gridTemplateColumns: `repeat(${Math.min(family.length, 3)}, minmax(0, 1fr))` }}>
+            {family.map((m) => (
+              <FamilyWeatherCard key={`${m.label}-${m.city}`} m={m} />
+            ))}
+          </div>
+        ) : (
+          <div style={{ padding: '12px 0 4px', fontSize: 13, color: 'rgb(var(--color-tertiary))' }}>Meteo non disponibile al momento.</div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function FamilyWeatherCard({ m }: { m: FamilyWeather }) {
+  const hasTemp = m.temp !== null && m.temp !== undefined;
+  return (
+    <div className="sd-lift" style={{ border: '1px solid rgb(var(--color-border))', borderRadius: 14, padding: 18, background: 'rgb(var(--color-card-inner))' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'rgb(var(--color-heading))', fontFamily: "'Fraunces',serif", fontStyle: 'italic' }}>{m.label || m.city}</div>
+          <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{m.city}</div>
+        </div>
+        <span style={{ fontSize: 30, lineHeight: 1 }} aria-hidden>{weatherIcon(m.code)}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 14 }}>
+        <span style={{ fontFamily: mono, fontSize: 28, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{hasTemp ? `${m.temp}°` : '—'}</span>
+        <span style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{weatherDescription(m.code)}</span>
+      </div>
+      <div style={{ fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))', marginTop: 6 }}>
+        {m.min !== null && m.min !== undefined ? `min ${m.min}°` : 'min —'} · {m.max !== null && m.max !== undefined ? `max ${m.max}°` : 'max —'}
       </div>
     </div>
   );

@@ -20,6 +20,7 @@ interface SleepSession {
   sleep_end: string;
   duration_minutes: number;
   quality_score: number | null;
+  sc_quality_score?: number | null;
   time_in_bed_minutes: number | null;
   sleep_efficiency: number | null;
   awake_minutes: number;
@@ -131,27 +132,6 @@ function Hypnogram({ phases, sleepStart, sleepEnd }: {
   );
 
   if (sorted.length === 0) return null;
-
-  // Build polyline path with smooth transitions
-  const points: string[] = [];
-
-  sorted.forEach((ph, i) => {
-    const startMs = new Date(ph.start_time).getTime() - sleepStart.getTime();
-    const endMs = new Date(ph.end_time).getTime() - sleepStart.getTime();
-    const x1 = PAD.left + (startMs / totalMs) * plotW;
-    const x2 = PAD.left + (endMs / totalMs) * plotW;
-    const y = PAD.top + PHASE_Y[ph.phase] * plotH;
-
-    if (i === 0) {
-      points.push(`M ${x1} ${y}`);
-    } else {
-      // smooth step to new level
-      points.push(`L ${x1} ${y}`);
-    }
-    points.push(`L ${x2} ${y}`);
-  });
-
-  const pathD = points.join(' ');
 
   // Time labels
   const labels: { x: number; text: string }[] = [];

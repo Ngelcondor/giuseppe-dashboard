@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, date
 from typing import List
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_editor
 from app.models.focus import PomodoroSession, FocusScore
 from app.schemas.focus import (
     PomodoroSessionCreate, PomodoroSessionResponse, PomodoroSessionUpdate,
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/focus", tags=["focus"])
 @router.post("/pomodoro/start", response_model=PomodoroSessionResponse, status_code=status.HTTP_201_CREATED)
 async def start_pomodoro(
     request: PomodoroStartRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> PomodoroSessionResponse:
     """Start a Pomodoro session."""
@@ -43,7 +43,7 @@ async def start_pomodoro(
 async def stop_pomodoro(
     session_id: str,
     request: PomodoroStopRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> PomodoroSessionResponse:
     """Stop a Pomodoro session."""
@@ -90,7 +90,7 @@ async def list_pomodoro_sessions(
 @router.post("/score", response_model=FocusScoreResponse, status_code=status.HTTP_201_CREATED)
 async def create_focus_score(
     score: FocusScoreCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> FocusScoreResponse:
     """Create a focus score entry."""

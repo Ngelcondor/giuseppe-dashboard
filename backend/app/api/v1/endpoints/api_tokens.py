@@ -10,7 +10,7 @@ from sqlalchemy.future import select
 
 from app.core.database import get_db
 from app.core.config import settings
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_editor
 from app.models.api_token import APIToken
 from app.models.user import User
 from app.schemas.api_token import (
@@ -60,7 +60,7 @@ async def list_tokens(
 @router.post("", response_model=APITokenCreated, status_code=201)
 async def create_token(
     request: APITokenCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> APITokenCreated:
     """Create a new API token. The full token is returned only once."""
@@ -100,7 +100,7 @@ async def create_token(
 @router.delete("/{token_id}", status_code=204)
 async def revoke_token(
     token_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Revoke and delete an API token."""
@@ -126,7 +126,7 @@ async def revoke_token(
 @router.patch("/{token_id}/toggle", response_model=APITokenResponse)
 async def toggle_token(
     token_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> APITokenResponse:
     """Toggle a token active/inactive."""

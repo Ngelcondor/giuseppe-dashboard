@@ -2,13 +2,11 @@
 
 import React from 'react';
 import {
-  Heart,
   Pill,
   Play,
   PlusCircle,
   Smile,
   TrendingUp,
-  Clock,
   Target,
 } from 'lucide-react';
 import { CompactWidget } from '@/components/layout/WidgetWrapper';
@@ -19,7 +17,7 @@ interface QuickAction {
   label: string;
   icon: React.ReactNode;
   color: string;
-  onClick: () => void;
+  onClick?: () => void;
   disabled?: boolean;
 }
 
@@ -28,7 +26,7 @@ interface QuickActionsProps {
   onDefaultActionClick?: (actionId: string) => void;
 }
 
-const defaultActions = [
+const defaultActions: QuickAction[] = [
   {
     id: 'mood',
     label: 'Umore',
