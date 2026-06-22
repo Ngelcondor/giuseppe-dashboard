@@ -12,13 +12,16 @@ interface TwoFAState {
   email: string;
 }
 
-// "Login 3D — Orbit" design (from Claude Design / Giuseppe Dashboard DS),
-// adapted to the app's real auth flow. Dark, self-contained theme: the color
-// tokens are overridden on .lg-root so it renders correctly over the dark
-// scene regardless of the app's light dashboard theme.
+const ACCENT_HEX = '#22c55e'; // emerald
+
+// "Login 3D — Field (Emerald)" design from Claude Design / Giuseppe Dashboard DS,
+// adapted to the app's real auth flow. WebGL icosahedron + particle field
+// (three.js, dynamically imported, self-hosted), glass two-column card with
+// mouse parallax. Dark, self-contained theme (color tokens overridden on
+// .lg-root) so it renders over the dark scene regardless of the app's light theme.
 const LOGIN_CSS = `
 .lg-root{
-  --lg-accent:99 102 241;
+  --lg-accent:34 197 94;
   --color-heading:255 255 255;
   --color-body:226 232 240;
   --color-tertiary:148 163 184;
@@ -35,19 +38,7 @@ const LOGIN_CSS = `
 .lg-glow-a{width:420px;height:420px;left:8%;top:12%;background:rgb(var(--lg-accent)/0.5);animation:lgDrift 14s ease-in-out infinite}
 .lg-glow-b{width:360px;height:360px;right:6%;bottom:8%;background:rgb(236 72 153/0.4);animation:lgDrift 18s ease-in-out infinite reverse}
 @keyframes lgDrift{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,-24px)}}
-.lg-orbit{position:absolute;inset:0;display:grid;place-items:center;perspective:1100px;pointer-events:none}
-.lg-gyro{position:relative;width:560px;height:560px;transform-style:preserve-3d;animation:lgTumble 30s linear infinite}
-.lg-ring{position:absolute;inset:0;border-radius:50%;border:1.5px solid rgb(var(--lg-accent)/0.4);box-shadow:inset 0 0 60px rgb(var(--lg-accent)/0.08)}
-.lg-ring.r1{transform:rotateX(74deg)}
-.lg-ring.r2{transform:rotateY(72deg);border-color:rgb(var(--lg-accent)/0.3)}
-.lg-ring.r3{inset:64px;transform:rotateX(58deg) rotateY(42deg);border-color:rgb(var(--lg-accent)/0.26)}
-.lg-ring.r4{inset:132px;transform:rotateX(18deg) rotateY(68deg);border:1.5px solid rgb(236 72 153/0.3)}
-.lg-ring.r5{inset:200px;transform:rotateY(30deg) rotateX(50deg);border-color:rgb(var(--lg-accent)/0.45)}
-.lg-orbdot{position:absolute;top:50%;left:50%;width:10px;height:10px;margin:-5px;border-radius:50%;background:rgb(var(--lg-accent));box-shadow:0 0 18px 2px rgb(var(--lg-accent)/0.8);transform:rotateX(74deg) translateX(280px)}
-.lg-orbdot.d2{background:rgb(236 72 153);box-shadow:0 0 18px 2px rgb(236 72 153/0.8);transform:rotateY(72deg) translateX(280px)}
-.lg-core{position:absolute;inset:42%;border-radius:50%;background:radial-gradient(circle,rgb(var(--lg-accent)/0.95),rgb(var(--lg-accent)/0) 70%);filter:blur(8px);animation:lgPulse 4.5s ease-in-out infinite}
-@keyframes lgTumble{from{transform:rotateX(0) rotateY(0)}to{transform:rotateX(360deg) rotateY(360deg)}}
-@keyframes lgPulse{0%,100%{opacity:.65;transform:scale(.92)}50%{opacity:1;transform:scale(1.08)}}
+.lg-webgl{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
 .lg-stage{position:relative;z-index:5;min-height:100vh;display:grid;place-items:center;padding:40px 20px}
 .lg-cardwrap{perspective:1300px}
 .lg-card{position:relative;width:min(424px,92vw);transform-style:preserve-3d;transform:rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));transition:transform .18s cubic-bezier(.2,.7,.2,1);
@@ -56,10 +47,18 @@ const LOGIN_CSS = `
   backdrop-filter:blur(22px) saturate(1.2);-webkit-backdrop-filter:blur(22px) saturate(1.2);
   box-shadow:0 50px 100px -28px rgb(0 0 0/0.8),0 0 0 1px rgb(var(--lg-accent)/0.07),inset 0 1px 0 rgb(255 255 255/0.09);
   display:flex;overflow:visible}
+.lg-card:has(.lg-brandpanel){width:min(800px,95vw)}
 .lg-sheen{position:absolute;inset:0;border-radius:26px;background:linear-gradient(120deg,transparent 35%,rgb(255 255 255/0.07) 48%,transparent 60%);pointer-events:none;opacity:.7}
+.lg-brandpanel{position:relative;flex:none;width:44%;padding:40px 34px;transform-style:preserve-3d;border-radius:26px 0 0 26px;border-right:1px solid rgb(255 255 255/0.08);
+  background:linear-gradient(165deg,rgb(var(--lg-accent)/0.22),rgb(255 255 255/0.015));display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
+.lg-brandpanel::after{content:"";position:absolute;width:240px;height:240px;border-radius:50%;right:-90px;bottom:-90px;background:radial-gradient(circle,rgb(var(--lg-accent)/0.5),transparent 70%);filter:blur(20px)}
+.lg-brandh{margin:14px 0 0;font-size:27px;line-height:1.08;letter-spacing:-.02em;color:rgb(var(--color-heading));font-weight:600}
+.lg-brandh em{font-family:'Fraunces',serif;font-style:italic;font-weight:500}
+.lg-brandp{margin:14px 0 0;font-size:13.5px;line-height:1.55;color:rgb(var(--color-body));opacity:.82;max-width:240px}
 .lg-formcol{flex:1;min-width:0;padding:40px 38px;transform-style:preserve-3d}
-@media(max-width:640px){.lg-formcol{padding:34px 28px}}
-.lg-mark{width:38px;height:38px;border-radius:11px;background:rgb(var(--lg-accent));display:flex;align-items:center;justify-content:center;color:#fff;font-family:'Fraunces',serif;font-style:italic;font-weight:600;font-size:21px;flex:none;box-shadow:0 8px 24px -6px rgb(var(--lg-accent)/0.8)}
+.lg-formbrand{display:none}
+@media(max-width:640px){.lg-brandpanel{display:none}.lg-card:has(.lg-brandpanel){width:min(424px,92vw)}.lg-formcol{padding:34px 28px}.lg-formbrand{display:flex}}
+.lg-mark{width:38px;height:38px;border-radius:11px;background:rgb(var(--lg-accent));display:flex;align-items:center;justify-content:center;color:#06210f;font-family:'Fraunces',serif;font-style:italic;font-weight:600;font-size:21px;flex:none;box-shadow:0 8px 24px -6px rgb(var(--lg-accent)/0.8)}
 .lg-brandtop{display:flex;align-items:center;gap:12px;margin-bottom:30px}
 .lg-brandtop .nm{font-size:15.5px;font-weight:600;color:rgb(var(--color-heading));letter-spacing:-.01em}
 .lg-brandtop .tg{font-size:11.5px;color:rgb(var(--color-tertiary))}
@@ -81,11 +80,11 @@ const LOGIN_CSS = `
 .lg-remember{display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none}
 .lg-remember input{appearance:none;-webkit-appearance:none;width:18px;height:18px;border-radius:6px;border:1.5px solid rgb(255 255 255/0.2);background:rgb(255 255 255/0.04);cursor:pointer;position:relative;flex:none;transition:.18s}
 .lg-remember input:checked{background:rgb(var(--lg-accent));border-color:rgb(var(--lg-accent))}
-.lg-remember input:checked::after{content:"";position:absolute;left:5px;top:1.5px;width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.lg-remember input:checked::after{content:"";position:absolute;left:5px;top:1.5px;width:5px;height:9px;border:solid #06210f;border-width:0 2px 2px 0;transform:rotate(45deg)}
 .lg-remember span{font-size:13px;color:rgb(var(--color-body))}
 .lg-link{font-size:12.5px;color:rgb(var(--lg-accent));text-decoration:none;font-weight:500;background:none;border:none;cursor:pointer;padding:0}
 .lg-link:hover{text-decoration:underline}
-.lg-submit{width:100%;border:none;border-radius:13px;padding:14px 18px;font:600 15px/1 'Inter Tight',sans-serif;color:#fff;cursor:pointer;background:rgb(var(--lg-accent));box-shadow:0 14px 34px -10px rgb(var(--lg-accent)/0.85);transition:transform .14s,box-shadow .2s,filter .2s}
+.lg-submit{width:100%;border:none;border-radius:13px;padding:14px 18px;font:600 15px/1 'Inter Tight',sans-serif;color:#06210f;cursor:pointer;background:rgb(var(--lg-accent));box-shadow:0 14px 34px -10px rgb(var(--lg-accent)/0.85);transition:transform .14s,box-shadow .2s,filter .2s}
 .lg-submit:hover{filter:brightness(1.08);box-shadow:0 18px 44px -10px rgb(var(--lg-accent)/0.95)}
 .lg-submit:active{transform:scale(.98)}
 .lg-submit:disabled{opacity:.65;cursor:not-allowed;filter:none}
@@ -99,10 +98,86 @@ const LOGIN_CSS = `
 }
 @media(prefers-reduced-motion:reduce){
   .lg-anim .lg-reveal{opacity:1;transform:none}
-  .lg-gyro,.lg-glow,.lg-core{animation:none}
+  .lg-glow{animation:none}
   .lg-card{transition:none}
 }
 `;
+
+const clamp = (n: number) => Math.max(-1, Math.min(1, n));
+
+// WebGL icosahedron + particle field (ported from the Claude Design template).
+// THREE is the dynamically-imported module; mouse is a live {x,y} the render
+// loop reads for parallax. Returns a disposer.
+function buildScene(THREE: any, canvas: HTMLCanvasElement, hex: string, mouse: { x: number; y: number }, reduce: boolean) {
+  const sz = (): [number, number] => [
+    canvas.clientWidth || canvas.parentElement?.clientWidth || window.innerWidth,
+    canvas.clientHeight || canvas.parentElement?.clientHeight || window.innerHeight,
+  ];
+  let [w, h] = sz();
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  renderer.setSize(w, h, false);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(55, w / h, 0.1, 100);
+  camera.position.z = 6.4;
+  const col = new THREE.Color(hex);
+
+  const geo = new THREE.IcosahedronGeometry(2.15, 1);
+  const line = new THREE.LineSegments(
+    new THREE.WireframeGeometry(geo),
+    new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.72 }),
+  );
+  scene.add(line);
+  const solid = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.07 }));
+  scene.add(solid);
+
+  const N = 700;
+  const pos = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    const rad = 3.2 + Math.random() * 4.5;
+    const a = Math.random() * Math.PI * 2;
+    const bb = Math.acos(2 * Math.random() - 1);
+    pos[i * 3] = rad * Math.sin(bb) * Math.cos(a);
+    pos[i * 3 + 1] = rad * Math.sin(bb) * Math.sin(a);
+    pos[i * 3 + 2] = rad * Math.cos(bb);
+  }
+  const pgeo = new THREE.BufferGeometry();
+  pgeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const pts = new THREE.Points(pgeo, new THREE.PointsMaterial({ color: col, size: 0.035, transparent: true, opacity: 0.65 }));
+  scene.add(pts);
+
+  let raf = 0;
+  let running = true;
+  const resize = () => { const [W, H] = sz(); renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix(); };
+  window.addEventListener('resize', resize);
+
+  const loop = () => {
+    if (!running) return;
+    line.rotation.y += 0.0035; line.rotation.x += 0.0013;
+    solid.rotation.copy(line.rotation);
+    pts.rotation.y -= 0.0009; pts.rotation.x += 0.0004;
+    camera.position.x += (mouse.x * 1.4 - camera.position.x) * 0.05;
+    camera.position.y += (-mouse.y * 1.4 - camera.position.y) * 0.05;
+    camera.lookAt(0, 0, 0);
+    renderer.render(scene, camera);
+    raf = requestAnimationFrame(loop);
+  };
+  if (reduce) {
+    camera.lookAt(0, 0, 0);
+    renderer.render(scene, camera); // single static frame
+  } else {
+    loop();
+  }
+
+  return {
+    dispose() {
+      running = false;
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', resize);
+      try { geo.dispose(); pgeo.dispose(); renderer.dispose(); } catch { /* noop */ }
+    },
+  };
+}
 
 export default function AuthPage() {
   const router = useRouter();
@@ -118,37 +193,55 @@ export default function AuthPage() {
 
   const rootRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Entrance reveal + mouse-tilt parallax (respects reduced motion).
   useEffect(() => {
     const root = rootRef.current;
     const card = cardRef.current;
+    const canvas = canvasRef.current;
     if (!root) return;
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    const raf = requestAnimationFrame(() => requestAnimationFrame(() => root.classList.add('lg-lit')));
+    const raf0 = requestAnimationFrame(() => requestAnimationFrame(() => root.classList.add('lg-lit')));
     const t1 = window.setTimeout(() => root.classList.add('lg-lit'), 120);
     const t2 = window.setTimeout(() => root.classList.remove('lg-anim'), 1600);
 
+    const mouse = { x: 0, y: 0 };
     let onMove: ((e: PointerEvent) => void) | undefined;
-    if (!reduce && card) {
+    if (!reduce) {
       const stage = root.querySelector<HTMLElement>('.lg-stage');
       onMove = (e: PointerEvent) => {
         if (!stage) return;
         const r = stage.getBoundingClientRect();
-        const cx = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / (r.width / 2)));
-        const cy = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / (r.height / 2)));
-        card.style.setProperty('--ry', (cx * 15).toFixed(2) + 'deg');
-        card.style.setProperty('--rx', (cy * -15).toFixed(2) + 'deg');
+        const cx = clamp((e.clientX - (r.left + r.width / 2)) / (r.width / 2));
+        const cy = clamp((e.clientY - (r.top + r.height / 2)) / (r.height / 2));
+        mouse.x = cx; mouse.y = cy;
+        if (card) {
+          card.style.setProperty('--ry', (cx * 13).toFixed(2) + 'deg');
+          card.style.setProperty('--rx', (cy * -13).toFixed(2) + 'deg');
+        }
       };
       window.addEventListener('pointermove', onMove, { passive: true });
     }
 
+    let scene: { dispose: () => void } | undefined;
+    let cancelled = false;
+    (async () => {
+      if (!canvas) return;
+      try {
+        const THREE = await import('three');
+        if (cancelled) return;
+        scene = buildScene(THREE, canvas, ACCENT_HEX, mouse, reduce);
+      } catch { /* WebGL unavailable — the static gradient/grid/glows still render */ }
+    })();
+
     return () => {
-      cancelAnimationFrame(raf);
+      cancelled = true;
+      cancelAnimationFrame(raf0);
       window.clearTimeout(t1);
       window.clearTimeout(t2);
       if (onMove) window.removeEventListener('pointermove', onMove);
+      if (scene) scene.dispose();
     };
   }, []);
 
@@ -156,8 +249,7 @@ export default function AuthPage() {
     setToken(accessToken);
     const store = remember ? window.localStorage : window.sessionStorage;
     store.setItem('token', accessToken);
-    // api.ts reads localStorage.token — mirror there so the session works either way.
-    window.localStorage.setItem('token', accessToken);
+    window.localStorage.setItem('token', accessToken); // api.ts reads localStorage.token
     if (refreshToken) store.setItem('refreshToken', refreshToken);
   };
 
@@ -217,6 +309,16 @@ export default function AuthPage() {
     }
   };
 
+  const Brand = ({ className = '', z = 62 }: { className?: string; z?: number }) => (
+    <div className={`lg-brandtop ${className}`} style={{ transform: `translateZ(${z}px)` }}>
+      <span className="lg-mark">G</span>
+      <div>
+        <div className="nm">Giuseppe Dashboard</div>
+        <div className="tg">Control center</div>
+      </div>
+    </div>
+  );
+
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: LOGIN_CSS }} />
@@ -224,20 +326,7 @@ export default function AuthPage() {
         <div className="lg-grid" />
         <div className="lg-glow lg-glow-a" />
         <div className="lg-glow lg-glow-b" />
-
-        <div className="lg-orbit" aria-hidden="true">
-          <div className="lg-gyro">
-            <div className="lg-ring r1" />
-            <div className="lg-ring r2" />
-            <div className="lg-ring r3" />
-            <div className="lg-ring r4" />
-            <div className="lg-ring r5" />
-            <div className="lg-orbdot" />
-            <div className="lg-orbdot d2" />
-            <div className="lg-core" />
-          </div>
-        </div>
-
+        <canvas ref={canvasRef} className="lg-webgl" aria-hidden="true" />
         <div className="lg-vignette" />
         <div className="lg-chip"><i />SISTEMA OPERATIVO</div>
 
@@ -245,14 +334,18 @@ export default function AuthPage() {
           <div className="lg-cardwrap lg-reveal">
             <div className="lg-card" ref={cardRef}>
               <div className="lg-sheen" />
-              <div className="lg-formcol">
-                <div className="lg-brandtop" style={{ transform: 'translateZ(62px)' }}>
-                  <span className="lg-mark">G</span>
-                  <div>
-                    <div className="nm">Giuseppe Dashboard</div>
-                    <div className="tg">Il tuo spazio di studio</div>
-                  </div>
+
+              <div className="lg-brandpanel">
+                <Brand className="" z={40} />
+                <div style={{ transform: 'translateZ(30px)' }}>
+                  <div className="lg-eyebrow">Accesso riservato</div>
+                  <h2 className="lg-brandh">Tutto il tuo studio,<br /><em>in un solo posto.</em></h2>
+                  <p className="lg-brandp">Corsi, scadenze, certificazioni e budget. Riprendi da dove avevi lasciato.</p>
                 </div>
+              </div>
+
+              <div className="lg-formcol">
+                <Brand className="lg-formbrand" z={62} />
 
                 {twoFA.enabled ? (
                   <>
@@ -261,38 +354,23 @@ export default function AuthPage() {
                       <h1 className="lg-h1">Due <em>fattori</em></h1>
                       <p className="lg-sub">Inserisci il codice dalla tua app authenticator.</p>
                     </div>
-
                     {error && (
-                      <div className="lg-error" role="alert">
-                        <AlertCircle size={16} />
-                        <span>{error}</span>
-                      </div>
+                      <div className="lg-error" role="alert"><AlertCircle size={16} /><span>{error}</span></div>
                     )}
-
                     <form className="lg-form" onSubmit={handleTwoFASubmit}>
                       <div className="lg-field" style={{ transform: 'translateZ(30px)' }}>
                         <label className="lg-label" htmlFor="lg-2fa">Codice 2FA</label>
                         <input
-                          className="lg-input"
-                          id="lg-2fa"
-                          type="text"
-                          inputMode="numeric"
-                          maxLength={6}
-                          placeholder="000000"
-                          autoComplete="one-time-code"
-                          value={twoFA.code}
+                          className="lg-input" id="lg-2fa" type="text" inputMode="numeric" maxLength={6}
+                          placeholder="000000" autoComplete="one-time-code" value={twoFA.code}
                           onChange={(e) => { setTwoFA((p) => ({ ...p, code: e.target.value.replace(/\D/g, '') })); setError(''); }}
                         />
                       </div>
                       <div className="lg-row" style={{ transform: 'translateZ(22px)' }}>
-                        <button type="button" className="lg-link" onClick={() => { setTwoFA({ enabled: false, code: '', email: '' }); setError(''); }}>
-                          ← Indietro
-                        </button>
+                        <button type="button" className="lg-link" onClick={() => { setTwoFA({ enabled: false, code: '', email: '' }); setError(''); }}>← Indietro</button>
                       </div>
                       <div style={{ transform: 'translateZ(54px)', marginTop: 6 }}>
-                        <button className="lg-submit" type="submit" disabled={isLoading}>
-                          {isLoading ? 'Verifica…' : 'Verifica'}
-                        </button>
+                        <button className="lg-submit" type="submit" disabled={isLoading}>{isLoading ? 'Verifica…' : 'Verifica'}</button>
                       </div>
                     </form>
                   </>
@@ -303,24 +381,15 @@ export default function AuthPage() {
                       <h1 className="lg-h1">Accedi al tuo <em>spazio</em></h1>
                       <p className="lg-sub">Inserisci le credenziali per continuare.</p>
                     </div>
-
                     {error && (
-                      <div className="lg-error" role="alert">
-                        <AlertCircle size={16} />
-                        <span>{error}</span>
-                      </div>
+                      <div className="lg-error" role="alert"><AlertCircle size={16} /><span>{error}</span></div>
                     )}
-
                     <form className="lg-form" onSubmit={handleSubmit}>
                       <div className="lg-field" style={{ transform: 'translateZ(30px)' }}>
                         <label className="lg-label" htmlFor="lg-email">Email</label>
                         <input
-                          className="lg-input"
-                          id="lg-email"
-                          type="email"
-                          placeholder="nome@esempio.com"
-                          autoComplete="username"
-                          value={email}
+                          className="lg-input" id="lg-email" type="email" placeholder="nome@esempio.com"
+                          autoComplete="username" value={email}
                           onChange={(e) => { setEmail(e.target.value); setError(''); }}
                         />
                       </div>
@@ -328,20 +397,11 @@ export default function AuthPage() {
                         <label className="lg-label" htmlFor="lg-pass">Password</label>
                         <div className="lg-inputwrap">
                           <input
-                            className="lg-input"
-                            id="lg-pass"
-                            type={showPassword ? 'text' : 'password'}
-                            placeholder="••••••••••"
-                            autoComplete="current-password"
-                            value={password}
+                            className="lg-input" id="lg-pass" type={showPassword ? 'text' : 'password'}
+                            placeholder="••••••••••" autoComplete="current-password" value={password}
                             onChange={(e) => { setPassword(e.target.value); setError(''); }}
                           />
-                          <button
-                            type="button"
-                            className="lg-eye"
-                            aria-label={showPassword ? 'Nascondi password' : 'Mostra password'}
-                            onClick={() => setShowPassword((s) => !s)}
-                          >
+                          <button type="button" className="lg-eye" aria-label={showPassword ? 'Nascondi password' : 'Mostra password'} onClick={() => setShowPassword((s) => !s)}>
                             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                           </button>
                         </div>
@@ -353,9 +413,7 @@ export default function AuthPage() {
                         </label>
                       </div>
                       <div style={{ transform: 'translateZ(54px)', marginTop: 6 }}>
-                        <button className="lg-submit" type="submit" disabled={isLoading}>
-                          {isLoading ? 'Accesso…' : 'Accedi'}
-                        </button>
+                        <button className="lg-submit" type="submit" disabled={isLoading}>{isLoading ? 'Accesso…' : 'Accedi'}</button>
                       </div>
                     </form>
                   </>
