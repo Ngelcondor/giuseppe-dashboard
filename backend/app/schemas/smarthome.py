@@ -51,3 +51,19 @@ class ShellyDevicesResponse(BaseModel):
     total_power_w: float = 0.0
     total_kwh: float = 0.0
     error: Optional[str] = None
+
+
+class ShellyConsumptionDevice(BaseModel):
+    device_id: str
+    name: str
+    consumption_kwh: float
+
+
+class ShellyConsumptionResponse(BaseModel):
+    connected: bool
+    period: str  # day | week | month
+    total_kwh: float = 0.0
+    devices: List[ShellyConsumptionDevice] = []
+    data_since: Optional[str] = None  # ISO ts of the earliest snapshot (honesty)
+    samples: int = 0                  # snapshots in the window
+    error: Optional[str] = None

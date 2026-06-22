@@ -25,6 +25,9 @@ from app.services.focus_calculator import calculate_daily_focus_score
 from app.services.feed_service import fetch_cybersecurity_feed
 from app.services.weather_service import get_weather
 from app.services.caldav_service import sync_calendar_events
+from app.services.smarthome_service import shelly_devices
+from app.models.app_settings import AppSetting
+from app.models.shelly_reading import ShellyReading
 from app.tasks.celery_app import celery_app
 
 # Optional: Medication model not yet created
@@ -94,6 +97,48 @@ def calculate_focus_scores():
                 score_data = await calculate_daily_focus_score(str(user.id), today, db)
                 if score_data:
                     pass
+
+        await engine.dispose()
+
+    _run_async(_inner())
+
+
+@celery_app.task
+def snapshot_shelly_readings():
+    """Snapshot each user's Shelly device cumulative energy counters.
+
+    The Shelly Cloud exposes no historical consumption, so we record
+    `aenergy.total` per device on a schedule; per-period consumption is the
+    delta between snapshots (see smarthome_service.consumption_kwh).
+    """
+
+    async def _inner():
+        engine = create_async_engine(settings.DATABASE_URL)
+        async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+        async with async_session() as db:
+            result = await db.execute(select(AppSetting).where(AppSetting.key == "shelly"))
+            rows = result.scalars().all()
+            recorded = 0
+            for row in rows:
+                cfg = row.value or {}
+                if not (cfg.get("auth_key") and cfg.get("server")):
+                    continue
+                try:
+                    devices = await shelly_devices(cfg["auth_key"], cfg["server"])
+                except Exception as exc:  # noqa: BLE001 — skip this user, keep going
+                    logger.warning("Shelly snapshot failed for user %s: %s", row.user_id, exc)
+                    continue
+                for d in devices:
+                    db.add(ShellyReading(
+                        user_id=row.user_id,
+                        device_id=d["device_id"],
+                        name=d.get("name"),
+                        total_kwh=float(d["total_kwh"]),
+                    ))
+                    recorded += 1
+            if recorded:
+                await db.commit()
 
         await engine.dispose()
 
