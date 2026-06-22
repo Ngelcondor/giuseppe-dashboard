@@ -17,12 +17,15 @@ SHELLY_TIMEOUT = 10.0
 async def hue_get_lights(bridge_ip: str, app_key: str) -> List[Dict[str, Any]]:
     """Fetch lights from the local Hue bridge.
 
-    GET http://{bridge_ip}/api/{app_key}/lights
+    GET https://{bridge_ip}/api/{app_key}/lights
     Returns a normalised list [{id, name, on, bri, reachable}].
     Raises httpx.HTTPError / ValueError on failure (handled by caller).
+
+    Modern Hue bridges run nginx and force HTTPS (HTTP 301-redirects to it)
+    with a self-signed cert (CN = bridgeid) -> verify=False, follow redirects.
     """
-    url = f"http://{bridge_ip}/api/{app_key}/lights"
-    async with httpx.AsyncClient() as client:
+    url = f"https://{bridge_ip}/api/{app_key}/lights"
+    async with httpx.AsyncClient(verify=False, follow_redirects=True) as client:
         resp = await client.get(url, timeout=HUE_TIMEOUT)
         resp.raise_for_status()
         data = resp.json()
@@ -52,7 +55,7 @@ async def hue_set_light(
     bridge_ip: str, app_key: str, light_id: str,
     on: Optional[bool], bri: Optional[int],
 ) -> None:
-    """Control a light: PUT http://{bridge_ip}/api/{app_key}/lights/{id}/state.
+    """Control a light: PUT https://{bridge_ip}/api/{app_key}/lights/{id}/state.
 
     Raises on transport/bridge error (handled by caller).
     """
@@ -65,8 +68,8 @@ async def hue_set_light(
     if not body:
         return
 
-    url = f"http://{bridge_ip}/api/{app_key}/lights/{light_id}/state"
-    async with httpx.AsyncClient() as client:
+    url = f"https://{bridge_ip}/api/{app_key}/lights/{light_id}/state"
+    async with httpx.AsyncClient(verify=False, follow_redirects=True) as client:
         resp = await client.put(url, json=body, timeout=HUE_TIMEOUT)
         resp.raise_for_status()
         data = resp.json()
