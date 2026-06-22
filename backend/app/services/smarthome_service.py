@@ -144,3 +144,31 @@ async def shelly_devices(auth_key: str, server: str) -> List[Dict[str, Any]]:
         })
     out.sort(key=lambda d: d["name"].lower())
     return out
+
+
+def consumption_kwh(readings, period_start) -> float:
+    """Energy consumed in [period_start, now] from cumulative snapshots.
+
+    `readings` is one device's snapshots (objects with .recorded_at and
+    .total_kwh) sorted ascending, including at least one anchor BEFORE
+    period_start when available. Consumption = sum of positive deltas between
+    consecutive snapshots; a negative delta (the device's counter was reset)
+    contributes 0 rather than a bogus huge/negative number. Returns 0.0 when
+    there aren't yet two usable snapshots (history still accumulating).
+    """
+    anchor = None
+    in_window = []
+    for r in readings:
+        if r.recorded_at < period_start:
+            anchor = r  # keep the latest snapshot before the window
+        else:
+            in_window.append(r)
+    series = ([anchor] if anchor is not None else []) + in_window
+    if len(series) < 2:
+        return 0.0
+    total = 0.0
+    for a, b in zip(series, series[1:]):
+        delta = float(b.total_kwh) - float(a.total_kwh)
+        if delta > 0:
+            total += delta
+    return round(total, 3)

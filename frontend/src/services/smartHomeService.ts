@@ -60,3 +60,26 @@ export async function getShellyDevices(): Promise<ShellyDevicesResponse> {
   const { data } = await api.get<ShellyDevicesResponse>('/smarthome/shelly/devices');
   return data;
 }
+
+// ── Shelly consumption history (per-period, from hourly snapshots) ──
+export type ShellyPeriod = 'day' | 'week' | 'month';
+export interface ShellyConsumptionDevice {
+  device_id: string;
+  name: string;
+  consumption_kwh: number;
+}
+export interface ShellyConsumptionResponse {
+  connected: boolean;
+  period: ShellyPeriod;
+  total_kwh: number;
+  devices: ShellyConsumptionDevice[];
+  data_since?: string | null;
+  samples: number;
+  error?: string | null;
+}
+export async function getShellyConsumption(period: ShellyPeriod): Promise<ShellyConsumptionResponse> {
+  const { data } = await api.get<ShellyConsumptionResponse>('/smarthome/shelly/consumption', {
+    params: { period },
+  });
+  return data;
+}

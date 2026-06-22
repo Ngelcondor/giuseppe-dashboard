@@ -15,6 +15,7 @@ from app.models import (  # noqa: F401
 )
 from app.models import health, notification, api_token, study, university  # noqa: F401
 from app.models import app_settings  # noqa: F401
+from app.models import shelly_reading  # noqa: F401
 from app.core.redis import init_redis, close_redis
 from app.api.v1.router import router as api_v1_router
 

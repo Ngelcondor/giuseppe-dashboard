@@ -7,18 +7,22 @@ user's own Hue bridge (local API) and Shelly Cloud account. NO fabricated
 brightness, kWh or costs — ever.
 """
 from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_editor
 from app.services.settings_store import get_setting
 from app.services import smarthome_service as sh
+from app.models.shelly_reading import ShellyReading
 from app.schemas.smarthome import (
     SmartHomeStatus,
     HueLight, HueLightsResponse, HueLightUpdate,
     ShellyDevice, ShellyDevicesResponse,
+    ShellyConsumptionDevice, ShellyConsumptionResponse,
 )
 
 router = APIRouter(prefix="/smarthome", tags=["smarthome"])
@@ -130,4 +134,78 @@ async def shelly_devices(
         devices=points,
         total_power_w=round(sum(p.power_w for p in points), 1),
         total_kwh=round(sum(p.total_kwh for p in points), 3),
+    )
+
+
+@router.get("/shelly/consumption", response_model=ShellyConsumptionResponse)
+async def shelly_consumption(
+    period: str = Query("day", pattern="^(day|week|month)$"),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ShellyConsumptionResponse:
+    """Per-device energy consumed in the period, from hourly snapshots.
+
+    consumption = delta of the cumulative counter across the window (a Celery
+    beat task records snapshots). History accumulates from the first snapshot,
+    so recent windows may read 0 until enough data exists (data_since/samples
+    make that explicit). Never fabricated.
+    """
+    cfg = await get_setting(db, current_user["sub"], SHELLY_KEY)
+    if not _shelly_ready(cfg):
+        return ShellyConsumptionResponse(connected=False, period=period)
+
+    now = datetime.utcnow()
+    if period == "day":
+        period_start = datetime(now.year, now.month, now.day)
+    elif period == "week":
+        period_start = now - timedelta(days=7)
+    else:  # month
+        period_start = now - timedelta(days=30)
+
+    uid = current_user["sub"]
+    # Pull window rows plus ~1 day of lookback so each device has an anchor
+    # snapshot taken just before period_start.
+    result = await db.execute(
+        select(ShellyReading)
+        .where(
+            ShellyReading.user_id == uid,
+            ShellyReading.recorded_at >= period_start - timedelta(hours=26),
+        )
+        .order_by(ShellyReading.device_id, ShellyReading.recorded_at)
+    )
+    rows = result.scalars().all()
+
+    by_device: Dict[str, list] = {}
+    names: Dict[str, str] = {}
+    samples = 0
+    for r in rows:
+        by_device.setdefault(r.device_id, []).append(r)
+        names[r.device_id] = r.name or r.device_id
+        if r.recorded_at >= period_start:
+            samples += 1
+
+    devices = []
+    for dev_id, readings in by_device.items():
+        kwh = sh.consumption_kwh(readings, period_start)
+        devices.append(ShellyConsumptionDevice(
+            device_id=dev_id, name=names.get(dev_id, dev_id), consumption_kwh=kwh,
+        ))
+    devices.sort(key=lambda d: d.name.lower())
+
+    # Earliest snapshot overall (when collection started) — honest context.
+    first = await db.execute(
+        select(ShellyReading.recorded_at)
+        .where(ShellyReading.user_id == uid)
+        .order_by(ShellyReading.recorded_at)
+        .limit(1)
+    )
+    data_since = first.scalars().first()
+
+    return ShellyConsumptionResponse(
+        connected=True,
+        period=period,
+        total_kwh=round(sum(d.consumption_kwh for d in devices), 3),
+        devices=devices,
+        data_since=data_since.isoformat() if data_since else None,
+        samples=samples,
     )

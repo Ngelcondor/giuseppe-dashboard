@@ -41,6 +41,12 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.periodic.refresh_cybersecurity_feed",
         "schedule": crontab(minute=0, hour="*/2"),
     },
+    # Snapshot consumi Shelly ogni ora (per lo storico giorno/settimana/mese)
+    "snapshot-shelly-readings-hourly": {
+        "task": "app.tasks.periodic.snapshot_shelly_readings",
+        "schedule": crontab(minute=5),  # every hour at :05
+        "options": {"expires": 600},
+    },
     # Check medication reminders ogni 30 minuti
     "check-medication-reminders": {
         "task": "app.tasks.periodic.check_medication_reminders",
