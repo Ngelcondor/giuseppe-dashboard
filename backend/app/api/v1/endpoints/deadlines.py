@@ -203,8 +203,9 @@ def _expand_occurrences(d: Deadline, today: date, horizon_end: date) -> List[Dea
     within [today, horizon_end].
 
     - none: the single deadline itself, if not completed and within horizon.
-    - installments: the remaining UNPAID rate. Rata k falls on due_date + (k-1)
-      intervals. With no explicit interval we space rate one month apart.
+    - installments: the remaining UNPAID rate. due_date is the NEXT unpaid rata
+      (rata #paid+1); the rest follow one interval apart. With no explicit
+      interval we space rate one month apart.
     - subscription: every period from due_date forward that lands in the window.
     """
     rec = d.recurrence_type or RecurrenceType.NONE
@@ -225,15 +226,17 @@ def _expand_occurrences(d: Deadline, today: date, horizon_end: date) -> List[Dea
 
     if rec == RecurrenceType.INSTALLMENTS:
         total = d.installments_total or 0
-        paid = d.installments_paid or 0
+        paid = max(0, d.installments_paid or 0)
         if total <= 0:
             return out
-        # Rate are spaced one month apart starting at due_date.
-        for k in range(paid + 1, total + 1):  # 1-based remaining rate
-            when = d.due_date + relativedelta(months=(k - 1))
+        step = _INTERVAL_MONTHS.get(d.recurrence_interval or RecurrenceInterval.MONTHLY, 1)
+        # due_date is the next unpaid rata (#paid+1); the rest follow one
+        # interval apart. Rata #(paid+1+i) falls on due_date + i*step.
+        for i in range(total - paid):
+            when = d.due_date + relativedelta(months=step * i)
             if when > horizon_end:
                 break
-            out.append(_make(when, index=k, total=total))
+            out.append(_make(when, index=paid + 1 + i, total=total))
         return out
 
     if rec == RecurrenceType.SUBSCRIPTION:
