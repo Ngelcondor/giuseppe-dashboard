@@ -38,8 +38,20 @@ is `src/components/**` (primarily `src/components/ui`). The converter runs in
       BUT PostCSS pushes a same-line source comment onto its own line, where the app won't read it —
       so `annotate-tw.mjs` strips orphaned standalone `@kind` lines and re-attaches `@kind` inline.
   **Always run `annotate-tw.mjs` after `tailwindcss`** (it's in the regen command), or these reappear
-  mis-tagged next sync. Idempotent. After upload, re-open the project so the app regenerates
-  `x-omelette`, then `check_design_system` should report 0 issues.
+  mis-tagged next sync. Idempotent.
+- **`--tw-*` split out of the scraped bundle — `split-tokens.mjs` (POST-build step).** `@kind` only
+  *classifies*; the adherence check still flags `--tw-*` because they're declared under style
+  selectors (`*,::before,::after,::backdrop`, `.space-y-*`), not `:root`/`[data-*]`. There is NO
+  ignore mechanism (converter config strict; project-side `ignoreTokens`/`ignoreTokenPrefixes` under
+  `x-omelette` is NOT honored — tested). The app scrapes tokens from **`_ds_bundle.css`**, so
+  `.design-sync/build/split-tokens.mjs` moves every rule that declares `--tw-*` into a sibling
+  **`_ds_tw.css`** (99 rules / 215 decls) and rewrites `styles.css` to `@import "./_ds_tw.css"` then
+  `"./_ds_bundle.css"`. Result: the scraped `_ds_bundle.css` has 0 `--tw-*` (only real `:root`/theme
+  tokens); the render closure is unchanged (both files imported). Upload `_ds_bundle.css`,
+  **`_ds_tw.css`**, AND `styles.css`. **Run order each sync: `package-build` → `split-tokens.mjs
+  ds-bundle/_ds_bundle.css`** (package-build rewrites `styles.css` to import only `_ds_bundle.css`, so
+  the split MUST run after it). Caveat: this works only because the app scrapes `_ds_bundle.css`
+  specifically (not the whole `styles.css` closure) — confirmed by `check_design_system` reporting 0.
 
 ## Sync-time shims & forks (all in .design-sync/)
 
