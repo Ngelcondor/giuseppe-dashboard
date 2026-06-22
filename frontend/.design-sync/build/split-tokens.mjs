@@ -63,8 +63,10 @@ const units = topLevelUnits(css);
 const twUnits = [];   // declare --tw-* somewhere
 const tokenUnits = []; // everything else (incl. :root design tokens)
 for (const u of units) {
-  // A unit "declares" --tw-* if it contains a `--tw-...:` declaration.
-  if (/--tw-[A-Za-z0-9-]+\s*:/.test(u)) twUnits.push(u);
+  // Route ANY rule mentioning --tw-* (declaration OR var() usage) out of the
+  // scraped bundle, so _ds_bundle.css contains zero --tw- text — removes the
+  // ambiguity of whether the checker counts declarations or also references.
+  if (u.includes('--tw-')) twUnits.push(u);
   else tokenUnits.push(u);
 }
 
