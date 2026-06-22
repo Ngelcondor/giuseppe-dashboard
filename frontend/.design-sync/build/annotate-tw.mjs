@@ -9,10 +9,15 @@
 // what reaches the bundle the app classifies. Run IN-PLACE on ds.css right
 // after `tailwindcss` (see .design-sync/NOTES.md). Idempotent.
 //
+// Valid @kind values (Claude Design adherence check): color, spacing, radius,
+// shadow, font, other. ("ignore" is NOT valid — it fails the check.)
+//
 // Rules:
-//   --tw-*    Tailwind preflight/utility internals  -> /* @kind ignore */
-//             (the "ignore pattern --tw-*" — keeps them out of design tokens;
-//              referenced at runtime so they can't be stripped)
+//   --tw-*    Tailwind preflight/utility internals (~40 unique, ~98 decls across
+//             *,::before,::after,::backdrop and .space-y-*)  -> /* @kind other */
+//             (runtime vars, not design tokens — can't be stripped, so tag them
+//              "other"; true exclusion would need a token-ignore in the converter
+//              config, which doesn't exist — the app scrapes tokens from the CSS)
 //   --accent-{primary,secondary,tertiary,warning,danger,success}  brand colors
 //             -> /* @kind color */  (else the classifier defaults them to "other")
 //
@@ -23,7 +28,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const RULES = [
-  { re: /(--tw-[A-Za-z0-9-]+\s*:[^;{}]*;)(?![ \t]*\/\*\s*@kind)/g, kind: 'ignore' },
+  { re: /(--tw-[A-Za-z0-9-]+\s*:[^;{}]*;)(?![ \t]*\/\*\s*@kind)/g, kind: 'other' },
   { re: /(--accent-(?:primary|secondary|tertiary|warning|danger|success)\s*:[^;{}]*;)(?![ \t]*\/\*\s*@kind)/g, kind: 'color' },
 ];
 
@@ -39,4 +44,4 @@ for (const { re, kind } of RULES) {
   css = css.replace(re, (_, decl) => { counts[kind]++; return `${decl} /* @kind ${kind} */`; });
 }
 writeFileSync(file, css);
-console.error(`annotate-tw: ${counts.ignore} --tw-* -> @kind ignore, ${counts.color} --accent-* -> @kind color in ${file}`);
+console.error(`annotate-tw: ${counts.other} --tw-* -> @kind other, ${counts.color} --accent-* -> @kind color in ${file}`);

@@ -27,10 +27,12 @@ is `src/components/**` (primarily `src/components/ui`). The converter runs in
   from the compiled CSS) reads a trailing **same-line** `/* @kind <k> */` on each custom-property
   declaration. The converter appends `cfg.cssEntry` VERBATIM into `_ds_bundle.css` (`appendFileSync`/
   `cpSync`, no minify → comments survive), so tagging `ds.css` is what the app classifies. Two rules:
-    - **`--tw-*` → `/* @kind ignore */`** (the "ignore pattern `--tw-*`"): Tailwind preflight/utility
-      internals (~60 vars). Can't be stripped (utilities reference them at runtime), so they're tagged
-      `ignore` to keep them out of the design-token set. Previously `@kind other` — the check still
-      flagged "other", so it must be `ignore`.
+    - **`--tw-*` → `/* @kind other */`**: Tailwind preflight/utility internals (~40 unique, ~215
+      decls across `*,::before,::after,::backdrop` and `.space-y-*`). Runtime vars, not design tokens;
+      can't be stripped (utilities reference them at runtime). **Valid kinds: color/spacing/radius/
+      shadow/font/other ONLY — `ignore` is invalid and fails the check.** True exclusion would need a
+      token-ignore in the /design-sync config (doesn't exist — config strict-validated, app scrapes
+      tokens from the CSS), so `other` is the supported fallback.
     - **`--accent-{primary,secondary,tertiary,warning,danger,success}` → `/* @kind color */`**: brand
       colors the classifier otherwise defaults to "other". Also annotated in source `globals.css`,
       BUT PostCSS pushes a same-line source comment onto its own line, where the app won't read it —
