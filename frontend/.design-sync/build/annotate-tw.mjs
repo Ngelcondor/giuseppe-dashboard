@@ -1,28 +1,42 @@
 #!/usr/bin/env node
-// Mark Tailwind-internal custom properties (--tw-*) as non-design-tokens.
+// Tag custom properties for the Claude Design adherence check.
 //
-// Tailwind's preflight + transform/ring/gradient/shadow utilities emit ~60
-// internal `--tw-*` custom properties into the compiled CSS (cfg.cssEntry =
-// .design-sync/build/ds.css). The /design-sync converter appends that file
-// VERBATIM into _ds_bundle.css (package-build.mjs: appendFileSync), so the
-// Claude Design token classifier sees every --tw-* as a design token and
-// flags them as unclassified/unregistered. They are NOT design tokens.
+// The app's self-check regenerates _adherence.oxlintrc.json's `x-omelette`
+// (tokens + tokenKinds) by scanning the compiled CSS, honoring a trailing,
+// SAME-LINE `/* @kind <k> */` comment on each declaration. The /design-sync
+// converter appends cfg.cssEntry (.design-sync/build/ds.css) VERBATIM into
+// _ds_bundle.css (no minify → comments survive), so annotating ds.css here is
+// what reaches the bundle the app classifies. Run IN-PLACE on ds.css right
+// after `tailwindcss` (see .design-sync/NOTES.md). Idempotent.
 //
-// We can't strip them (the utilities reference them at runtime), so we append
-// `/* @kind other */` after each --tw-* declaration; the classifier honors the
-// comment and excludes them. Run this IN-PLACE on ds.css right after
-// `tailwindcss` compiles it (see .design-sync/NOTES.md regeneration command),
-// so the annotation is present in the cssEntry the converter appends — i.e. it
-// survives every re-sync. Idempotent: skips already-annotated declarations.
+// Rules:
+//   --tw-*    Tailwind preflight/utility internals  -> /* @kind ignore */
+//             (the "ignore pattern --tw-*" — keeps them out of design tokens;
+//              referenced at runtime so they can't be stripped)
+//   --accent-{primary,secondary,tertiary,warning,danger,success}  brand colors
+//             -> /* @kind color */  (else the classifier defaults them to "other")
+//
+// PostCSS/Tailwind pushes a same-line source comment (e.g. one we put in
+// globals.css) onto its OWN line, where the app won't associate it with the
+// declaration. So first drop standalone @kind comment lines, then re-attach
+// @kind inline — that placement is the one the check reads.
 import { readFileSync, writeFileSync } from 'node:fs';
+
+const RULES = [
+  { re: /(--tw-[A-Za-z0-9-]+\s*:[^;{}]*;)(?![ \t]*\/\*\s*@kind)/g, kind: 'ignore' },
+  { re: /(--accent-(?:primary|secondary|tertiary|warning|danger|success)\s*:[^;{}]*;)(?![ \t]*\/\*\s*@kind)/g, kind: 'color' },
+];
 
 const file = process.argv[2];
 if (!file) { console.error('usage: node annotate-tw.mjs <css-file>'); process.exit(1); }
 
-let count = 0;
-const css = readFileSync(file, 'utf8').replace(
-  /(--tw-[A-Za-z0-9-]+\s*:[^;{}]*;)(?!\s*\/\*\s*@kind)/g,
-  (_, decl) => { count++; return `${decl} /* @kind other */`; },
-);
+let css = readFileSync(file, 'utf8');
+// Drop standalone @kind comment lines (PostCSS-orphaned), so we can re-attach inline.
+css = css.replace(/^[ \t]*\/\*\s*@kind\s+\w+\s*\*\/[ \t]*\r?\n/gm, '');
+const counts = {};
+for (const { re, kind } of RULES) {
+  counts[kind] = 0;
+  css = css.replace(re, (_, decl) => { counts[kind]++; return `${decl} /* @kind ${kind} */`; });
+}
 writeFileSync(file, css);
-console.error(`annotate-tw: marked ${count} --tw-* declaration(s) as /* @kind other */ in ${file}`);
+console.error(`annotate-tw: ${counts.ignore} --tw-* -> @kind ignore, ${counts.color} --accent-* -> @kind color in ${file}`);
