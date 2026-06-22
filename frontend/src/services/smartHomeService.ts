@@ -21,17 +21,19 @@ export interface HueLightsResponse {
 }
 
 // ── Shelly ──
-export type ShellyPeriod = 'day' | 'week' | 'month';
-export interface ShellyDevicePoint {
+export interface ShellyDevice {
   device_id: string;
   name: string;
-  consumption_kwh: number;
+  power_w: number;   // live active power
+  total_kwh: number; // cumulative energy counter
+  output: boolean;   // relay on/off
+  online: boolean;
 }
-export interface ShellyConsumptionResponse {
+export interface ShellyDevicesResponse {
   connected: boolean;
-  period: ShellyPeriod;
+  devices: ShellyDevice[];
+  total_power_w: number;
   total_kwh: number;
-  devices: ShellyDevicePoint[];
   error?: string | null;
 }
 
@@ -54,9 +56,7 @@ export async function setHueLight(
   return data;
 }
 
-export async function getShellyConsumption(period: ShellyPeriod): Promise<ShellyConsumptionResponse> {
-  const { data } = await api.get<ShellyConsumptionResponse>('/smarthome/shelly/consumption', {
-    params: { period },
-  });
+export async function getShellyDevices(): Promise<ShellyDevicesResponse> {
+  const { data } = await api.get<ShellyDevicesResponse>('/smarthome/shelly/devices');
   return data;
 }

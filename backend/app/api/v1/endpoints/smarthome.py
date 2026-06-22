@@ -8,7 +8,7 @@ brightness, kWh or costs — ever.
 """
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -18,7 +18,7 @@ from app.services import smarthome_service as sh
 from app.schemas.smarthome import (
     SmartHomeStatus,
     HueLight, HueLightsResponse, HueLightUpdate,
-    ShellyDevicePoint, ShellyConsumptionResponse,
+    ShellyDevice, ShellyDevicesResponse,
 )
 
 router = APIRouter(prefix="/smarthome", tags=["smarthome"])
@@ -100,42 +100,34 @@ async def update_hue_light(
     return HueLight(**updated)
 
 
-# ── Shelly consumption ──
-@router.get("/shelly/consumption", response_model=ShellyConsumptionResponse)
-async def shelly_consumption(
-    period: str = Query("day", pattern="^(day|week|month)$"),
+# ── Shelly devices (live power + cumulative energy) ──
+@router.get("/shelly/devices", response_model=ShellyDevicesResponse)
+async def shelly_devices(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> ShellyConsumptionResponse:
-    """Real per-device energy consumption for the period, or connected:false."""
+) -> ShellyDevicesResponse:
+    """Live per-device power + cumulative energy from the Shelly Cloud account.
+
+    Auto-discovers every device on the account (no device_ids needed). The
+    cloud has no historical per-period endpoint — that needs snapshotting,
+    a separate build. Returns connected:false when Shelly is unconfigured.
+    """
     cfg = await get_setting(db, current_user["sub"], SHELLY_KEY)
     if not _shelly_ready(cfg):
-        return ShellyConsumptionResponse(connected=False, period=period)
-
-    device_ids = cfg.get("device_ids") or []
-    if not device_ids:
-        return ShellyConsumptionResponse(
-            connected=True,
-            period=period,
-            error="Nessun device_id configurato in Impostazioni",
-        )
+        return ShellyDevicesResponse(connected=False)
 
     try:
-        devices = await sh.shelly_consumption(
-            cfg["auth_key"], cfg["server"], device_ids, period,
-        )
+        devices = await sh.shelly_devices(cfg["auth_key"], cfg["server"])
     except Exception as exc:  # noqa: BLE001 — honest error surface
-        return ShellyConsumptionResponse(
+        return ShellyDevicesResponse(
             connected=True,
-            period=period,
             error=f"Shelly Cloud non raggiungibile: {exc}",
         )
 
-    points = [ShellyDevicePoint(**d) for d in devices]
-    total = round(sum(p.consumption_kwh for p in points), 3)
-    return ShellyConsumptionResponse(
+    points = [ShellyDevice(**d) for d in devices]
+    return ShellyDevicesResponse(
         connected=True,
-        period=period,
-        total_kwh=total,
         devices=points,
+        total_power_w=round(sum(p.power_w for p in points), 1),
+        total_kwh=round(sum(p.total_kwh for p in points), 3),
     )
