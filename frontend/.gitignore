@@ -62,9 +62,9 @@ ds-bundle/
 .design-sync/.cache/
 .design-sync/learnings/
 .design-sync/node_modules
-# build/: ignore compiled artifacts but KEEP the annotate-tw source.
+# build/: ignore compiled artifacts but KEEP the source .mjs pipeline scripts.
 # (root .gitignore's unanchored `build/` would otherwise hide the whole dir.)
 !.design-sync/build/
 .design-sync/build/*
-!.design-sync/build/annotate-tw.mjs
+!.design-sync/build/*.mjs
 # durable (committed): config.json, NOTES.md, conventions.md, previews/, shims/, overrides/, tsconfig.sync.json, _extra.css
