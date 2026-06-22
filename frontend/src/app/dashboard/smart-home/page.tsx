@@ -6,9 +6,9 @@ import { Button } from '@/components/ui/Button';
 import { getMe } from '@/services/settingsService';
 import {
   getHueLights, setHueLight,
-  getShellyConsumption,
+  getShellyDevices,
   type HueLight, type HueLightsResponse,
-  type ShellyConsumptionResponse, type ShellyPeriod,
+  type ShellyDevicesResponse,
 } from '@/services/smartHomeService';
 
 const card: React.CSSProperties = {
@@ -19,9 +19,9 @@ const card: React.CSSProperties = {
 };
 const mono = "'JetBrains Mono',monospace";
 
-const PERIOD_LABEL: Record<ShellyPeriod, string> = { day: 'Oggi', week: 'Settimana', month: 'Mese' };
 const briPct = (bri: number) => Math.round((Math.max(1, Math.min(254, bri)) / 254) * 100);
 const fmtKwh = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: n < 10 ? 2 : 1, maximumFractionDigits: 2 });
+const fmtW = (n: number) => n.toLocaleString('it-IT', { maximumFractionDigits: 1 });
 
 export default function SmartHomePage() {
   const [canEdit, setCanEdit] = useState(false);
@@ -165,22 +165,21 @@ function Toggle({ on, disabled, onClick }: { on: boolean; disabled?: boolean; on
   );
 }
 
-/* ── Shelly consumption ── */
+/* ── Shelly devices (live power + cumulative energy) ── */
 
 function ShellySection() {
-  const [period, setPeriod] = useState<ShellyPeriod>('day');
-  const [resp, setResp] = useState<ShellyConsumptionResponse | null>(null);
+  const [resp, setResp] = useState<ShellyDevicesResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async (p: ShellyPeriod) => {
+  const load = useCallback(async () => {
     setLoading(true);
-    try { setResp(await getShellyConsumption(p)); }
-    catch { setResp({ connected: false, period: p, total_kwh: 0, devices: [] }); }
+    try { setResp(await getShellyDevices()); }
+    catch { setResp({ connected: false, devices: [], total_power_w: 0, total_kwh: 0 }); }
     finally { setLoading(false); }
   }, []);
-  useEffect(() => { load(period); }, [period, load]);
+  useEffect(() => { load(); }, [load]);
 
-  const maxKwh = resp ? Math.max(0, ...resp.devices.map((d) => d.consumption_kwh)) : 0;
+  const maxW = resp ? Math.max(0, ...resp.devices.map((d) => d.power_w)) : 0;
 
   return (
     <section className="sd-reveal" style={{ ['--i' as string]: 2 }}>
@@ -188,60 +187,62 @@ function ShellySection() {
         <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'rgb(var(--color-heading))', display: 'flex', alignItems: 'center', gap: 9 }}>
           <Zap size={18} style={{ color: 'rgb(99 102 241)' }} /> Consumi · Shelly
         </h3>
-        {resp?.connected && (
-          <div style={{ display: 'inline-flex', background: 'rgb(var(--color-card-inner))', borderRadius: 10, padding: 3, gap: 2 }}>
-            {(['day', 'week', 'month'] as ShellyPeriod[]).map((p) => (
-              <button
-                key={p} onClick={() => setPeriod(p)}
-                style={{
-                  border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 500,
-                  background: period === p ? 'rgb(var(--color-card))' : 'transparent',
-                  color: period === p ? 'rgb(var(--color-heading))' : 'rgb(var(--color-tertiary))',
-                  boxShadow: period === p ? '0 1px 2px rgba(17,17,26,.08)' : 'none',
-                }}
-              >{PERIOD_LABEL[p]}</button>
-            ))}
-          </div>
+        {resp?.connected && !resp.error && (
+          <button className="sd-iconbtn" aria-label="Aggiorna" onClick={load}><RefreshCw size={15} /></button>
         )}
       </div>
 
       {!resp || loading ? (
-        <SkeletonCard text="Caricamento consumi…" />
+        <SkeletonCard text="Caricamento dispositivi…" />
       ) : !resp.connected ? (
         <NotConnected
           icon={<Zap size={22} style={{ color: 'rgb(var(--color-muted))' }} />}
           title="Shelly non collegato"
-          body="Inserisci auth key e server Shelly Cloud (e gli ID dei device) nelle Impostazioni per vedere i consumi reali."
+          body="Inserisci auth key e server Shelly Cloud nelle Impostazioni per vedere potenza e consumi reali dei tuoi dispositivi."
         />
       ) : resp.error ? (
-        <ErrorCard message={resp.error} onRetry={() => load(period)} />
+        <ErrorCard message={resp.error} onRetry={load} />
+      ) : resp.devices.length === 0 ? (
+        <SkeletonCard text="Nessun dispositivo nell'account Shelly." />
       ) : (
         <div className="sd-shadow" style={{ ...card, padding: '24px 26px' }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 20 }}>
-            <span style={{ fontSize: 10.5, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgb(var(--color-tertiary))', fontWeight: 600 }}>Totale · {PERIOD_LABEL[period].toLowerCase()}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 24 }}>
-            <span style={{ fontFamily: mono, fontSize: 38, fontWeight: 700, color: 'rgb(var(--color-heading))' }}>{fmtKwh(resp.total_kwh)}</span>
-            <span style={{ fontSize: 15, color: 'rgb(var(--color-tertiary))' }}>kWh</span>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 36, marginBottom: 24, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: 10.5, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgb(var(--color-tertiary))', fontWeight: 600, marginBottom: 6 }}>Potenza ora</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
+                <span style={{ fontFamily: mono, fontSize: 38, fontWeight: 700, color: 'rgb(var(--color-heading))' }}>{fmtW(resp.total_power_w)}</span>
+                <span style={{ fontSize: 15, color: 'rgb(var(--color-tertiary))' }}>W</span>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10.5, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgb(var(--color-tertiary))', fontWeight: 600, marginBottom: 6 }}>Energia totale</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
+                <span style={{ fontFamily: mono, fontSize: 26, fontWeight: 700, color: 'rgb(var(--color-heading))' }}>{fmtKwh(resp.total_kwh)}</span>
+                <span style={{ fontSize: 14, color: 'rgb(var(--color-tertiary))' }}>kWh</span>
+              </div>
+            </div>
           </div>
 
-          {resp.devices.length === 0 ? (
-            <p style={{ margin: 0, fontSize: 14, color: 'rgb(var(--color-tertiary))' }}>Nessun device configurato.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {resp.devices.map((d) => (
-                <div key={d.device_id}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 7, gap: 10 }}>
-                    <span style={{ fontSize: 13.5, fontWeight: 500, color: 'rgb(var(--color-heading))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}</span>
-                    <span style={{ fontFamily: mono, fontSize: 13, color: 'rgb(var(--color-tertiary))', flex: 'none' }}>{fmtKwh(d.consumption_kwh)} kWh</span>
-                  </div>
-                  <div style={{ height: 9, borderRadius: 8, background: 'rgb(var(--color-card-inner))', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${maxKwh > 0 ? Math.round((d.consumption_kwh / maxKwh) * 100) : 0}%`, minWidth: d.consumption_kwh > 0 ? 4 : 0, borderRadius: 8, background: 'rgb(99 102 241)', transition: 'width .3s ease' }} />
-                  </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {resp.devices.map((d) => (
+              <div key={d.device_id} style={{ opacity: d.online ? 1 : 0.5 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 7, gap: 10 }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 500, color: 'rgb(var(--color-heading))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', flex: 'none', background: d.output ? 'rgb(16 185 129)' : 'rgb(var(--color-muted))' }} />
+                    {d.name}{!d.online && <span style={{ fontSize: 11, color: 'rgb(var(--color-muted))' }}>· offline</span>}
+                  </span>
+                  <span style={{ fontFamily: mono, fontSize: 13, color: 'rgb(var(--color-tertiary))', flex: 'none' }}>{fmtW(d.power_w)} W · {fmtKwh(d.total_kwh)} kWh</span>
                 </div>
-              ))}
-            </div>
-          )}
+                <div style={{ height: 9, borderRadius: 8, background: 'rgb(var(--color-card-inner))', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${maxW > 0 ? Math.round((d.power_w / maxW) * 100) : 0}%`, minWidth: d.power_w > 0 ? 4 : 0, borderRadius: 8, background: 'rgb(99 102 241)', transition: 'width .3s ease' }} />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p style={{ margin: '18px 0 0', fontSize: 12, color: 'rgb(var(--color-muted))', lineHeight: 1.5 }}>
+            Potenza in tempo reale ed energia cumulativa dei dispositivi. Lo storico per giorno/settimana/mese richiede la raccolta periodica dei dati (in arrivo).
+          </p>
         </div>
       )}
     </section>

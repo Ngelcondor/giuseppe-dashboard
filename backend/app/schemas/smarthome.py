@@ -36,15 +36,18 @@ class HueLightUpdate(BaseModel):
 
 
 # ── Shelly ──
-class ShellyDevicePoint(BaseModel):
+class ShellyDevice(BaseModel):
     device_id: str
     name: str
-    consumption_kwh: float
+    power_w: float        # live active power (W)
+    total_kwh: float      # cumulative energy counter (kWh)
+    output: bool = False  # relay on/off
+    online: bool = True
 
 
-class ShellyConsumptionResponse(BaseModel):
+class ShellyDevicesResponse(BaseModel):
     connected: bool
-    period: str  # day | week | month
+    devices: List[ShellyDevice] = []
+    total_power_w: float = 0.0
     total_kwh: float = 0.0
-    devices: List[ShellyDevicePoint] = []
     error: Optional[str] = None

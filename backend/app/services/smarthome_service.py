@@ -5,8 +5,7 @@ shared settings store (keys 'hue' and 'shelly'). Nothing here is fabricated:
 when a call fails or a config is missing the caller surfaces an honest
 not-connected / error state.
 """
-from typing import Any, Dict, List, Optional, Tuple
-from datetime import date, timedelta
+from typing import Any, Dict, List, Optional
 import httpx
 
 HUE_TIMEOUT = 5.0
@@ -81,94 +80,67 @@ async def hue_set_light(
 
 
 # ── Shelly Cloud API ──
-def shelly_period_range(period: str) -> Tuple[date, date]:
-    """Map a period token to an inclusive [date_from, date_to] range."""
-    today = date.today()
-    if period == "day":
-        return today, today
-    if period == "week":
-        return today - timedelta(days=6), today
-    # month: rolling 30-day window ending today
-    return today - timedelta(days=29), today
+async def shelly_devices(auth_key: str, server: str) -> List[Dict[str, Any]]:
+    """Fetch all Shelly devices' live status from the Cloud account.
 
+    POST {server}/device/all_status (auth_key) -> per-device status. The cloud
+    control API exposes live state, not historical per-period stats (the old
+    /statistics/.../consumption path returns 404). For each device we sum its
+    metered channels: live active power (W) and the cumulative energy counter
+    (Wh -> kWh). Supports Gen2/3 (switch:N with apower + aenergy.total) and
+    Gen1 (meters[] power + total in Watt-minutes).
 
-async def shelly_consumption(
-    auth_key: str, server: str, device_ids: List[str], period: str,
-) -> List[Dict[str, Any]]:
-    """Query real per-device energy consumption (kWh) for the period.
-
-    Uses the Shelly Cloud statistics endpoint:
-      GET {server}/statistics/relay/consumption
-          ?id={device}&channel=0&date_range=custom
-          &date_from=YYYY-MM-DD&date_to=YYYY-MM-DD&auth_key={auth_key}
-
-    Returns [{device_id, name, consumption_kwh}]. Devices that error out are
-    reported with consumption 0.0 and their id as name — never invented values.
-    Raises if NO device could be reached (caller surfaces honest error).
+    Returns [{device_id, name, power_w, total_kwh, output, online}].
+    Raises on transport/API failure (handled by caller). Nothing fabricated.
     """
-    date_from, date_to = shelly_period_range(period)
     base = server.rstrip("/")
     if not base.startswith("http"):
         base = f"https://{base}"
 
-    results: List[Dict[str, Any]] = []
-    any_ok = False
-    last_error: Optional[Exception] = None
-
     async with httpx.AsyncClient() as client:
-        for device_id in device_ids:
-            try:
-                resp = await client.get(
-                    f"{base}/statistics/relay/consumption",
-                    params={
-                        "id": device_id,
-                        "channel": 0,
-                        "date_range": "custom",
-                        "date_from": date_from.isoformat(),
-                        "date_to": date_to.isoformat(),
-                        "auth_key": auth_key,
-                    },
-                    timeout=SHELLY_TIMEOUT,
-                )
-                resp.raise_for_status()
-                payload = resp.json()
-            except Exception as exc:  # noqa: BLE001 — recorded, not fabricated
-                last_error = exc
-                results.append({"device_id": device_id, "name": device_id, "consumption_kwh": 0.0})
-                continue
+        resp = await client.post(
+            f"{base}/device/all_status",
+            data={"auth_key": auth_key},
+            timeout=SHELLY_TIMEOUT,
+        )
+        resp.raise_for_status()
+        payload = resp.json()
 
-            if not payload.get("isok", False):
-                last_error = ValueError(payload.get("errors") or "Shelly API error")
-                results.append({"device_id": device_id, "name": device_id, "consumption_kwh": 0.0})
-                continue
+    if not payload.get("isok", False):
+        raise ValueError(str(payload.get("errors") or "Shelly Cloud error"))
 
-            any_ok = True
-            results.append({
-                "device_id": device_id,
-                "name": str(payload.get("data", {}).get("device_name") or device_id),
-                "consumption_kwh": round(_shelly_sum_kwh(payload.get("data", {})), 3),
-            })
-
-    if not any_ok and last_error is not None:
-        raise last_error
-    return results
-
-
-def _shelly_sum_kwh(data: Dict[str, Any]) -> float:
-    """Sum the per-interval consumption returned by the statistics endpoint.
-
-    The endpoint returns data['history'] as a list of buckets each carrying a
-    'consumption' value in Watt-hours; total kWh = sum(consumption)/1000.
-    Falls back to data['total'] (Wh) when no history breakdown is present.
-    """
-    history = data.get("history")
-    if isinstance(history, list) and history:
+    devices_status = (payload.get("data") or {}).get("devices_status") or {}
+    out: List[Dict[str, Any]] = []
+    for dev_id, st in devices_status.items():
+        if not isinstance(st, dict):
+            continue
+        power_w = 0.0
         total_wh = 0.0
-        for bucket in history:
-            if isinstance(bucket, dict):
-                total_wh += float(bucket.get("consumption", 0) or 0)
-        return total_wh / 1000.0
-    total = data.get("total")
-    if total is not None:
-        return float(total) / 1000.0
-    return 0.0
+        output = False
+        # Gen2/3 RPC: switch:0, switch:1, ... (apower in W, aenergy.total in Wh)
+        for key, val in st.items():
+            if key.startswith("switch:") and isinstance(val, dict):
+                power_w += float(val.get("apower") or 0)
+                total_wh += float((val.get("aenergy") or {}).get("total") or 0)
+                if val.get("output"):
+                    output = True
+        # Gen1 fallback: meters[] (power W, total in Watt-minutes) + relays[]
+        if not any(k.startswith("switch:") for k in st):
+            for m in (st.get("meters") or []):
+                if isinstance(m, dict):
+                    power_w += float(m.get("power") or 0)
+                    total_wh += float(m.get("total") or 0) / 60.0  # W*min -> Wh
+            if any(isinstance(r, dict) and r.get("ison") for r in (st.get("relays") or [])):
+                output = True
+
+        online = bool((st.get("cloud") or {}).get("connected", st.get("_online", True)))
+        out.append({
+            "device_id": str(dev_id),
+            "name": st.get("name") or f"Shelly {str(dev_id)[-4:]}",
+            "power_w": round(power_w, 1),
+            "total_kwh": round(total_wh / 1000.0, 3),
+            "output": output,
+            "online": online,
+        })
+    out.sort(key=lambda d: d["name"].lower())
+    return out
