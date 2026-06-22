@@ -44,14 +44,18 @@ is `src/components/**` (primarily `src/components/ui`). The converter runs in
   selectors (`*,::before,::after,::backdrop`, `.space-y-*`), not `:root`/`[data-*]`. There is NO
   ignore mechanism (converter config strict; project-side `ignoreTokens`/`ignoreTokenPrefixes` under
   `x-omelette` is NOT honored — tested). The app scrapes tokens from **`_ds_bundle.css`**, so
-  `.design-sync/build/split-tokens.mjs` moves every rule that declares `--tw-*` into a sibling
-  **`_ds_tw.css`** (99 rules / 215 decls) and rewrites `styles.css` to `@import "./_ds_tw.css"` then
-  `"./_ds_bundle.css"`. Result: the scraped `_ds_bundle.css` has 0 `--tw-*` (only real `:root`/theme
-  tokens); the render closure is unchanged (both files imported). Upload `_ds_bundle.css`,
-  **`_ds_tw.css`**, AND `styles.css`. **Run order each sync: `package-build` → `split-tokens.mjs
-  ds-bundle/_ds_bundle.css`** (package-build rewrites `styles.css` to import only `_ds_bundle.css`, so
-  the split MUST run after it). Caveat: this works only because the app scrapes `_ds_bundle.css`
-  specifically (not the whole `styles.css` closure) — confirmed by `check_design_system` reporting 0.
+  `.design-sync/build/split-tokens.mjs` moves every rule that *mentions* `--tw-` (declaration OR
+  `var()` usage — `u.includes('--tw-')`) into a sibling **`_ds_tw.css`** and rewrites `styles.css` to
+  `@import "./_ds_tw.css"` then `"./_ds_bundle.css"`. Result: the scraped `_ds_bundle.css` has **0
+  `--tw-` text** (only real `:root`/theme tokens); the render closure is unchanged (both files
+  imported). Upload `_ds_bundle.css`, **`_ds_tw.css`**, AND `styles.css`. **Run order each sync:
+  `package-build` → `split-tokens.mjs ds-bundle/_ds_bundle.css`** (package-build rewrites `styles.css`
+  to import only `_ds_bundle.css`, so the split MUST run after it). **CONFIRMED 2026-06-22:
+  `check_design_system` = 0 issues** after the split → the app scrapes `_ds_bundle.css` specifically,
+  NOT the whole `styles.css` closure. (`@kind` only *classifies* and didn't suppress the flag, since
+  the check complains about *position* — `--tw-` under style selectors, not `:root`/`[data-*]`; no
+  ignore mechanism exists, project-side `ignoreTokens`/`ignoreTokenPrefixes` under `x-omelette` is NOT
+  honored. The split is the only thing that worked.)
 
 ## Sync-time shims & forks (all in .design-sync/)
 
