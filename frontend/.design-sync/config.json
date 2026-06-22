@@ -12,7 +12,8 @@
     "./.design-sync/shims/default-exports.ts"
   ],
   "libOverrides": {
-    "dts.mjs": "synth-entry mode: load src/*.tsx into the ts-morph project so <Name>Props interfaces resolve"
+    "dts.mjs": "synth-entry mode: load src/*.tsx into the ts-morph project so <Name>Props interfaces resolve",
+    "css.mjs": "writeStylesCss splits Tailwind --tw-* runtime vars into _ds_tw.css (via build/split-tokens.mjs) so the adherence token scrape of _ds_bundle.css stays --tw--free (0 issues); both files imported by styles.css"
   },
   "componentSrcMap": {
     "Providers": null

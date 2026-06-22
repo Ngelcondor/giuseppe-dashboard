@@ -39,18 +39,23 @@ is `src/components/**` (primarily `src/components/ui`). The converter runs in
       so `annotate-tw.mjs` strips orphaned standalone `@kind` lines and re-attaches `@kind` inline.
   **Always run `annotate-tw.mjs` after `tailwindcss`** (it's in the regen command), or these reappear
   mis-tagged next sync. Idempotent.
-- **`--tw-*` split out of the scraped bundle — `split-tokens.mjs` (POST-build step).** `@kind` only
+- **`--tw-*` split out of the scraped bundle — AUTOMATIC via the `css.mjs` override.** `@kind` only
   *classifies*; the adherence check still flags `--tw-*` because they're declared under style
   selectors (`*,::before,::after,::backdrop`, `.space-y-*`), not `:root`/`[data-*]`. There is NO
   ignore mechanism (converter config strict; project-side `ignoreTokens`/`ignoreTokenPrefixes` under
-  `x-omelette` is NOT honored — tested). The app scrapes tokens from **`_ds_bundle.css`**, so
-  `.design-sync/build/split-tokens.mjs` moves every rule that *mentions* `--tw-` (declaration OR
-  `var()` usage — `u.includes('--tw-')`) into a sibling **`_ds_tw.css`** and rewrites `styles.css` to
-  `@import "./_ds_tw.css"` then `"./_ds_bundle.css"`. Result: the scraped `_ds_bundle.css` has **0
-  `--tw-` text** (only real `:root`/theme tokens); the render closure is unchanged (both files
-  imported). Upload `_ds_bundle.css`, **`_ds_tw.css`**, AND `styles.css`. **Run order each sync:
-  `package-build` → `split-tokens.mjs ds-bundle/_ds_bundle.css`** (package-build rewrites `styles.css`
-  to import only `_ds_bundle.css`, so the split MUST run after it). **CONFIRMED 2026-06-22:
+  `x-omelette` is NOT honored — tested). The app scrapes tokens from **`_ds_bundle.css`**, so the
+  split moves every rule that *mentions* `--tw-` (declaration OR `var()` usage — `u.includes('--tw-')`)
+  into a sibling **`_ds_tw.css`**; `styles.css` then `@import`s `_ds_tw.css` (preflight/base) before
+  `_ds_bundle.css`. Result: the scraped `_ds_bundle.css` has **0 `--tw-` text** (only real
+  `:root`/theme tokens); the render closure is unchanged (both files imported).
+  **Integrated into the converter (2026-06-22): `.design-sync/overrides/css.mjs`** — a fork of
+  `lib/css.mjs` (declared in `config.json` → `libOverrides`) whose `writeStylesCss` calls
+  `splitTwFile()` from `build/split-tokens.mjs` and adds the `_ds_tw.css` import. So **every
+  `package-build` / re-sync applies the split automatically — NO manual post-step.** (Verify the fork
+  loads: build log shows `[OVERRIDE] using .design-sync/overrides/css.mjs` + `[css-fork] split N
+  --tw-* rule(s)`.) `split-tokens.mjs` is the shared module (also a manual CLI: `node
+  split-tokens.mjs <_ds_bundle.css>`, which additionally rewrites `styles.css`). Upload after a build:
+  `_ds_bundle.css`, **`_ds_tw.css`**, `styles.css`, `_ds_sync.json`. **CONFIRMED 2026-06-22:
   `check_design_system` = 0 issues** after the split → the app scrapes `_ds_bundle.css` specifically,
   NOT the whole `styles.css` closure. (`@kind` only *classifies* and didn't suppress the flag, since
   the check complains about *position* — `--tw-` under style selectors, not `:root`/`[data-*]`; no
