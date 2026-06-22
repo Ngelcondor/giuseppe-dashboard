@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.25.0",
+    "@types/three": "^0.160.0",
     "axios": "^1.6.0",
     "caniuse-lite": "^1.0.30001786",
     "clsx": "^2.0.0",
@@ -25,6 +26,7 @@
     "react-grid-layout": "^1.4.4",
     "recharts": "^2.10.0",
     "tailwind-merge": "^2.2.0",
+    "three": "^0.160.1",
     "zustand": "^4.4.0"
   },
   "devDependencies": {
