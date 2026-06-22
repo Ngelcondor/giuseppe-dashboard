@@ -58,10 +58,13 @@ Thumbs.db
 # design-sync (claude.ai/design import) — staged scripts, build output, machine state
 .ds-sync/
 ds-bundle/
+.redesign/
 .design-sync/.cache/
 .design-sync/learnings/
 .design-sync/node_modules
-.design-sync/build/input.css
-.design-sync/build/ds.css
-# durable (committed): config.json, NOTES.md, conventions.md, previews/, shims/, tsconfig.sync.json, _extra.css
-frontend/.redesign/
+# build/: ignore compiled artifacts but KEEP the annotate-tw source.
+# (root .gitignore's unanchored `build/` would otherwise hide the whole dir.)
+!.design-sync/build/
+.design-sync/build/*
+!.design-sync/build/annotate-tw.mjs
+# durable (committed): config.json, NOTES.md, conventions.md, previews/, shims/, overrides/, tsconfig.sync.json, _extra.css
