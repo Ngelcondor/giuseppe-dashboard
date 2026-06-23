@@ -641,6 +641,14 @@ input[type='checkbox'], input[type='radio'] {
   background: rgb(var(--color-card));
 }
 .sd-input::placeholder, .sd-textarea::placeholder { color: rgb(var(--color-muted)); }
+/* Keep browser autofill matching the dark input style (no light-blue fill). */
+.sd-input:-webkit-autofill, .sd-select:-webkit-autofill, .sd-textarea:-webkit-autofill,
+.sd-input:-webkit-autofill:focus, .sd-select:-webkit-autofill:focus, .sd-textarea:-webkit-autofill:focus {
+  -webkit-text-fill-color: rgb(var(--color-heading));
+  caret-color: rgb(var(--color-heading));
+  -webkit-box-shadow: 0 0 0 1000px rgb(var(--color-card-inner)) inset;
+  transition: background-color 9999s ease-out 0s;
+}
 .sd-select {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 10px center; padding-right: 34px; cursor: pointer;
