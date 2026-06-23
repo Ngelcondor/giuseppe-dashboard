@@ -753,3 +753,53 @@ input[type='checkbox'], input[type='radio'] {
 .sd-fin-del { opacity: 0; transition: opacity .15s ease; }
 .sd-fin-tx:hover .sd-fin-del, .sd-fin-legend:hover .sd-fin-del { opacity: 1; }
 @media (hover: none) { .sd-fin-del { opacity: .5; } }
+
+/* ════ Home redesign · terminal header + horizontal lanes + statbar ════════════ */
+
+/* Horizontal scrollable lane */
+.sd-lane-scroll { overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+.sd-lane-scroll::-webkit-scrollbar { height: 8px; }
+.sd-lane-scroll::-webkit-scrollbar-thumb { background: rgb(var(--color-border)); border-radius: 8px; }
+.sd-lane-scroll::-webkit-scrollbar-track { background: transparent; }
+.sd-node { scroll-snap-align: start; }
+.sd-node-card { transition: transform .2s cubic-bezier(.2,.7,.2,1), border-color .2s; }
+
+/* Statbar dividers (vertical by default; horizontal when it wraps to 2 cols) */
+.sd-statbar > div { border-right: 1px solid rgb(var(--color-border)); }
+.sd-statbar > div:last-child { border-right: none; }
+@media (max-width: 760px) {
+  .sd-statbar { grid-template-columns: 1fr 1fr !important; }
+  .sd-statbar > div { border-right: none !important; border-top: 1px solid rgb(var(--color-border)); }
+  .sd-statbar > div:nth-child(-n+2) { border-top: none; }
+}
+
+/* Motion: rail draws from the left, nodes cascade in from the right, dots pulse,
+   terminal cursor blinks. All gated on motion preference + low-stim below. */
+.sd-rail-line { transform: scaleX(0); transform-origin: left; }
+@keyframes sdPulseRing {
+  0%   { box-shadow: 0 0 0 4px rgb(var(--color-card-inner)), 0 0 0 3px var(--pulse, rgba(16,185,129,.5)); }
+  70%  { box-shadow: 0 0 0 4px rgb(var(--color-card-inner)), 0 0 0 12px transparent; }
+  100% { box-shadow: 0 0 0 4px rgb(var(--color-card-inner)), 0 0 0 12px transparent; }
+}
+@keyframes sdBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .sd-node-card:hover { transform: translateY(-2px); }
+  .sd-anim .sd-node { opacity: 0; transform: translateX(28px); }
+  .sd-anim.sd-lit .sd-node {
+    opacity: 1; transform: none;
+    transition: opacity .55s cubic-bezier(.2,.7,.2,1), transform .55s cubic-bezier(.2,.7,.2,1);
+    transition-delay: calc(var(--j, 0) * 85ms + .2s);
+  }
+  .sd-anim.sd-lit .sd-rail-line { transform: scaleX(1); transition: transform .9s cubic-bezier(.4,.5,.2,1) .2s; }
+  .sd-pulse { animation: sdPulseRing 2.6s ease-out infinite; }
+  .sd-cursor { animation: sdBlink 1.1s step-end infinite; }
+}
+@media (prefers-reduced-motion: reduce) { .sd-rail-line { transform: none; } }
+
+/* Low-stim: zero motion on every lane element */
+[data-stim="on"] .sd-node { opacity: 1 !important; transform: none !important; transition: none !important; }
+[data-stim="on"] .sd-node-card:hover { transform: none; }
+[data-stim="on"] .sd-rail-line { transform: none !important; }
+[data-stim="on"] .sd-pulse { animation: none !important; }
+[data-stim="on"] .sd-cursor { animation: none !important; }

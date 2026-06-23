@@ -99,6 +99,16 @@ export const calendarEvents = {
 
 // ─── Connections API ────────────────────────────────────────────────────────
 
+// Flattened, date-sorted upcoming events (next 30 days) for the home lane.
+// The /calendar/upcoming endpoint returns { next7Days, next30Days } (camelCase).
+export async function getUpcomingEvents(): Promise<CalendarEventDTO[]> {
+  const { data } = await api.get<{ next7Days?: CalendarEventDTO[]; next30Days?: CalendarEventDTO[] }>(
+    '/calendar/upcoming',
+  );
+  const all = [...(data?.next7Days ?? []), ...(data?.next30Days ?? [])];
+  return all.sort((a, b) => a.startTime.localeCompare(b.startTime));
+}
+
 export const calendarConnections = {
   list: async (): Promise<CalendarConnection[]> => {
     const { data } = await api.get('/calendar/connections');

@@ -5,69 +5,140 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { CircularProgress } from '@/components/ui/ProgressBar';
-import { Checkbox } from '@/components/ui/Toggle';
 import { getUniversitaDashboard, type UniDashboard } from '@/services/universitaService';
 import { getBudgetDashboard, type BudgetDashboard } from '@/services/budgetService';
 import { getScadenze, type ScadenzaItem } from '@/services/scadenzeService';
 import { getStudyOverview, type StudyOverview } from '@/services/studyService';
-import { getFamilyWeather, weatherDescription, weatherIcon, type FamilyWeather } from '@/services/weatherService';
+import { getUpcomingEvents, type CalendarEventDTO } from '@/services/calendarService';
 
-const card: React.CSSProperties = {
-  background: 'rgb(var(--color-card))',
-  border: '1px solid rgb(var(--color-border))',
-  borderRadius: 16,
-  boxShadow: '0 1px 2px rgba(17,17,26,.04)',
-};
-const eyebrow: React.CSSProperties = {
-  fontSize: 10.5, letterSpacing: '.14em', textTransform: 'uppercase',
-  color: 'rgb(var(--color-tertiary))', fontWeight: 600,
-};
+/* ── Home redesign · "Study Desk" ─────────────────────────────────────────────
+   Terminal-style header with a live clock, three horizontal scrollable lanes
+   (Studio di oggi · Appuntamenti · Scadenze), and a demoted stats bar. All
+   content is wired to the real data layer; the terminal header stays dark in
+   every theme. Lane entrance + rail + pulse animations are CSS-driven and
+   respect prefers-reduced-motion and the low-stim theme (see globals.css). */
+
+type BadgeVariant = 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info';
+
 const mono = "'JetBrains Mono',monospace";
 
-// ── Empty fallbacks — render an honest empty state before/without data, never
-// fabricated content. Real data is fetched in useEffect. ──────────────────────
+// Lane accent triplets (theme-aware, used in rgb(...) and rgb(.../alpha)).
+const EMERALD = '16 185 129';
+const INDIGO = '99 102 241';
+const AMBER = '245 158 11';
+const PINK = '236 72 153';
+
+// Terminal palette — always dark, even in light theme (it's a real terminal).
+const TERM = {
+  bg: '#0a0c12', fg: '#e6edf3', dim: '#9aa7b8', dim2: '#8b97a8', dim3: '#6b7689',
+  green: '#7ee787', cyan: '#56c2ff', blue: '#7c9bff', pink: '#ff6b9d',
+};
+
+// ── Empty fallbacks — honest empty state before/without data, never fabricated. ─
 const EMPTY_UNI: UniDashboard = {
   profilo: { corso_laurea: '', semestre: '', cfu_totali: 0, cfu_superati: 0, cfu_in_corso: 0 },
-  corsi: [],
-  prossimo_esame: null,
-  consegne: [],
+  corsi: [], prossimo_esame: null, consegne: [],
 };
-
 const EMPTY_BUDGET: Pick<BudgetDashboard, 'total_expenses' | 'categories'> = {
-  total_expenses: 0,
-  categories: [],
+  total_expenses: 0, categories: [],
 };
 
-// ── Date helpers (it-IT) ─────────────────────────────────────────────────────
-const fmtDate = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
-const fmtDateLong = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'long' });
-const daysTo = (iso: string) => Math.max(0, Math.round((new Date(iso + 'T00:00:00').getTime() - new Date(new Date().toDateString()).getTime()) / 86_400_000));
+// ── Date helpers (it-IT) ──────────────────────────────────────────────────────
+const pad2 = (n: number) => String(n).padStart(2, '0');
 const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+const fmtDay = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: 'short' });
 
-const scadenzaBadge = (d: number) =>
-  d <= 6 ? <Badge variant="warning" size="sm">{d} giorni</Badge>
-  : d <= 7 ? <Badge variant="primary" size="sm">{d} giorni</Badge>
-  : d <= 20 ? <Badge variant="info" size="sm">{d} giorni</Badge>
-  : <Badge variant="secondary" size="sm">{d} giorni</Badge>;
+// ── Live terminal clock (isolated so only it re-renders every second) ──────────
+function TerminalClock() {
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const time = now ? now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--:--:--';
+  const date = now ? cap(now.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })) : '';
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 20, flexWrap: 'wrap', margin: '14px 0 4px' }}>
+      <span style={{ fontSize: 62, fontWeight: 700, letterSpacing: '-.01em', color: TERM.fg, lineHeight: 0.95, fontVariantNumeric: 'tabular-nums' }}>{time}</span>
+      <span style={{ fontSize: 18, color: TERM.dim, whiteSpace: 'nowrap' }}>{date}</span>
+    </div>
+  );
+}
 
-const scadenzaDot = (d: number) =>
-  d <= 6 ? 'rgb(245 158 11)'
-  : d <= 7 ? 'rgb(99 102 241)'
-  : d <= 20 ? 'rgb(99 102 241)'
-  : 'rgb(var(--color-muted))';
+// ── Timeline dot ───────────────────────────────────────────────────────────────
+type DotKind = 'now' | 'done' | 'urgent' | 'future';
+function Dot({ kind, color, pulseRgb }: { kind: DotKind; color: string; pulseRgb?: string }) {
+  const ring = '0 0 0 4px rgb(var(--color-card-inner))';
+  if (kind === 'now')
+    return <span className="sd-pulse" style={{ position: 'absolute', left: 8, top: 4, width: 14, height: 14, borderRadius: '50%', background: color, boxShadow: ring, ['--pulse' as string]: pulseRgb }} />;
+  if (kind === 'urgent')
+    return <span style={{ position: 'absolute', left: 8, top: 4, width: 14, height: 14, borderRadius: '50%', background: color, boxShadow: ring }} />;
+  if (kind === 'done')
+    return <span style={{ position: 'absolute', left: 8, top: 5, width: 12, height: 12, borderRadius: '50%', background: color, boxShadow: ring }} />;
+  return <span style={{ position: 'absolute', left: 8, top: 5, width: 12, height: 12, borderRadius: '50%', background: 'rgb(var(--color-card))', border: `2px solid ${color}`, boxShadow: ring }} />;
+}
+
+// ── A single timeline node ─────────────────────────────────────────────────────
+function LaneNode({ j, width = 226, dimmed, time, timeColor, timeWeight, dot, cardStyle, children }: {
+  j: number; width?: number; dimmed?: boolean; time: string; timeColor?: string; timeWeight?: number;
+  dot: React.ReactNode; cardStyle?: React.CSSProperties; children: React.ReactNode;
+}) {
+  return (
+    <div className="sd-node" style={{ ['--j' as string]: j, flex: 'none', width, position: 'relative', opacity: dimmed ? 0.62 : undefined }}>
+      <div style={{ height: 24, fontFamily: mono, fontSize: 13, color: timeColor ?? 'rgb(var(--color-tertiary))', fontWeight: timeWeight }}>{time}</div>
+      <div style={{ height: 22, position: 'relative' }}>{dot}</div>
+      <div className="sd-node-card" style={{ background: 'rgb(var(--color-card))', border: '1px solid rgb(var(--color-border))', borderRadius: 9, padding: '13px 15px', boxShadow: '0 1px 2px rgba(17,17,26,.04)', ...cardStyle }}>{children}</div>
+    </div>
+  );
+}
+
+// ── Lane scaffolding (prompt + scroll container) ───────────────────────────────
+function LanePrompt({ cmd, flags, comment }: { cmd: string; flags: { text: string; color: string }[]; comment: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '0 4px 10px', fontFamily: mono, fontSize: 12.5 }}>
+      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <span style={{ color: `rgb(${EMERALD})`, fontWeight: 600 }}>$</span>{' '}
+        <span style={{ color: 'rgb(var(--color-heading))' }}>{cmd}</span>
+        {flags.map((f, i) => <span key={i} style={{ color: f.color }}> {f.text}</span>)}
+      </span>
+      <span style={{ color: 'rgb(var(--color-tertiary))', whiteSpace: 'nowrap' }}>{comment}</span>
+    </div>
+  );
+}
+function LaneScroll({ railColor, children }: { railColor: string; children: React.ReactNode }) {
+  return (
+    <div className="sd-lane-scroll" style={{ border: '1px solid rgb(var(--color-border))', borderRadius: 10, background: 'rgb(var(--color-card-inner))', padding: '20px 20px 22px' }}>
+      <div style={{ position: 'relative', display: 'flex', gap: 16, minWidth: 'max-content', alignItems: 'flex-start' }}>
+        <span className="sd-rail-line" style={{ position: 'absolute', left: 8, right: 8, top: 35, height: 2, background: railColor }} />
+        {children}
+      </div>
+    </div>
+  );
+}
+function LaneEmpty({ text }: { text: string }) {
+  return (
+    <div className="sd-lane-scroll" style={{ border: '1px solid rgb(var(--color-border))', borderRadius: 10, background: 'rgb(var(--color-card-inner))', padding: '20px 20px 22px' }}>
+      <div style={{ fontSize: 13, color: 'rgb(var(--color-tertiary))' }}>{text}</div>
+    </div>
+  );
+}
+const nodeTitle: React.CSSProperties = { fontSize: 14, fontWeight: 500, color: 'rgb(var(--color-heading))' };
+const nodeSub: React.CSSProperties = { fontSize: 12, color: 'rgb(var(--color-tertiary))', marginTop: 3 };
 
 export default function HomePage() {
   const [uni, setUni] = useState<UniDashboard>(EMPTY_UNI);
   const [budget, setBudget] = useState<Pick<BudgetDashboard, 'total_expenses' | 'categories'>>(EMPTY_BUDGET);
   const [scadenze, setScadenze] = useState<ScadenzaItem[]>([]);
   const [study, setStudy] = useState<StudyOverview | null>(null);
-  const [family, setFamily] = useState<FamilyWeather[]>([]);
+  const [appts, setAppts] = useState<CalendarEventDTO[]>([]);
 
-  // Dynamic "today" — never hardcode the date.
+  // Stable "today" for date math (local, not UTC — correct near midnight in CET).
   const now = new Date();
-  const todayIso = now.toISOString().slice(0, 10);
-  const headerDate = cap(now.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }));
-  const budgetMonthLabel = cap(now.toLocaleDateString('it-IT', { month: 'long' }));
+  const todayIso = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const daysTo = (iso: string) => Math.round((new Date(iso + 'T00:00:00').getTime() - startOfToday) / 86_400_000);
+  const budgetMonthLabel = now.toLocaleDateString('it-IT', { month: 'long' });
 
   useEffect(() => {
     let alive = true;
@@ -77,236 +148,236 @@ export default function HomePage() {
     getBudgetDashboard(m, y).then((d) => { if (alive) setBudget(d); }).catch(() => {/* keep empty */});
     getScadenze().then((d) => { if (alive) setScadenze(d); }).catch(() => {/* keep empty */});
     getStudyOverview().then((d) => { if (alive) setStudy(d); }).catch(() => {/* keep empty */});
-    getFamilyWeather().then((d) => { if (alive) setFamily(d); }).catch(() => {/* keep empty */});
+    getUpcomingEvents().then((d) => { if (alive) setAppts(d); }).catch(() => {/* keep empty */});
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const { profilo, prossimo_esame } = uni;
+  const esameDays = prossimo_esame ? Math.max(0, daysTo(prossimo_esame.data)) : null;
 
-  // At-a-glance · CFU
-  const cfuPct = profilo.cfu_totali ? Math.round((profilo.cfu_superati / profilo.cfu_totali) * 100) : 0;
-
-  // Signature + cards · prossimo esame
-  const esameDays = prossimo_esame ? daysTo(prossimo_esame.data) : 0;
-
-  // At-a-glance · budget
-  const budgetLimit = budget.categories.reduce((s, c) => s + (c.limit ?? 0), 0);
-  const budgetSpent = budget.total_expenses;
-  const budgetLeft = Math.max(0, budgetLimit - budgetSpent);
-  const budgetPct = budgetLimit ? Math.round((budgetSpent / budgetLimit) * 100) : 0;
-
-  // Study overview · today + overall progress (real)
+  // ── Lane 1 · Studio di oggi (real study overview) ───────────────────────────
   const today = study?.today ?? null;
   const overall = study?.overall ?? { done: 0, total: 0, pct: 0 };
-  const todayHasTasks = !!today && !today.isRest && today.tasks.length > 0;
+  const tasks = today && !today.isRest ? today.tasks : [];
+  const doneCount = today?.done ?? 0;
+  const totalCount = today?.total ?? 0;
+  const activeIdx = tasks.findIndex((t) => !t.completed);
 
-  // Scadenze imminenti · first 4 upcoming (data >= today), real service data.
-  const upcoming = scadenze.filter((s) => s.data >= todayIso).slice(0, 4);
+  // ── Lane 2 · Appuntamenti (real calendar) ───────────────────────────────────
+  const appointments = appts.slice(0, 10);
+
+  // ── Lane 3 · Scadenze (real, upcoming) ──────────────────────────────────────
+  const upcoming = scadenze.filter((s) => s.data >= todayIso).slice(0, 10);
+
+  // ── Stats ───────────────────────────────────────────────────────────────────
+  const cfuPct = profilo.cfu_totali ? Math.round((profilo.cfu_superati / profilo.cfu_totali) * 100) : 0;
+  const budgetLimit = budget.categories.reduce((s, c) => s + (c.limit ?? 0), 0);
+  const budgetSpent = budget.total_expenses;
+  const budgetPct = budgetLimit ? Math.min(100, Math.round((budgetSpent / budgetLimit) * 100)) : 0;
+  const studioHint = !today || today.isRest ? 'Riposo' : totalCount === 0 ? 'Nessun piano' : doneCount >= totalCount ? 'Tutto fatto ✓' : 'Continua così';
+  const studioHintColor = !today || today.isRest || totalCount === 0 ? 'rgb(var(--color-tertiary))' : `rgb(${EMERALD})`;
 
   return (
     <div>
-      {/* Header */}
-      <header className="sd-reveal" style={{ ['--i' as string]: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap', marginBottom: 30 }}>
-        <div>
-          <div style={{ fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgb(var(--color-tertiary))', fontFamily: mono, marginBottom: 12 }}>{headerDate}</div>
-          <h1 style={{ margin: 0, fontSize: 40, lineHeight: 1.04, letterSpacing: '-.02em', color: 'rgb(var(--color-heading))', fontWeight: 600 }}>
-            Buongiorno, <span className="sd-accent" style={{ fontFamily: "'Fraunces',serif", fontStyle: 'italic', fontWeight: 500 }}>Giuseppe</span>.
-          </h1>
-          <p style={{ margin: '12px 0 0', fontSize: 16, color: 'rgb(var(--color-tertiary))', maxWidth: 540, lineHeight: 1.5 }}>Ecco il riepilogo della tua giornata.</p>
+      {/* ════ Header terminale (Kali style · sempre scuro) ════ */}
+      <header className="sd-reveal" style={{ ['--i' as string]: 0, margin: '0 0 30px' }}>
+        <div style={{ background: TERM.bg, border: '1px solid rgb(255 255 255/0.09)', borderRadius: 11, overflow: 'hidden', fontFamily: mono, boxShadow: '0 18px 44px -26px rgba(0,0,0,.7)' }}>
+          {/* title bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', background: 'rgb(255 255 255/0.035)', borderBottom: '1px solid rgb(255 255 255/0.07)' }}>
+            {['#ff5f57', '#febc2e', '#28c840'].map((c) => (
+              <span key={c} style={{ width: 11, height: 11, borderRadius: '50%', background: c, flex: 'none' }} />
+            ))}
+            <span style={{ marginLeft: 8, fontSize: 11.5, color: TERM.dim2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>giuseppe@study-desk: ~/sessione-esami</span>
+          </div>
+          {/* body */}
+          <div style={{ padding: '18px 22px 20px' }}>
+            <div style={{ fontSize: 13, lineHeight: 1.75 }}>
+              <span style={{ color: TERM.cyan }}>┌──(</span><span style={{ color: TERM.blue, fontWeight: 600 }}>giuseppe</span><span style={{ color: TERM.pink }}>㉿</span><span style={{ color: TERM.blue, fontWeight: 600 }}>study-desk</span><span style={{ color: TERM.cyan }}>)-[</span><span style={{ color: TERM.fg }}>~/sessione-esami</span><span style={{ color: TERM.cyan }}>]</span><br />
+              <span style={{ color: TERM.cyan }}>└─$</span> <span style={{ color: TERM.green }}>date</span>
+            </div>
+            <TerminalClock />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginTop: 14 }}>
+              <div style={{ fontSize: 13 }}>
+                <span style={{ color: TERM.cyan }}>└─$</span> <span style={{ color: TERM.fg }}>today --focus</span>
+                <span className="sd-cursor" style={{ display: 'inline-block', width: 8, height: 15, background: TERM.green, marginLeft: 5, transform: 'translateY(2px)' }} />
+              </div>
+              <div style={{ fontSize: 12, color: TERM.dim3, whiteSpace: 'nowrap' }}>
+                {prossimo_esame && esameDays !== null
+                  ? <># prossimo esame: {prossimo_esame.corso} · <span style={{ color: TERM.green }}>tra {esameDays}g</span></>
+                  : <># sessione di studio</>}
+              </div>
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* Signature: focus + today */}
-      <section className="sd-reveal sd-shadow" style={{ ['--i' as string]: 1, ...card, borderRadius: 20, overflow: 'hidden', marginBottom: 18 }}>
-        <div className="sd-focus">
-          <div style={{ padding: '30px 30px 30px 32px', borderRight: '1px solid rgb(var(--color-border))', position: 'relative' }}>
-            <span style={{ position: 'absolute', left: 0, top: 30, bottom: 30, width: 4, borderRadius: 4, background: 'rgb(99 102 241)' }} />
-            <div style={{ fontSize: 10.5, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgb(99 102 241)', fontWeight: 600, marginBottom: 14 }}>La cosa più importante</div>
-            {prossimo_esame ? (
-              <>
-                <h2 style={{ margin: 0, fontSize: 27, lineHeight: 1.12, letterSpacing: '-.01em', color: 'rgb(var(--color-heading))', fontWeight: 600 }}>
-                  <span style={{ fontFamily: "'Fraunces',serif", fontStyle: 'italic', fontWeight: 500 }}>{prossimo_esame.corso}</span>
-                </h2>
-                {prossimo_esame.descrizione && (
-                  <p style={{ margin: '12px 0 0', fontSize: 14, color: 'rgb(var(--color-tertiary))', lineHeight: 1.55 }}>{prossimo_esame.descrizione}</p>
-                )}
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: '20px 0 22px' }}>
-                  <span style={{ fontFamily: mono, fontSize: 30, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{esameDays}</span>
-                  <span style={{ fontSize: 13, color: 'rgb(var(--color-tertiary))' }}>giorni all&apos;esame · {fmtDateLong(prossimo_esame.data)}</span>
-                </div>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  <Link href="/dashboard/universita"><Button variant="primary" size="md">Apri il corso</Button></Link>
-                </div>
-              </>
-            ) : (
-              <>
-                <h2 style={{ margin: 0, fontSize: 27, lineHeight: 1.12, letterSpacing: '-.01em', color: 'rgb(var(--color-heading))', fontWeight: 600 }}>Nessun esame imminente</h2>
-                <p style={{ margin: '12px 0 22px', fontSize: 14, color: 'rgb(var(--color-tertiary))', lineHeight: 1.55 }}>Non ci sono esami in programma al momento.</p>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  <Link href="/dashboard/universita"><Button variant="ghost" size="md">Apri il corso</Button></Link>
-                </div>
-              </>
-            )}
-          </div>
-
-          <div style={{ padding: '30px 32px 30px 30px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-              <div style={eyebrow}>Il tuo oggi</div>
-              {todayHasTasks && (
-                <span style={{ fontFamily: mono, fontSize: 12, color: 'rgb(16 185 129)' }}>{today!.done} / {today!.total}</span>
-              )}
-            </div>
-            {todayHasTasks ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {today!.tasks.map((t) => (
-                  <Checkbox key={t.id} label={t.text} checked={t.completed} readOnly />
-                ))}
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 0' }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: 'rgb(var(--color-heading))' }}>{today?.isRest ? 'Oggi è riposo' : 'Niente in programma per oggi'}</div>
-                <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>Goditi la pausa o apri il piano di studio.</div>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* At a glance */}
-      <div className="sd-grid4" style={{ marginBottom: 18 }}>
-        <div className="sd-reveal sd-lift" style={{ ['--i' as string]: 2, ...card, padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
-          <CircularProgress value={cfuPct} size="md" variant="primary" />
-          <div>
-            <div style={eyebrow}>CFU · UOC</div>
-            <div style={{ fontFamily: mono, fontSize: 21, fontWeight: 600, color: 'rgb(var(--color-heading))', marginTop: 3 }}>{profilo.cfu_superati}<span style={{ color: 'rgb(var(--color-muted))' }}> / {profilo.cfu_totali}</span></div>
-            <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>del percorso</div>
-          </div>
-        </div>
-        <div className="sd-reveal sd-lift" style={{ ['--i' as string]: 3, ...card, padding: 20, display: 'flex', alignItems: 'center', gap: 16 }}>
-          <CircularProgress value={overall.pct} size="md" variant="warning" />
-          <div>
-            <div style={eyebrow}>CPTS</div>
-            <div style={{ fontFamily: mono, fontSize: 21, fontWeight: 600, color: 'rgb(var(--color-heading))', marginTop: 3 }}>{overall.done}<span style={{ color: 'rgb(var(--color-muted))' }}> / {overall.total}</span></div>
-            <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>task completati</div>
-          </div>
-        </div>
-        <div className="sd-reveal sd-lift" style={{ ['--i' as string]: 4, ...card, padding: 20 }}>
-          <div style={{ ...eyebrow, marginBottom: 10 }}>Prossimo esame</div>
-          {prossimo_esame ? (
-            <>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}><span style={{ fontFamily: mono, fontSize: 28, fontWeight: 600, color: 'rgb(99 102 241)' }}>{esameDays}</span><span style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>giorni</span></div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'rgb(var(--color-heading))', marginTop: 8 }}>{prossimo_esame.corso}</div>
-              <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))', fontFamily: mono }}>{fmtDate(prossimo_esame.data)}{prossimo_esame.ora ? ` · ${prossimo_esame.ora}` : ''}</div>
-            </>
-          ) : (
-            <>
-              <div style={{ fontSize: 14, fontWeight: 600, color: 'rgb(var(--color-heading))', marginTop: 4 }}>Nessun esame</div>
-              <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>Niente in programma</div>
-            </>
-          )}
-        </div>
-        <div className="sd-reveal sd-lift" style={{ ['--i' as string]: 5, ...card, padding: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}><div style={eyebrow}>Budget {budgetMonthLabel.toLowerCase()}</div><span style={{ width: 7, height: 7, borderRadius: '50%', background: 'rgb(16 185 129)' }} /></div>
-          <div style={{ fontFamily: mono, fontSize: 21, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>€{Math.round(budgetSpent)}<span style={{ color: 'rgb(var(--color-muted))', fontSize: 15 }}> / {Math.round(budgetLimit)}</span></div>
-          <div style={{ margin: '12px 0 6px' }}><div style={{ height: 8, borderRadius: 8, background: 'rgb(var(--color-card-inner))', overflow: 'hidden' }}><div style={{ height: '100%', width: `${budgetPct}%`, borderRadius: 8, background: 'rgb(16 185 129)' }} /></div></div>
-          <div style={{ fontSize: 12, color: 'rgb(16 185 129)' }}>€{Math.round(budgetLeft)} rimasti</div>
-        </div>
-      </div>
-
-      {/* Scadenze + studio oggi */}
-      <div className="sd-twocol">
-        <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: 6, ...card, padding: '22px 24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>Scadenze imminenti</h3>
-            <span style={{ fontSize: 11, color: 'rgb(var(--color-tertiary))', textTransform: 'uppercase', letterSpacing: '.12em', whiteSpace: 'nowrap' }}>Uni + Cert</span>
-          </div>
-          {upcoming.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {upcoming.map((s, idx) => {
-                const d = daysTo(s.data);
+      {/* ════ CORSIA 1 · STUDIO DI OGGI ════ */}
+      <section className="sd-reveal" style={{ ['--i' as string]: 1, marginBottom: 22 }}>
+        <LanePrompt
+          cmd="studio"
+          flags={[{ text: '--oggi', color: `rgb(${INDIGO})` }, { text: '--now', color: `rgb(${PINK})` }]}
+          comment={!today || today.isRest ? '# riposo' : `# ${totalCount} blocchi · ${doneCount} fatti`}
+        />
+        {tasks.length > 0 ? (
+          <LaneScroll railColor={`rgb(${EMERALD}/0.3)`}>
+            {tasks.map((t, i) => {
+              if (t.completed) {
                 return (
-                  <DeadlineRow key={s.id} dot={scadenzaDot(d)} title={s.titolo} sub={s.sottotitolo} date={fmtDate(s.data)} badge={scadenzaBadge(d)} last={idx === upcoming.length - 1} />
+                  <LaneNode key={t.id} j={i} dimmed time="fatto" dot={<Dot kind="done" color={`rgb(${EMERALD})`} />}>
+                    <div style={{ ...nodeTitle, textDecoration: 'line-through', textDecorationColor: 'rgb(var(--color-muted))' }}>{t.text}</div>
+                    <div style={{ marginTop: 10 }}><Badge variant="success" size="sm">Fatto</Badge></div>
+                  </LaneNode>
                 );
-              })}
-            </div>
-          ) : (
-            <div style={{ padding: '18px 0 4px', fontSize: 13, color: 'rgb(var(--color-tertiary))' }}>Nessuna scadenza imminente.</div>
-          )}
-        </div>
-
-        <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: 7, ...card, padding: '22px 24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>Studio di oggi</h3>
-            {todayHasTasks && <span style={{ fontFamily: mono, fontSize: 12, color: 'rgb(16 185 129)' }}>{today!.done} / {today!.total}</span>}
-          </div>
-          {todayHasTasks ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {today!.tasks.map((t) => (
-                <Checkbox key={t.id} label={t.text} checked={t.completed} readOnly />
-              ))}
-            </div>
-          ) : (
-            <div style={{ fontSize: 13, color: 'rgb(var(--color-tertiary))', padding: '4px 0' }}>{today?.isRest ? 'Oggi è riposo.' : 'Niente in programma per oggi.'}</div>
-          )}
-        </div>
-      </div>
-
-      {/* Famiglia · meteo reale delle città */}
-      <section className="sd-reveal sd-shadow" style={{ ['--i' as string]: 8, ...card, padding: '22px 24px', marginTop: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>La famiglia</h3>
-          <span style={{ fontSize: 11, color: 'rgb(var(--color-tertiary))', textTransform: 'uppercase', letterSpacing: '.12em', whiteSpace: 'nowrap' }}>Meteo · Open-Meteo</span>
-        </div>
-        <p style={{ margin: '0 0 16px', fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>
-          Posizione live non disponibile (Find My non espone API pubbliche). Mostro la città configurata di ogni familiare.
-        </p>
-        {family.length > 0 ? (
-          <div className="sd-grid4" style={{ gridTemplateColumns: `repeat(${Math.min(family.length, 3)}, minmax(0, 1fr))` }}>
-            {family.map((m) => (
-              <FamilyWeatherCard key={`${m.label}-${m.city}`} m={m} />
-            ))}
-          </div>
+              }
+              if (i === activeIdx) {
+                return (
+                  <LaneNode
+                    key={t.id} j={i} width={316}
+                    time="ADESSO" timeColor={`rgb(${EMERALD})`} timeWeight={600}
+                    dot={<Dot kind="now" color={`rgb(${EMERALD})`} pulseRgb={`rgba(16,185,129,.5)`} />}
+                    cardStyle={{ background: `rgb(${EMERALD}/0.07)`, border: `1px solid rgb(${EMERALD}/0.32)`, padding: '15px 16px' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{t.text}</div>
+                      <Badge variant="success" size="sm">In corso</Badge>
+                    </div>
+                    <div style={{ marginTop: 14 }}>
+                      <Link href="/dashboard/study"><Button variant="primary" size="sm">Riprendi lo studio</Button></Link>
+                    </div>
+                  </LaneNode>
+                );
+              }
+              return (
+                <LaneNode key={t.id} j={i} time="poi" dot={<Dot kind="future" color={`rgb(${AMBER})`} />}>
+                  <div style={nodeTitle}>{t.text}</div>
+                  <div style={{ marginTop: 10 }}><Badge variant="secondary" size="sm">Da fare</Badge></div>
+                </LaneNode>
+              );
+            })}
+          </LaneScroll>
         ) : (
-          <div style={{ padding: '12px 0 4px', fontSize: 13, color: 'rgb(var(--color-tertiary))' }}>Meteo non disponibile al momento.</div>
+          <LaneEmpty text={today?.isRest ? 'Oggi è riposo — goditi la pausa.' : 'Nessun blocco di studio per oggi.'} />
         )}
       </section>
-    </div>
-  );
-}
 
-function FamilyWeatherCard({ m }: { m: FamilyWeather }) {
-  const hasTemp = m.temp !== null && m.temp !== undefined;
-  return (
-    <div className="sd-lift" style={{ border: '1px solid rgb(var(--color-border))', borderRadius: 14, padding: 18, background: 'rgb(var(--color-card-inner))' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'rgb(var(--color-heading))', fontFamily: "'Fraunces',serif", fontStyle: 'italic' }}>{m.label || m.city}</div>
-          <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{m.city}</div>
+      {/* ════ CORSIA 2 · APPUNTAMENTI ════ */}
+      <section className="sd-reveal" style={{ ['--i' as string]: 2, marginBottom: 22 }}>
+        <LanePrompt cmd="appuntamenti" flags={[{ text: '--prossimi', color: `rgb(${INDIGO})` }]} comment={`# ${appointments.length} in calendario`} />
+        {appointments.length > 0 ? (
+          <LaneScroll railColor={`rgb(${INDIGO}/0.3)`}>
+            {appointments.map((e, i) => {
+              const start = new Date(e.startTime);
+              const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+              const dayDiff = Math.round((startDay - startOfToday) / 86_400_000);
+              const time = `${pad2(start.getHours())}:${pad2(start.getMinutes())}`;
+              const when = dayDiff === 0 ? `oggi · ${time}`
+                : dayDiff === 1 ? `domani · ${time}`
+                : dayDiff > 1 && dayDiff < 7 ? `${start.toLocaleDateString('it-IT', { weekday: 'short' })} · ${time}`
+                : `${start.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' })} · ${time}`;
+              const ms = start.getTime() - now.getTime();
+              let badge: { label: string; variant: BadgeVariant };
+              if (dayDiff === 0 && ms > 0) {
+                const totMin = Math.round(ms / 60_000); const h = Math.floor(totMin / 60); const mm = totMin % 60;
+                badge = { label: h > 0 ? `Tra ${h}h ${mm}m` : `Tra ${mm}m`, variant: 'primary' };
+              } else if (dayDiff === 0) badge = { label: 'Oggi', variant: 'primary' };
+              else if (dayDiff === 1) badge = { label: 'Domani', variant: 'info' };
+              else if (dayDiff < 7) badge = { label: cap(start.toLocaleDateString('it-IT', { weekday: 'long' })), variant: 'secondary' };
+              else badge = { label: start.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }), variant: 'secondary' };
+              const isNext = i === 0 && dayDiff === 0;
+              const dot = isNext ? <Dot kind="now" color={`rgb(${INDIGO})`} pulseRgb="rgba(99,102,241,.5)" />
+                : dayDiff < 7 ? <Dot kind="future" color={`rgb(${INDIGO})`} />
+                : <Dot kind="future" color="rgb(var(--color-muted))" />;
+              const sub = e.description || e.location || e.calendarName || '';
+              return (
+                <LaneNode key={e.id} j={i} time={when} timeColor={dayDiff === 0 ? `rgb(${INDIGO})` : undefined} timeWeight={dayDiff === 0 ? 600 : undefined} dot={dot}>
+                  <div style={nodeTitle}>{e.title}</div>
+                  {sub && <div style={nodeSub}>{sub}</div>}
+                  <div style={{ marginTop: 10 }}><Badge variant={badge.variant} size="sm">{badge.label}</Badge></div>
+                </LaneNode>
+              );
+            })}
+          </LaneScroll>
+        ) : (
+          <LaneEmpty text="Nessun appuntamento in calendario." />
+        )}
+      </section>
+
+      {/* ════ CORSIA 3 · SCADENZE ════ */}
+      <section className="sd-reveal" style={{ ['--i' as string]: 3, marginBottom: 30 }}>
+        <LanePrompt
+          cmd="scadenze" flags={[{ text: '--sort=data', color: `rgb(${INDIGO})` }]}
+          comment={upcoming.length > 0 ? `# prossima tra ${Math.max(0, daysTo(upcoming[0].data))} giorni` : '# nessuna scadenza'}
+        />
+        {upcoming.length > 0 ? (
+          <LaneScroll railColor={`rgb(${AMBER}/0.3)`}>
+            {upcoming.map((s, i) => {
+              const d = Math.max(0, daysTo(s.data));
+              const urgent = d <= 6;
+              const soon = d <= 20;
+              const dateColor = urgent ? `rgb(${AMBER})` : soon ? `rgb(${INDIGO})` : 'rgb(var(--color-muted))';
+              const dot = urgent
+                ? <Dot kind="urgent" color={`rgb(${AMBER})`} />
+                : <Dot kind="future" color={soon ? `rgb(${INDIGO})` : 'rgb(var(--color-muted))'} />;
+              const badge: BadgeVariant = urgent ? 'warning' : d <= 7 ? 'primary' : soon ? 'info' : 'secondary';
+              return (
+                <LaneNode
+                  key={s.id} j={i} time={fmtDay(s.data)} timeColor={dateColor} timeWeight={urgent ? 600 : undefined}
+                  dot={dot} cardStyle={urgent ? { border: `1px solid rgb(${AMBER}/0.4)` } : undefined}
+                >
+                  <div style={nodeTitle}>{s.titolo}</div>
+                  {s.sottotitolo && <div style={nodeSub}>{s.sottotitolo}</div>}
+                  <div style={{ marginTop: 10 }}><Badge variant={badge} size="sm">{d} giorni</Badge></div>
+                </LaneNode>
+              );
+            })}
+          </LaneScroll>
+        ) : (
+          <LaneEmpty text="Nessuna scadenza imminente." />
+        )}
+      </section>
+
+      {/* ════ STATS · riepilogo ════ */}
+      <div className="sd-reveal" style={{ ['--i' as string]: 4, display: 'flex', alignItems: 'center', gap: 14, margin: '6px 0 14px' }}>
+        <span style={{ fontFamily: mono, fontSize: 12.5, whiteSpace: 'nowrap' }}>
+          <span style={{ color: TERM.green, fontWeight: 600 }}>$</span> <span style={{ color: 'rgb(var(--color-heading))' }}>stats</span> <span style={{ color: `rgb(${INDIGO})` }}>--overview</span>
+        </span>
+        <span style={{ flex: 1, height: 1, background: 'rgb(var(--color-border))' }} />
+      </div>
+      <div className="sd-reveal sd-statbar" style={{ ['--i' as string]: 5, display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', background: 'rgb(var(--color-card))', border: '1px solid rgb(var(--color-border))', borderRadius: 8, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px 22px' }}>
+          <CircularProgress value={cfuPct} size="md" variant="primary" />
+          <div style={{ minWidth: 0 }}>
+            <div style={statLabel}>CFU · UOC</div>
+            <div style={statValue}>{profilo.cfu_superati}<span style={statUnit}> / {profilo.cfu_totali}</span></div>
+          </div>
         </div>
-        <span style={{ fontSize: 30, lineHeight: 1 }} aria-hidden>{weatherIcon(m.code)}</span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 14 }}>
-        <span style={{ fontFamily: mono, fontSize: 28, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{hasTemp ? `${m.temp}°` : '—'}</span>
-        <span style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{weatherDescription(m.code)}</span>
-      </div>
-      <div style={{ fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))', marginTop: 6 }}>
-        {m.min !== null && m.min !== undefined ? `min ${m.min}°` : 'min —'} · {m.max !== null && m.max !== undefined ? `max ${m.max}°` : 'max —'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px 22px' }}>
+          <CircularProgress value={overall.pct} size="md" variant="warning" />
+          <div style={{ minWidth: 0 }}>
+            <div style={statLabel}>CPTS · HTB</div>
+            <div style={statValue}>{overall.done}<span style={statUnit}> / {overall.total}</span></div>
+          </div>
+        </div>
+        <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{ ...statLabel, marginBottom: 7 }}>Budget {budgetMonthLabel}</div>
+          <div style={statValue}>€{Math.round(budgetSpent)}<span style={statUnit}> / {Math.round(budgetLimit)}</span></div>
+          <div style={{ marginTop: 10, height: 5, borderRadius: 5, background: 'rgb(var(--color-card-inner))', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${budgetPct}%`, borderRadius: 5, background: `rgb(${EMERALD})` }} />
+          </div>
+        </div>
+        <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{ ...statLabel, marginBottom: 7 }}>Studio oggi</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+            <span style={statValue}>{doneCount}<span style={statUnit}> / {totalCount}</span></span>
+          </div>
+          <div style={{ fontSize: 12, color: studioHintColor, marginTop: 6 }}>{studioHint}</div>
+        </div>
       </div>
     </div>
   );
 }
 
-function DeadlineRow({ dot, title, sub, date, badge, last }: { dot: string; title: string; sub: string; date: string; badge: React.ReactNode; last?: boolean }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: last ? '14px 0 4px' : '14px 0', borderTop: '1px solid rgb(var(--color-border))' }}>
-      <span style={{ width: 9, height: 9, borderRadius: '50%', background: dot, flex: 'none' }} />
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: 'rgb(var(--color-heading))' }}>{title}</div>
-        <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{sub}</div>
-      </div>
-      <div style={{ fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{date}</div>
-      <div style={{ flex: 'none', width: 'max-content' }}>{badge}</div>
-    </div>
-  );
-}
+const statLabel: React.CSSProperties = { fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: 'rgb(var(--color-tertiary))', fontWeight: 600, marginBottom: 4 };
+const statValue: React.CSSProperties = { fontFamily: mono, fontSize: 18, fontWeight: 600, color: 'rgb(var(--color-heading))' };
+const statUnit: React.CSSProperties = { color: 'rgb(var(--color-muted))', fontSize: 13 };
