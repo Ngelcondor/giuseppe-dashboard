@@ -622,10 +622,24 @@ async def get_budget_dashboard(
         if provider:
             try:
                 balances = await provider.get_balances(bank_conn.account_id)
-                for b in balances:
-                    if b.balance_type in ("closingBooked", "expected"):
-                        dashboard.bank_balance = b.amount
-                        break
+                logger.info(
+                    "EB balances for %s: %s",
+                    bank_conn.account_id,
+                    [(b.balance_type, b.amount, b.currency) for b in balances],
+                )
+                # Prefer a "current" balance type, but fall back to whatever the
+                # bank returns — EB/ASPSPs use varied balance_type codes.
+                preferred = (
+                    "closingBooked", "expected", "interimAvailable", "interimBooked",
+                    "openingBooked", "authorised", "forwardAvailable", "information",
+                )
+                chosen = next((b for b in balances if b.balance_type in preferred), None)
+                if chosen is None and balances:
+                    chosen = balances[0]
+                if chosen is not None:
+                    dashboard.bank_balance = chosen.amount
+                    if chosen.currency:
+                        dashboard.bank_currency = chosen.currency
             except Exception as e:
                 logger.warning(f"Could not fetch balance for dashboard: {e}")
 
