@@ -58,7 +58,9 @@ class CalendarConnectionTestResponse(BaseModel):
 
 class CalendarSyncRequest(BaseModel):
     """Request to trigger a calendar sync."""
-    connection_id: uuid.UUID
+    # Optional: the connection is identified by the URL path; requiring it in the
+    # body too is redundant and made the endpoint 422 when clients omitted it.
+    connection_id: Optional[uuid.UUID] = None
     calendar_ids: Optional[List[str]] = Field(
         None, description="Specifici calendar IDs da sincronizzare. Se omesso, sincronizza tutti."
     )
