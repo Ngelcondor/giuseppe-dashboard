@@ -84,6 +84,7 @@ class BankProvider(ABC):
         self,
         institution_id: str,
         redirect_url: Optional[str] = None,
+        country: str = "ES",
     ) -> BankAuthResult:
         """Start the bank authorization flow. Returns auth link for user."""
         ...

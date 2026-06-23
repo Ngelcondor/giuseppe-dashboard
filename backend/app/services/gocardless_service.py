@@ -79,7 +79,10 @@ class GoCardlessProvider(BankProvider):
         self,
         institution_id: str,
         redirect_url: Optional[str] = None,
+        country: str = "ES",
     ) -> BankAuthResult:
+        # GoCardless resolves the bank via institution_id, so `country` is unused
+        # here; it exists to satisfy the provider interface.
         hdrs = await _headers()
         redirect = redirect_url or settings.GOCARDLESS_REDIRECT_URL
         inst_id = institution_id or settings.GOCARDLESS_INSTITUTION_ID

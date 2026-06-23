@@ -133,7 +133,7 @@ export async function getBankProviderStatus(): Promise<BankProviderStatus> {
   return data;
 }
 
-export async function initBankAuth(institutionId?: string, country = 'FR'): Promise<BankAuthResponse> {
+export async function initBankAuth(institutionId?: string, country = 'ES'): Promise<BankAuthResponse> {
   const { data } = await api.post('/budget/bank/auth', {
     institution_id: institutionId,
     country,
@@ -141,9 +141,10 @@ export async function initBankAuth(institutionId?: string, country = 'FR'): Prom
   return data;
 }
 
-export async function completeBankAuth(requisitionId: string): Promise<BankConnection> {
+export async function completeBankAuth(code: string, state?: string): Promise<BankConnection> {
   const { data } = await api.post('/budget/bank/callback', {
-    requisition_id: requisitionId,
+    code,
+    state,
   });
   return data;
 }
@@ -157,7 +158,7 @@ export async function disconnectBank(): Promise<void> {
   await api.delete('/budget/bank/connection');
 }
 
-export async function listInstitutions(country = 'FR'): Promise<Institution[]> {
+export async function listInstitutions(country = 'ES'): Promise<Institution[]> {
   const { data } = await api.get(`/budget/bank/institutions?country=${country}`);
   return data;
 }

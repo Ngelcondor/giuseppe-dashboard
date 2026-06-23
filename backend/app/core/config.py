@@ -103,10 +103,13 @@ class Settings(BaseSettings):
 
     # Open Banking — Provider-agnostic (configure one of the two)
     # Option 1: Enable Banking (recommended — free for personal use)
-    # Register at https://enablebanking.com/
-    ENABLE_BANKING_APP_ID: str = ""
+    # Register at https://enablebanking.com/  ·  App "Giuseppe Dashboard" (SANDBOX)
+    # App ID is an identifier (not secret); the private RSA key goes in
+    # ENABLE_BANKING_APP_SECRET via env only (never commit it). Redirect URL must
+    # match exactly a value registered in the EB app (EB rejects query strings).
+    ENABLE_BANKING_APP_ID: str = "ce2e676c-fd45-4df0-9055-cc4fbe0c2447"
     ENABLE_BANKING_APP_SECRET: str = ""
-    ENABLE_BANKING_REDIRECT_URL: str = "http://localhost:3000/dashboard/budget?bank=callback"
+    ENABLE_BANKING_REDIRECT_URL: str = "http://localhost:3000/dashboard/budget"
 
     # Option 2: GoCardless Bank Account Data (legacy — not accepting new signups)
     GOCARDLESS_SECRET_ID: str = ""

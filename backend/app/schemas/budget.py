@@ -39,7 +39,7 @@ class BankAuthInitRequest(BaseModel):
     """Request to initiate bank auth."""
 
     institution_id: Optional[str] = None
-    country: str = "FR"
+    country: Optional[str] = "ES"
 
 
 class BankAuthInitResponse(BaseModel):
@@ -52,9 +52,15 @@ class BankAuthInitResponse(BaseModel):
 
 
 class BankAuthCallbackRequest(BaseModel):
-    """Request after bank auth callback."""
+    """Request after bank auth callback.
 
-    requisition_id: str
+    Enable Banking returns a `code` (+ `state`) on the redirect; GoCardless used
+    a `requisition_id`. All are optional for cross-provider compatibility.
+    """
+
+    code: Optional[str] = None
+    state: Optional[str] = None
+    requisition_id: Optional[str] = None
 
 
 class BankBalanceResponse(BaseModel):
