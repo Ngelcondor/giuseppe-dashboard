@@ -2,14 +2,14 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Trash2, ShoppingCart, Train, Shield, Home, Music, CreditCard, FileUp, Landmark,
+  Trash2, ShoppingCart, Train, Shield, Home, Music, CreditCard, FileUp, Landmark, RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Sheet, Field, FieldRow } from '@/components/sd/FormSheet';
 import {
   getBudgetDashboard, listGoals, createGoal, deleteGoal,
   listTransactions, createTransaction, deleteTransaction, importCSV,
-  initBankAuth, completeBankAuth, listInstitutions,
+  initBankAuth, completeBankAuth, listInstitutions, syncBankTransactions,
   type BudgetDashboard, type CategorySpending, type BudgetGoal,
   type Transaction, type ScadenzaPreview, type Institution,
 } from '@/services/budgetService';
@@ -136,6 +136,19 @@ export default function BudgetPage() {
   const setViewP = (v: 'a' | 'b' | 'c') => { setView(v); try { localStorage.setItem('sd-fin-view', v); } catch {/**/} };
   const onBudget = (v: number) => { setBudget(v); try { localStorage.setItem('sd-fin-budget', String(v)); } catch {/**/} };
 
+  // Manual bank sync (also used to pull transactions for an already-connected account).
+  const [syncing, setSyncing] = useState(false);
+  const doSync = async () => {
+    setSyncing(true); setImportErr(null); setImportMsg(null);
+    try {
+      const r = await syncBankTransactions(90);
+      setImportMsg(`${r.imported} transazioni sincronizzate${r.skipped ? ` · ${r.skipped} già presenti` : ''}`);
+      await load();
+    } catch {
+      setImportErr('Sincronizzazione non riuscita. Riprova.');
+    } finally { setSyncing(false); }
+  };
+
   // Enable Banking callback: bank redirects back with ?code=&state=.
   // Runs once on mount, independent of the ?view= handling above.
   useEffect(() => {
@@ -149,10 +162,14 @@ export default function BudgetPage() {
     (async () => {
       try {
         await completeBankAuth(code, state);
+        // Pull recent transactions so they show immediately (balance is fetched
+        // live by the dashboard; transactions need a sync into the DB).
+        let synced = 0;
+        try { synced = (await syncBankTransactions(90)).imported; } catch {/* balance still works */}
         await load();
         if (!alive) return;
         setBankCallback('done');
-        setBankCallbackMsg('Conto collegato con successo.');
+        setBankCallbackMsg(synced > 0 ? `Conto collegato · ${synced} transazioni importate.` : 'Conto collegato. Saldo aggiornato; nessuna transazione recente.');
       } catch {
         if (!alive) return;
         setBankCallback('error');
@@ -292,9 +309,13 @@ export default function BudgetPage() {
                 <input type="number" min={0} value={budget || ''} placeholder={String(Math.round(totalLimit) || 900)} onChange={(e) => onBudget(parseInt(e.target.value, 10) || 0)} style={{ width: 62, background: 'transparent', border: 'none', outline: 'none', color: 'inherit', fontFamily: 'inherit', fontSize: 13, marginLeft: 2 }} />
               </span>
             </label>
-            {!bankConnected && (
+            {!bankConnected ? (
               <Button size="sm" variant="secondary" onClick={() => setBankOpen(true)}>
                 <Landmark size={15} style={{ marginRight: 6 }} />Collega banca
+              </Button>
+            ) : (
+              <Button size="sm" variant="secondary" isLoading={syncing} onClick={doSync}>
+                <RefreshCw size={15} style={{ marginRight: 6 }} />Sincronizza
               </Button>
             )}
             <Button size="sm" variant="primary" isLoading={importing} onClick={() => fileRef.current?.click()}>Carica CSV</Button>
