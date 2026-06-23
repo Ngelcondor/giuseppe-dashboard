@@ -18,7 +18,6 @@ const NAV: NavItem[] = [
   { label: 'Home', href: '/dashboard', dot: 'rgb(99 102 241)' },
   { label: 'Università', href: '/dashboard/universita', dot: 'rgb(99 102 241)' },
   { label: 'Studio', href: '/dashboard/study', dot: 'rgb(99 102 241)' },
-  { label: 'Scadenze', href: '/dashboard/deadlines', dot: 'rgb(245 158 11)' },
   { label: 'Calendario', href: '/dashboard/calendar', dot: 'rgb(99 102 241)' },
   { label: 'Budget', href: '/dashboard/budget', dot: 'rgb(16 185 129)' },
   { label: 'Smart Home', href: '/dashboard/smart-home', dot: 'rgb(245 158 11)' },

@@ -121,7 +121,10 @@ export default function BudgetPage() {
   useEffect(() => {
     try {
       const b = localStorage.getItem('sd-fin-budget'); if (b) setBudget(parseInt(b, 10) || 0);
-      const v = localStorage.getItem('sd-fin-view'); if (v === 'a' || v === 'b' || v === 'c') setView(v);
+      const map: Record<string, 'a' | 'b' | 'c'> = { a: 'a', b: 'b', c: 'c', panoramica: 'a', flusso: 'b', scadenze: 'c' };
+      const param = new URLSearchParams(window.location.search).get('view');
+      if (param && map[param]) setView(map[param]);
+      else { const v = localStorage.getItem('sd-fin-view'); if (v === 'a' || v === 'b' || v === 'c') setView(v); }
     } catch {/* ignore */}
   }, []);
   const setViewP = (v: 'a' | 'b' | 'c') => { setView(v); try { localStorage.setItem('sd-fin-view', v); } catch {/**/} };
