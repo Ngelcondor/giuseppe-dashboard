@@ -630,8 +630,10 @@ async def get_budget_dashboard(
                 # Prefer a "current" balance type, but fall back to whatever the
                 # bank returns — EB/ASPSPs use varied balance_type codes.
                 preferred = (
+                    # Berlin Group long names + EB/ISO short codes (EB returns e.g. ITAV)
                     "closingBooked", "expected", "interimAvailable", "interimBooked",
                     "openingBooked", "authorised", "forwardAvailable", "information",
+                    "CLBD", "XPCD", "ITAV", "ITBD", "OPBD", "PRCD", "FWAV",
                 )
                 chosen = next((b for b in balances if b.balance_type in preferred), None)
                 if chosen is None and balances:
