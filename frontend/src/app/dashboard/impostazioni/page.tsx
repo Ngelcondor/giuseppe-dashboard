@@ -21,6 +21,13 @@ const card: React.CSSProperties = {
 const mono = "'JetBrains Mono',monospace";
 const errStyle: React.CSSProperties = { margin: '2px 0 0', fontSize: 12.5, color: 'rgb(239 68 68)' };
 const eyebrow: React.CSSProperties = { fontSize: 10.5, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgb(var(--color-tertiary))', fontWeight: 600, marginBottom: 8 };
+// Action bar pinned to the bottom of a scrollable Sheet body (so it stays
+// reachable on short viewports). Negative margins span the body's 24px padding.
+const stickyBar: React.CSSProperties = {
+  position: 'sticky', bottom: 0, display: 'flex', gap: 10, justifyContent: 'flex-end',
+  marginTop: 10, marginLeft: -24, marginRight: -24, padding: '12px 24px 4px',
+  background: 'rgb(var(--color-card))', borderTop: '1px solid rgb(var(--color-border))',
+};
 
 const has = (v: unknown) => v != null && typeof v === 'object' && Object.keys(v as object).length > 0;
 
@@ -389,7 +396,7 @@ function ConnectionForm({ onCreated, onCancel }: { onCreated: (c: CalendarConnec
         </>
       )}
       {error && <p style={errStyle}>{error}</p>}
-      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 6 }}>
+      <div style={stickyBar}>
         <Button type="button" variant="secondary" onClick={onCancel} disabled={saving}>Annulla</Button>
         <Button type="submit" variant="primary" isLoading={saving} disabled={!provider}>Connetti</Button>
       </div>
@@ -453,7 +460,7 @@ function CalendarPicker({ conn, onSaved, onCancel }: { conn: CalendarConnection;
           ))}
         </div>
       )}
-      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 14 }}>
+      <div style={stickyBar}>
         <Button type="button" variant="secondary" onClick={onCancel} disabled={saving}>Annulla</Button>
         <Button type="button" variant="primary" isLoading={saving} disabled={!cals || cals.length === 0} onClick={save}>Importa e sincronizza</Button>
       </div>
