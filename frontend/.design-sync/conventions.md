@@ -30,7 +30,7 @@ raw color/spacing values** — they carry the tokens and adapt across themes:
 | Accent text | `text-accent` (indigo) `text-accent-pink` `text-accent-sun` (yellow) `text-name` |
 | Borders | `border-border-default` `border-border-hover` `border-accent` `border-accent-soft` |
 | Type | `font-display` (Inter Tight) `font-serif` (Fraunces) `font-mono-display` (JetBrains Mono) `text-display` (huge editorial weight) `tracking-uppercase` |
-| Primitives | `.panel` (editorial card) `.chip` / `.chip-accent` (pills) `.eyebrow` (uppercase label) `.dock` (floating nav) `.scrollbar-hidden` |
+| Primitives | `.panel` (editorial card) `.chip` (pill) `.eyebrow` (uppercase label) `.dock` (floating nav) `.scrollbar-hidden` |
 
 Components themselves are styled **via props**, not class overrides — e.g. `Button` takes
 `variant` (`primary` `secondary` `ghost` `danger` `success`) and `size` (`sm` `md` `lg`);
