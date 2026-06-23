@@ -102,7 +102,9 @@ is `src/components/**` (primarily `src/components/ui`). The converter runs in
 - **Full-page shells** (PageShell, EditorialPage, AppShell) + Sidebar + BottomDock get `cardMode:single` (they paint min-h-screen / fixed dock).
 - **Known component quirks (real, not preview bugs):** Toggle's visual track always shows OFF (uses `peer-checked:` but the input lacks the `peer` class); StatBlock ignores its `trend` prop; Header's MenuOpen vs Default look identical on a desktop viewport (menu button is `md:hidden`).
 - **Two `ProgressBar`-named exports**: `ProgressBar` (ui/ProgressBar.tsx, captioned bar) and `Progress` (ui/Surface.tsx, bare thin bar) — separate components/cards.
-- **Data-coupled widgets** (NextTaskWidget, QuickActions, SleepWidget, WeatherWidget, CalendarView) render default/empty states with no props — graded good as-is.
+- **Data-coupled widgets** (NextTaskWidget, QuickActions, SleepWidget, WeatherWidget, CalendarView, ScadenzeMese) render default/empty states with no props — graded good as-is.
+- **New components 2026-06-23 (`DeadlineForm`, `ScadenzeMese`, both `src/components/sd`)** added to the DS as **floor-cards** (user choice — no authored previews yet; enrich on a future re-sync). `DeadlineForm` renders a real floor card; `ScadenzeMese` is data-coupled → blank without props.
+- **Known render warns (accepted, validate exits 1):** `[RENDER] root empty` on **CalendarView, SleepWidget, ScadenzeMese** — data-coupled, render blank with no props. They ship as empty-state/floor cards and work in claude.ai/design where real props flow. NOT a regression — re-syncs should expect these three and upload anyway (matches the prior sync's accepted state).
 - lucide icons work in previews: `import { Inbox } from 'lucide-react'; icon={Inbox}` for EmptyState/SectionHeader/StatusDot.
 
 ## Re-sync risks
