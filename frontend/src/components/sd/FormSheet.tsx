@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 /* Apple-style modal sheet + labelled form fields, built on the Study Desk
    design tokens. Reusable across CRUD screens (Università, Budget, …). */
@@ -16,6 +17,12 @@ export function Sheet({
   footer?: React.ReactNode;
   maxWidth?: number;
 }) {
+  // Render into document.body so the dialog escapes any ancestor that creates a
+  // containing block for position:fixed (the glass cards use backdrop-filter,
+  // which would otherwise anchor the sheet to the card and clip it).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -25,9 +32,13 @@ export function Sheet({
     return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
+  // Mount under .sd-root (the theme root: carries data-theme/data-stim + CSS vars)
+  // rather than <body>, so theming survives the portal. .sd-root has no transform,
+  // so position:fixed is viewport-relative again.
+  const portalTarget = document.querySelector('.sd-root') ?? document.body;
 
-  return (
+  return createPortal(
     <div
       className="sd-sheet-backdrop"
       role="dialog"
@@ -62,7 +73,8 @@ export function Sheet({
         <div style={{ padding: '18px 24px 8px', flex: '1 1 auto', overflowY: 'auto', minHeight: 0 }}>{children}</div>
         {footer && <div style={{ padding: '12px 24px 18px', flex: 'none', display: 'flex', gap: 10, justifyContent: 'flex-end', borderTop: '1px solid rgb(var(--color-border))' }}>{footer}</div>}
       </div>
-    </div>
+    </div>,
+    portalTarget,
   );
 }
 
