@@ -19,6 +19,7 @@ NOTE: this targets the EB SANDBOX. Field names below are best-effort and MUST be
 confirmed against a real round-trip — all parsing is defensive and raw responses
 are logged on any HTTP/parse error so the first real connection can be debugged.
 """
+import hashlib
 import logging
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -396,8 +397,25 @@ class EnableBankingProvider(BankProvider):
             tx.get("transaction_id")
             or tx.get("entry_reference")
             or tx.get("reference_number")
-            or ""
         )
+        transaction_id = str(transaction_id) if transaction_id else None
+        # Some ASPSPs omit a stable id — derive a deterministic one so the
+        # transaction still imports and de-duplicates across syncs.
+        if not transaction_id:
+            basis = f"{booking_date}|{amount}|{amount_obj.get('currency', 'EUR')}|{description}"
+            transaction_id = "eb-" + hashlib.sha1(basis.encode("utf-8")).hexdigest()[:24]
+
+        # EB sends bank_transaction_code as an OBJECT and merchant_category_code
+        # as a short string (when present). Flatten both to plain strings — a
+        # dict here crashes the downstream category lookup (DEFAULT_CATEGORY_MAP.get).
+        btc = tx.get("bank_transaction_code")
+        if isinstance(btc, dict):
+            btc = btc.get("code") or btc.get("description") or btc.get("sub_family_code")
+        elif not isinstance(btc, str):
+            btc = None
+        mcc = tx.get("merchant_category_code")
+        if not isinstance(mcc, str):
+            mcc = None
 
         return BankTransaction(
             transaction_id=transaction_id,
@@ -407,8 +425,7 @@ class EnableBankingProvider(BankProvider):
             description=description,
             creditor_name=creditor_name,
             debtor_name=debtor_name,
-            merchant_category_code=tx.get("merchant_category_code")
-            or tx.get("bank_transaction_code"),
-            bank_transaction_code=tx.get("bank_transaction_code"),
+            merchant_category_code=mcc,
+            bank_transaction_code=btc,
             raw_data=tx,
         )
