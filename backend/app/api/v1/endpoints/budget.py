@@ -111,9 +111,11 @@ async def initiate_bank_auth(
     try:
         result = await provider.initiate_auth(
             institution_id=request.institution_id or "",
+            country=request.country or "ES",
         )
 
-        # Save pending connection
+        # Save pending connection. agreement_id holds the EB `state` so the
+        # callback can be correlated if needed.
         connection = BankConnection(
             user_id=current_user["sub"],
             requisition_id=result.requisition_id,
@@ -143,39 +145,51 @@ async def bank_auth_callback(
     db: AsyncSession = Depends(get_db),
 ) -> BankConnectionResponse:
     """
-    Complete bank authorization after user redirects back.
-    Fetches account details and activates the connection.
+    Complete bank authorization after the user redirects back.
+
+    Enable Banking redirects with ?code=<code>&state=<state>; the `code` differs
+    from the saved authorization id, so we match the most recent PENDING
+    connection for the user rather than by requisition_id. The provider then
+    exchanges the token (code) for a session and we activate the connection.
     """
-    # Find the pending connection
+    # The token to hand to the provider: EB `code`, else legacy requisition_id.
+    token = request.code or request.requisition_id
+    if not token:
+        raise HTTPException(status_code=400, detail="Codice di autorizzazione mancante")
+
+    # Match the most recent PENDING connection for this user.
     result = await db.execute(
-        select(BankConnection).where(
-            (BankConnection.requisition_id == request.requisition_id)
-            & (BankConnection.user_id == current_user["sub"])
+        select(BankConnection)
+        .where(
+            (BankConnection.user_id == current_user["sub"])
+            & (BankConnection.status == BankConnectionStatus.PENDING)
         )
+        .order_by(BankConnection.created_at.desc())
     )
     connection = result.scalars().first()
     if not connection:
-        raise HTTPException(status_code=404, detail="Connessione non trovata")
+        raise HTTPException(status_code=404, detail="Connessione in attesa non trovata")
 
     provider = get_bank_provider()
     if not provider:
         raise HTTPException(status_code=503, detail="Nessun provider bancario configurato")
 
     try:
-        # Complete auth via provider
-        accounts = await provider.complete_auth(request.requisition_id)
+        # Complete auth via provider (exchange code -> session -> accounts)
+        accounts = await provider.complete_auth(token)
 
         if not accounts:
             raise HTTPException(status_code=400, detail="Nessun conto trovato")
 
-        # Use first account
+        # Use first account; account_id is the provider account UID for later calls
         acc = accounts[0]
         connection.account_id = acc.account_id
         connection.account_iban = acc.iban
-        connection.account_name = acc.name or "Revolut"
+        connection.account_name = acc.name or "Conto"
         connection.currency = acc.currency
         connection.status = BankConnectionStatus.ACTIVE
         connection.expires_at = datetime.utcnow() + timedelta(days=90)
+        connection.last_sync_error = None
 
         db.add(connection)
         await db.commit()

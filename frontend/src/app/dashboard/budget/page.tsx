@@ -2,15 +2,16 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Trash2, ShoppingCart, Train, Shield, Home, Music, CreditCard, FileUp,
+  Trash2, ShoppingCart, Train, Shield, Home, Music, CreditCard, FileUp, Landmark,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Sheet, Field, FieldRow } from '@/components/sd/FormSheet';
 import {
   getBudgetDashboard, listGoals, createGoal, deleteGoal,
   listTransactions, createTransaction, deleteTransaction, importCSV,
+  initBankAuth, completeBankAuth, listInstitutions,
   type BudgetDashboard, type CategorySpending, type BudgetGoal,
-  type Transaction, type ScadenzaPreview,
+  type Transaction, type ScadenzaPreview, type Institution,
 } from '@/services/budgetService';
 import { ScadenzeMese } from '@/components/sd/ScadenzeMese';
 
@@ -103,6 +104,11 @@ export default function BudgetPage() {
   const [del, setDel] = useState<{ kind: 'goal' | 'tx'; id: string; label: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // ── Bank connection (Enable Banking) ──
+  const [bankOpen, setBankOpen] = useState(false);
+  const [bankCallback, setBankCallback] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
+  const [bankCallbackMsg, setBankCallbackMsg] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     try {
       const [dash, gls, tx] = await Promise.all([
@@ -129,6 +135,36 @@ export default function BudgetPage() {
   }, []);
   const setViewP = (v: 'a' | 'b' | 'c') => { setView(v); try { localStorage.setItem('sd-fin-view', v); } catch {/**/} };
   const onBudget = (v: number) => { setBudget(v); try { localStorage.setItem('sd-fin-budget', String(v)); } catch {/**/} };
+
+  // Enable Banking callback: bank redirects back with ?code=&state=.
+  // Runs once on mount, independent of the ?view= handling above.
+  useEffect(() => {
+    let alive = true;
+    const sp = new URLSearchParams(window.location.search);
+    const code = sp.get('code');
+    if (!code) return;
+    const state = sp.get('state') ?? undefined;
+    setBankCallback('busy');
+    setBankCallbackMsg('Collegamento in corso…');
+    (async () => {
+      try {
+        await completeBankAuth(code, state);
+        await load();
+        if (!alive) return;
+        setBankCallback('done');
+        setBankCallbackMsg('Conto collegato con successo.');
+      } catch {
+        if (!alive) return;
+        setBankCallback('error');
+        setBankCallbackMsg('Collegamento al conto non riuscito. Riprova o usa l’import CSV.');
+      } finally {
+        // Clean the URL so a refresh doesn't replay the callback. Preserve nothing
+        // from the query string — the ?view= state lives in localStorage.
+        try { window.history.replaceState(null, '', '/dashboard/budget'); } catch {/* ignore */}
+      }
+    })();
+    return () => { alive = false; };
+  }, [load]);
 
   // real 6-month spend trend
   useEffect(() => {
@@ -200,6 +236,7 @@ export default function BudgetPage() {
   };
 
   const hasData = cats.length > 0 || txView.length > 0 || balance != null;
+  const bankConnected = data.bank_connected || balance != null;
 
   return (
     <div>
@@ -218,6 +255,20 @@ export default function BudgetPage() {
           <ViewTab active={view === 'c'} dot="245 158 11" label="Scadenze" onClick={() => setViewP('c')} />
         </div>
       </header>
+
+      {/* Bank-connect callback banner (after EB redirect) */}
+      {bankCallback !== 'idle' && (
+        <div className="sd-reveal" style={{ ['--i' as string]: 0, marginBottom: 18 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px', borderRadius: 14,
+            border: `1px solid rgb(${bankCallback === 'error' ? '239 68 68' : '16 185 129'}/0.32)`,
+            background: `rgb(${bankCallback === 'error' ? '239 68 68' : '16 185 129'}/0.08)`,
+          }}>
+            <span style={{ width: 9, height: 9, borderRadius: '50%', flex: 'none', background: `rgb(${bankCallback === 'error' ? '239 68 68' : '16 185 129'})` }} />
+            <span style={{ fontSize: 13.5, fontWeight: 500, color: 'rgb(var(--color-heading))' }}>{bankCallbackMsg}</span>
+          </div>
+        </div>
+      )}
 
       {/* CSV import — hidden on the Scadenze view */}
       {view !== 'c' && (
@@ -241,6 +292,11 @@ export default function BudgetPage() {
                 <input type="number" min={0} value={budget || ''} placeholder={String(Math.round(totalLimit) || 900)} onChange={(e) => onBudget(parseInt(e.target.value, 10) || 0)} style={{ width: 62, background: 'transparent', border: 'none', outline: 'none', color: 'inherit', fontFamily: 'inherit', fontSize: 13, marginLeft: 2 }} />
               </span>
             </label>
+            {!bankConnected && (
+              <Button size="sm" variant="secondary" onClick={() => setBankOpen(true)}>
+                <Landmark size={15} style={{ marginRight: 6 }} />Collega banca
+              </Button>
+            )}
             <Button size="sm" variant="primary" isLoading={importing} onClick={() => fileRef.current?.click()}>Carica CSV</Button>
           </div>
         </div>
@@ -249,7 +305,7 @@ export default function BudgetPage() {
       )}
 
       {view === 'a'
-        ? <Panoramica cats={cats} spent={spent} net={net} balance={balance} target={target} remain={remain} spentPct={spentPct} trend={trend} txView={txView} scadenze={data.upcoming_scadenze} hasData={hasData} onAddTx={() => setTxOpen(true)} onAddCat={() => setGoalOpen(true)} onDelTx={(t) => setDel({ kind: 'tx', id: t.id, label: t.label })} goalByCategory={goalByCategory} onDelCat={(name, id) => setDel({ kind: 'goal', id, label: name })} />
+        ? <Panoramica cats={cats} spent={spent} net={net} balance={balance} target={target} remain={remain} spentPct={spentPct} trend={trend} txView={txView} scadenze={data.upcoming_scadenze} hasData={hasData} bankConnected={bankConnected} onConnectBank={() => setBankOpen(true)} onAddTx={() => setTxOpen(true)} onAddCat={() => setGoalOpen(true)} onDelTx={(t) => setDel({ kind: 'tx', id: t.id, label: t.label })} goalByCategory={goalByCategory} onDelCat={(name, id) => setDel({ kind: 'goal', id, label: name })} />
         : view === 'b'
           ? <Flusso cats={cats} spent={spent} net={net} balance={balance} target={target} remain={remain} spentPct={spentPct} trend={trend} txView={txView} scadenze={data.upcoming_scadenze} daysLeft={daysLeft} hasData={hasData} onDelTx={(t) => setDel({ kind: 'tx', id: t.id, label: t.label })} goalByCategory={goalByCategory} onDelCat={(name, id) => setDel({ kind: 'goal', id, label: name })} />
           : <ScadenzeMese />}
@@ -268,6 +324,9 @@ export default function BudgetPage() {
           <Button variant="danger" isLoading={busy} onClick={confirmDelete}>Elimina</Button>
         </div>
       </Sheet>
+      <Sheet open={bankOpen} onClose={() => setBankOpen(false)} title="Collega banca" subtitle="Open Banking · Enable Banking">
+        <BankConnectForm key={bankOpen ? 'open' : 'closed'} onCancel={() => setBankOpen(false)} />
+      </Sheet>
     </div>
   );
 }
@@ -276,6 +335,7 @@ export default function BudgetPage() {
 function Panoramica(p: {
   cats: Cat[]; spent: number; net: number; balance: number | null; target: number; remain: number; spentPct: number;
   trend: { m: string; v: number }[]; txView: TxView[]; scadenze: ScadenzaPreview[]; hasData: boolean;
+  bankConnected: boolean; onConnectBank: () => void;
   onAddTx: () => void; onAddCat: () => void; onDelTx: (t: TxView) => void;
   goalByCategory: Map<string, string>; onDelCat: (name: string, id: string) => void;
 }) {
@@ -298,7 +358,9 @@ function Panoramica(p: {
           <Sparkline trend={p.trend} />
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
             <button className="sd-press" onClick={p.onAddTx} style={{ flex: 1, background: '#fff', color: 'rgb(79 70 229)', border: 'none', padding: '11px 14px', borderRadius: 11, fontWeight: 600, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }}>+ Aggiungi spesa</button>
-            <button className="sd-press" onClick={p.onAddCat} style={{ flex: 1, background: 'rgb(255 255 255/0.16)', color: '#fff', border: '1px solid rgb(255 255 255/0.28)', padding: '11px 14px', borderRadius: 11, fontWeight: 600, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }}>+ Categoria</button>
+            {p.bankConnected
+              ? <button className="sd-press" onClick={p.onAddCat} style={{ flex: 1, background: 'rgb(255 255 255/0.16)', color: '#fff', border: '1px solid rgb(255 255 255/0.28)', padding: '11px 14px', borderRadius: 11, fontWeight: 600, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }}>+ Categoria</button>
+              : <button className="sd-press" onClick={p.onConnectBank} style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, background: 'rgb(255 255 255/0.16)', color: '#fff', border: '1px solid rgb(255 255 255/0.28)', padding: '11px 14px', borderRadius: 11, fontWeight: 600, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }}><Landmark size={15} />Collega banca</button>}
           </div>
         </div>
 
@@ -680,5 +742,104 @@ function TransactionForm({ categoryNames, onSubmit, onCancel }: { categoryNames:
       {error && <p style={errStyle}>{error}</p>}
       <FormActions onCancel={onCancel} submitting={submitting} />
     </form>
+  );
+}
+
+/* ── Bank connect (Enable Banking) ── */
+function BankConnectForm({ onCancel }: { onCancel: () => void }) {
+  const [country, setCountry] = useState<'ES' | 'IT'>('ES');
+  const [institutions, setInstitutions] = useState<Institution[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [connectingId, setConnectingId] = useState<string | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true); setError('');
+    listInstitutions(country)
+      .then((list) => { if (alive) setInstitutions(list); })
+      .catch(() => { if (alive) { setInstitutions([]); setError('Impossibile caricare le banche. Riprova più tardi.'); } })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [country]);
+
+  const connect = async (bankId: string) => {
+    setConnectingId(bankId); setError('');
+    try {
+      const res = await initBankAuth(bankId, country);
+      if (res.auth_link) {
+        window.location.href = res.auth_link;
+      } else {
+        setError('Il provider non ha restituito un link di autorizzazione.');
+        setConnectingId(null);
+      }
+    } catch {
+      setError('Avvio del collegamento non riuscito. Riprova.');
+      setConnectingId(null);
+    }
+  };
+
+  return (
+    <div>
+      <Field label="Paese">
+        <div style={{ display: 'flex', gap: 8 }}>
+          {(['ES', 'IT'] as const).map((cc) => (
+            <button
+              key={cc}
+              type="button"
+              className="sd-press"
+              onClick={() => setCountry(cc)}
+              style={{
+                flex: 1, padding: '9px 14px', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                color: country === cc ? '#fff' : 'rgb(var(--color-heading))',
+                background: country === cc ? 'rgb(99 102 241)' : 'rgb(var(--color-card-inner))',
+                border: `1px solid ${country === cc ? 'rgb(99 102 241)' : 'rgb(var(--color-border))'}`,
+              }}
+            >{cc === 'ES' ? 'Spagna' : 'Italia'}</button>
+          ))}
+        </div>
+      </Field>
+
+      <div style={{ marginTop: 4 }}>
+        <span style={{ display: 'block', fontSize: 12.5, fontWeight: 500, color: 'rgb(var(--color-tertiary))', marginBottom: 6 }}>Banca</span>
+        {loading ? (
+          <p style={{ margin: '4px 0', fontSize: 13.5, color: 'rgb(var(--color-muted))' }}>Caricamento banche…</p>
+        ) : institutions.length === 0 ? (
+          <p style={{ margin: '4px 0', fontSize: 13.5, color: 'rgb(var(--color-muted))' }}>Nessuna banca disponibile per questo paese.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
+            {institutions.map((inst) => (
+              <button
+                key={inst.id}
+                type="button"
+                className="sd-press"
+                disabled={connectingId !== null}
+                onClick={() => connect(inst.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', width: '100%',
+                  padding: '11px 13px', borderRadius: 12, cursor: connectingId !== null ? 'default' : 'pointer',
+                  background: 'rgb(var(--color-card-inner))', border: '1px solid rgb(var(--color-border))',
+                  fontFamily: 'inherit', opacity: connectingId && connectingId !== inst.id ? 0.55 : 1,
+                }}
+              >
+                <span style={{ width: 34, height: 34, borderRadius: 9, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgb(99 102 241/0.14)', color: 'rgb(99 102 241)', overflow: 'hidden' }}>
+                  {inst.logo
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    ? <img src={inst.logo} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    : <Landmark size={17} />}
+                </span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 500, color: 'rgb(var(--color-heading))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{inst.name}</span>
+                {connectingId === inst.id && <span style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>Avvio…</span>}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {error && <p style={errStyle}>{error}</p>}
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 14 }}>
+        <Button type="button" variant="secondary" onClick={onCancel} disabled={connectingId !== null}>Chiudi</Button>
+      </div>
+    </div>
   );
 }
