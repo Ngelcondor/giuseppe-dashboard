@@ -59,6 +59,11 @@ services:
       ALLOW_ADMIN_INIT: "false"
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      # Enable Banking (open banking). APP_SECRET (private RSA key, single-line
+      # with \n) comes from docker/.env; APP_ID + redirect have prod defaults.
+      ENABLE_BANKING_APP_ID: ${ENABLE_BANKING_APP_ID:-ce2e676c-fd45-4df0-9055-cc4fbe0c2447}
+      ENABLE_BANKING_APP_SECRET: ${ENABLE_BANKING_APP_SECRET:-}
+      ENABLE_BANKING_REDIRECT_URL: ${ENABLE_BANKING_REDIRECT_URL:-https://dashboard.elcondor.dev/dashboard/budget}
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
