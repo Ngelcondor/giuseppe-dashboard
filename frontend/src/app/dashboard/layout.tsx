@@ -47,6 +47,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => { localStorage.setItem('sd-lowstim', lowStim ? '1' : '0'); }, [lowStim]);
   useEffect(() => { localStorage.setItem('sd-theme', theme); }, [theme]);
 
+  // Apply theme/low-stim changes made elsewhere (Impostazioni → Aspetto) live.
+  useEffect(() => {
+    const sync = () => {
+      try {
+        const t = localStorage.getItem('sd-theme');
+        if (t === 'light' || t === 'dark') setTheme(t);
+        setLowStim(localStorage.getItem('sd-lowstim') === '1');
+      } catch { /* ignore */ }
+    };
+    window.addEventListener('sd-prefs', sync);
+    window.addEventListener('storage', sync);
+    return () => { window.removeEventListener('sd-prefs', sync); window.removeEventListener('storage', sync); };
+  }, []);
+
   // Play-in entrance: re-trigger on each route change. in → lit → idle.
   useEffect(() => {
     setPhase('in');

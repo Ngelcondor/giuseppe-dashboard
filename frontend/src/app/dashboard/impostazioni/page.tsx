@@ -471,22 +471,33 @@ function CalendarPicker({ conn, onSaved, onCancel }: { conn: CalendarConnection;
 /* ── Style ── */
 
 function StyleCard({ value, editor, onSaved }: { value?: Record<string, unknown>; editor: boolean; onSaved: () => Promise<void> }) {
-  const [theme, setTheme] = useState<string>(String(value?.['theme'] ?? 'light'));
-  const [lowStim, setLowStim] = useState<boolean>(Boolean(value?.['low_stim']));
+  // Theme/low-stim live in localStorage (driven by the sidebar switch). Read those
+  // so this card shows the ACTUAL applied theme, not a stale backend value.
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [lowStim, setLowStim] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setTheme(String(value?.['theme'] ?? 'light'));
-    setLowStim(Boolean(value?.['low_stim']));
+    try {
+      const t = localStorage.getItem('sd-theme');
+      setTheme(t === 'light' || t === 'dark' ? t : (String(value?.['theme']) === 'light' ? 'light' : 'dark'));
+      const ls = localStorage.getItem('sd-lowstim');
+      setLowStim(ls != null ? ls === '1' : Boolean(value?.['low_stim']));
+    } catch { /* keep defaults */ }
   }, [value]);
 
-  const save = async (next: { theme: string; low_stim: boolean }) => {
+  // Apply live (localStorage + event the layout listens to) and persist to backend.
+  const apply = async (next: { theme: 'dark' | 'light'; low_stim: boolean }) => {
+    setTheme(next.theme); setLowStim(next.low_stim);
+    try {
+      localStorage.setItem('sd-theme', next.theme);
+      localStorage.setItem('sd-lowstim', next.low_stim ? '1' : '0');
+      window.dispatchEvent(new Event('sd-prefs'));
+    } catch { /* ignore */ }
     setSaving(true); setSaved(false);
     try {
       await updateSetting('style', next);
-      // Mirror low-stim to the layout's local preference so it applies live.
-      try { localStorage.setItem('sd-lowstim', next.low_stim ? '1' : '0'); } catch { /* ignore */ }
       await onSaved();
       setSaved(true);
       setTimeout(() => setSaved(false), 1800);
@@ -498,10 +509,9 @@ function StyleCard({ value, editor, onSaved }: { value?: Record<string, unknown>
       <div>
         <div style={eyebrow}>Tema</div>
         <select className="sd-select" value={theme} disabled={!editor || saving} style={{ maxWidth: 260 }}
-          onChange={(e) => { const t = e.target.value; setTheme(t); save({ theme: t, low_stim: lowStim }); }}>
-          <option value="light">Chiaro</option>
+          onChange={(e) => apply({ theme: e.target.value === 'light' ? 'light' : 'dark', low_stim: lowStim })}>
           <option value="dark">Scuro</option>
-          <option value="low-stim">Low-stim</option>
+          <option value="light">Chiaro</option>
         </select>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, borderTop: '1px solid rgb(var(--color-border))', paddingTop: 18 }}>
@@ -509,8 +519,9 @@ function StyleCard({ value, editor, onSaved }: { value?: Record<string, unknown>
           <div style={{ fontSize: 14, fontWeight: 500, color: 'rgb(var(--color-heading))' }}>Modalità low-stim</div>
           <div style={{ fontSize: 12.5, color: 'rgb(var(--color-tertiary))' }}>Niente movimento, colori desaturati.</div>
         </div>
-        <button type="button" disabled={!editor || saving} onClick={() => { const v = !lowStim; setLowStim(v); save({ theme, low_stim: v }); }}
-          style={{ position: 'relative', width: 44, height: 26, borderRadius: 20, flex: 'none', border: 'none', cursor: editor ? 'pointer' : 'not-allowed', background: lowStim ? 'rgb(16 185 129)' : 'rgb(0 0 0 / 0.14)', transition: 'background .2s ease' }}>
+        <button type="button" disabled={!editor || saving} onClick={() => apply({ theme, low_stim: !lowStim })}
+          className="sd-toggle-track sd-press"
+          style={{ position: 'relative', width: 44, height: 26, borderRadius: 20, flex: 'none', border: 'none', cursor: editor ? 'pointer' : 'not-allowed', background: lowStim ? 'rgb(16 185 129)' : undefined, transition: 'background .2s ease' }}>
           <span style={{ position: 'absolute', top: 2, left: 2, width: 22, height: 22, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.25)', transform: lowStim ? 'translateX(18px)' : 'translateX(0)', transition: 'transform .2s ease' }} />
         </button>
       </div>
