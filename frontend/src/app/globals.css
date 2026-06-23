@@ -738,3 +738,18 @@ input[type='checkbox'], input[type='radio'] {
 .sd-root[data-theme='light'] .sd-bgglow { opacity: .3; filter: blur(98px); }
 .sd-root[data-theme='light'] .sd-bgvig { background: radial-gradient(120% 120% at 50% 32%, transparent 62%, rgb(40 42 80/0.07) 100%); }
 .sd-root[data-theme='light'] .sd-gyro { opacity: .42; }
+
+/* ── Budget "Le tue finanze" — responsive grids + discreet row delete ── */
+.sd-fin-row1 { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: 18px; }
+.sd-fin-strip { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 34px; align-items: center; }
+.sd-fin-flow { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 880px) {
+  .sd-fin-row1, .sd-fin-strip { grid-template-columns: 1fr; }
+  .sd-fin-strip { gap: 22px; }
+}
+@media (max-width: 920px) {
+  .sd-fin-flow { grid-template-columns: 1fr; }
+}
+.sd-fin-del { opacity: 0; transition: opacity .15s ease; }
+.sd-fin-tx:hover .sd-fin-del, .sd-fin-legend:hover .sd-fin-del { opacity: 1; }
+@media (hover: none) { .sd-fin-del { opacity: .5; } }
