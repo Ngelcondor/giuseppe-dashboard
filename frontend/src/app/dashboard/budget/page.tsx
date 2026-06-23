@@ -12,6 +12,7 @@ import {
   type BudgetDashboard, type CategorySpending, type BudgetGoal,
   type Transaction, type ScadenzaPreview,
 } from '@/services/budgetService';
+import { ScadenzeMese } from '@/components/sd/ScadenzeMese';
 
 /* ── Budget — "Le tue finanze" (design StudyDesk.dc.html) ───────────────────
    Two views (Panoramica / Flusso) wired to real data: balance, category
@@ -89,7 +90,7 @@ export default function BudgetPage() {
   const [txs, setTxs] = useState<Transaction[]>([]);
   const [trend, setTrend] = useState<{ m: string; v: number }[]>([]);
 
-  const [view, setView] = useState<'a' | 'b'>('a');
+  const [view, setView] = useState<'a' | 'b' | 'c'>('a');
   const [budget, setBudget] = useState(0);          // monthly target (localStorage)
   const [dragOver, setDragOver] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
@@ -120,10 +121,10 @@ export default function BudgetPage() {
   useEffect(() => {
     try {
       const b = localStorage.getItem('sd-fin-budget'); if (b) setBudget(parseInt(b, 10) || 0);
-      const v = localStorage.getItem('sd-fin-view'); if (v === 'a' || v === 'b') setView(v);
+      const v = localStorage.getItem('sd-fin-view'); if (v === 'a' || v === 'b' || v === 'c') setView(v);
     } catch {/* ignore */}
   }, []);
-  const setViewP = (v: 'a' | 'b') => { setView(v); try { localStorage.setItem('sd-fin-view', v); } catch {/**/} };
+  const setViewP = (v: 'a' | 'b' | 'c') => { setView(v); try { localStorage.setItem('sd-fin-view', v); } catch {/**/} };
   const onBudget = (v: number) => { setBudget(v); try { localStorage.setItem('sd-fin-budget', String(v)); } catch {/**/} };
 
   // real 6-month spend trend
@@ -211,10 +212,12 @@ export default function BudgetPage() {
         <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 13, border: '1px solid rgb(var(--color-border))', background: 'rgb(var(--color-card-inner))' }}>
           <ViewTab active={view === 'a'} dot="16 185 129" label="Panoramica" onClick={() => setViewP('a')} />
           <ViewTab active={view === 'b'} dot="99 102 241" label="Flusso" onClick={() => setViewP('b')} />
+          <ViewTab active={view === 'c'} dot="245 158 11" label="Scadenze" onClick={() => setViewP('c')} />
         </div>
       </header>
 
-      {/* CSV import */}
+      {/* CSV import — hidden on the Scadenze view */}
+      {view !== 'c' && (
       <div className="sd-reveal" style={{ ['--i' as string]: 0, marginBottom: 18 }}>
         <div
           onDragOver={(e) => { e.preventDefault(); if (!dragOver) setDragOver(true); }}
@@ -240,10 +243,13 @@ export default function BudgetPage() {
         </div>
         {importErr && <div style={{ marginTop: 10, fontSize: 12.5, color: 'rgb(245 158 11)', display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: 'rgb(245 158 11)', flex: 'none' }} />{importErr}</div>}
       </div>
+      )}
 
       {view === 'a'
         ? <Panoramica cats={cats} spent={spent} net={net} balance={balance} target={target} remain={remain} spentPct={spentPct} trend={trend} txView={txView} scadenze={data.upcoming_scadenze} hasData={hasData} onAddTx={() => setTxOpen(true)} onAddCat={() => setGoalOpen(true)} onDelTx={(t) => setDel({ kind: 'tx', id: t.id, label: t.label })} goalByCategory={goalByCategory} onDelCat={(name, id) => setDel({ kind: 'goal', id, label: name })} />
-        : <Flusso cats={cats} spent={spent} net={net} balance={balance} target={target} remain={remain} spentPct={spentPct} trend={trend} txView={txView} scadenze={data.upcoming_scadenze} daysLeft={daysLeft} hasData={hasData} onDelTx={(t) => setDel({ kind: 'tx', id: t.id, label: t.label })} goalByCategory={goalByCategory} onDelCat={(name, id) => setDel({ kind: 'goal', id, label: name })} />}
+        : view === 'b'
+          ? <Flusso cats={cats} spent={spent} net={net} balance={balance} target={target} remain={remain} spentPct={spentPct} trend={trend} txView={txView} scadenze={data.upcoming_scadenze} daysLeft={daysLeft} hasData={hasData} onDelTx={(t) => setDel({ kind: 'tx', id: t.id, label: t.label })} goalByCategory={goalByCategory} onDelCat={(name, id) => setDel({ kind: 'goal', id, label: name })} />
+          : <ScadenzeMese />}
 
       {/* Sheets */}
       <Sheet open={goalOpen} onClose={() => setGoalOpen(false)} title="Nuova categoria" subtitle="Limite di spesa mensile">
