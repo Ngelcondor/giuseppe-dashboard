@@ -1,9 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Trash2, ShoppingCart, Train, Shield, Home, Music, CreditCard, FileUp, Landmark, RefreshCw,
-} from 'lucide-react';
+import { Trash2, FileUp, Landmark, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Sheet, Field, FieldRow } from '@/components/sd/FormSheet';
 import {
@@ -15,11 +13,11 @@ import {
 } from '@/services/budgetService';
 import { ScadenzeMese } from '@/components/sd/ScadenzeMese';
 
-/* ── Budget — "Le tue finanze" (design StudyDesk.dc.html) ───────────────────
-   Two views (Panoramica / Flusso) wired to real data: balance, category
-   spending (donut / rings / pills), transactions, upcoming scadenze as
-   scheduled payments, a real 6-month spend trend, Revolut CSV import, and the
-   monthly budget target. No fabricated data — honest empty states throughout. */
+/* ── Budget / Banking (design Banking.dc.html) ─────────────────────────────────
+   Clean banking page wired to real data: account balance + income/expenses/net,
+   category budget donut, recent transactions, cash-flow breakdown, an upcoming
+   deadline timeline, the Enable Banking connect flow, Revolut CSV import and the
+   scadenze CRUD list. No fabricated data — honest empty states throughout. */
 
 const mono = "'JetBrains Mono',monospace";
 const MONTH = 6;
@@ -37,23 +35,14 @@ const FALLBACK: BudgetDashboard = {
 
 const PALETTE = ['99 102 241', '16 185 129', '245 158 11', '236 72 153', '148 163 184', '34 197 94'];
 function colorFor(cat: string, i = 0): string {
-  const k = cat.toLowerCase();
+  const k = (cat || '').toLowerCase();
   if (/affitt|casa|rent|alloggi/.test(k)) return '245 158 11';
-  if (/spesa|cibo|aliment|mercad|grocer|super/.test(k)) return '99 102 241';
-  if (/trasport|treno|renfe|metro|bus|rodalies/.test(k)) return '16 185 129';
+  if (/spesa|cibo|aliment|mercad|grocer|super|lidl/.test(k)) return '99 102 241';
+  if (/trasport|treno|renfe|metro|bus|rodalies|tmb/.test(k)) return '16 185 129';
   if (/studi|htb|libr|corso|hack|uoc/.test(k)) return '236 72 153';
   if (/svago|spotif|abbon|leisure|netflix|intratten/.test(k)) return '148 163 184';
+  if (/stipend|borsa|entrat|salar|income|tirocin/.test(k)) return '34 197 94';
   return PALETTE[i % PALETTE.length];
-}
-function IconFor({ cat, size = 17 }: { cat: string; size?: number }) {
-  const k = cat.toLowerCase();
-  const p = { size };
-  if (/affitt|casa|rent|alloggi/.test(k)) return <Home {...p} />;
-  if (/spesa|cibo|aliment|mercad|grocer|super/.test(k)) return <ShoppingCart {...p} />;
-  if (/trasport|treno|renfe|metro|bus|rodalies/.test(k)) return <Train {...p} />;
-  if (/studi|htb|libr|corso|hack|uoc/.test(k)) return <Shield {...p} />;
-  if (/svago|spotif|abbon|musica|netflix/.test(k)) return <Music {...p} />;
-  return <CreditCard {...p} />;
 }
 
 const eur = (n: number, dec = false) => {
@@ -63,37 +52,28 @@ const eur = (n: number, dec = false) => {
   return (n < 0 ? '−' : '') + '€' + s;
 };
 const fmtTxDate = (iso: string) =>
-  new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+  new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { day: '2-digit', month: 'short' });
 const fmtMonthLabel = (iso: string) =>
   new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })
     .replace(/^./, (c) => c.toUpperCase());
-const monthShort = (m: number) =>
-  ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'][((m - 1) % 12 + 12) % 12];
-const daysLeftInMonth = (iso: string) => {
-  const y = Number(iso.slice(0, 4)), m = Number(iso.slice(5, 7)) - 1;
-  const last = new Date(y, m + 1, 0).getDate();
-  const t = new Date();
-  return (t.getFullYear() === y && t.getMonth() === m) ? Math.max(0, last - t.getDate()) : last;
-};
+const fmtSync = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'mai';
 
 type Cat = { name: string; color: string; amount: number; budget: number };
-
-/* ── view model from real data ── */
 function toCats(categories: CategorySpending[]): Cat[] {
   return [...categories]
     .sort((a, b) => b.spent - a.spent)
     .map((c, i) => ({ name: c.category, color: colorFor(c.category, i), amount: c.spent, budget: c.limit ?? 0 }));
 }
+type TxView = { id: string; name: string; cat: string; dateLabel: string; amount: number; color: string; label: string };
 
 export default function BudgetPage() {
   const [data, setData] = useState<BudgetDashboard>(FALLBACK);
   const [goals, setGoals] = useState<BudgetGoal[]>([]);
   const [txs, setTxs] = useState<Transaction[]>([]);
-  const [trend, setTrend] = useState<{ m: string; v: number }[]>([]);
 
   const [view, setView] = useState<'a' | 'b' | 'c'>('a');
   const [budget, setBudget] = useState(0);          // monthly target (localStorage)
-  const [dragOver, setDragOver] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [importErr, setImportErr] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
@@ -106,6 +86,7 @@ export default function BudgetPage() {
 
   // ── Bank connection (Enable Banking) ──
   const [bankOpen, setBankOpen] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [bankCallback, setBankCallback] = useState<'idle' | 'busy' | 'done' | 'error'>('idle');
   const [bankCallbackMsg, setBankCallbackMsg] = useState<string | null>(null);
 
@@ -116,14 +97,12 @@ export default function BudgetPage() {
         listGoals(),
         listTransactions({ month: MONTH, year: YEAR, limit: 30 }),
       ]);
-      setData(dash);
-      setGoals(gls);
-      setTxs(tx);
+      setData(dash); setGoals(gls); setTxs(tx);
     } catch {/* keep current */}
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  // restore prefs
+  // restore prefs (view + budget target)
   useEffect(() => {
     try {
       const b = localStorage.getItem('sd-fin-budget'); if (b) setBudget(parseInt(b, 10) || 0);
@@ -136,34 +115,28 @@ export default function BudgetPage() {
   const setViewP = (v: 'a' | 'b' | 'c') => { setView(v); try { localStorage.setItem('sd-fin-view', v); } catch {/**/} };
   const onBudget = (v: number) => { setBudget(v); try { localStorage.setItem('sd-fin-budget', String(v)); } catch {/**/} };
 
-  // Manual bank sync (also used to pull transactions for an already-connected account).
-  const [syncing, setSyncing] = useState(false);
+  // Manual bank sync (pull transactions for an already-connected account).
   const doSync = async () => {
     setSyncing(true); setImportErr(null); setImportMsg(null);
     try {
       const r = await syncBankTransactions(90);
       setImportMsg(`${r.imported} transazioni sincronizzate${r.skipped ? ` · ${r.skipped} già presenti` : ''}`);
       await load();
-    } catch {
-      setImportErr('Sincronizzazione non riuscita. Riprova.');
-    } finally { setSyncing(false); }
+    } catch { setImportErr('Sincronizzazione non riuscita. Riprova.'); }
+    finally { setSyncing(false); }
   };
 
   // Enable Banking callback: bank redirects back with ?code=&state=.
-  // Runs once on mount, independent of the ?view= handling above.
   useEffect(() => {
     let alive = true;
     const sp = new URLSearchParams(window.location.search);
     const code = sp.get('code');
     if (!code) return;
     const state = sp.get('state') ?? undefined;
-    setBankCallback('busy');
-    setBankCallbackMsg('Collegamento in corso…');
+    setBankCallback('busy'); setBankCallbackMsg('Collegamento in corso…');
     (async () => {
       try {
         await completeBankAuth(code, state);
-        // Pull recent transactions so they show immediately (balance is fetched
-        // live by the dashboard; transactions need a sync into the DB).
         let synced = 0;
         try { synced = (await syncBankTransactions(90)).imported; } catch {/* balance still works */}
         await load();
@@ -175,51 +148,44 @@ export default function BudgetPage() {
         setBankCallback('error');
         setBankCallbackMsg('Collegamento al conto non riuscito. Riprova o usa l’import CSV.');
       } finally {
-        // Clean the URL so a refresh doesn't replay the callback. Preserve nothing
-        // from the query string — the ?view= state lives in localStorage.
         try { window.history.replaceState(null, '', '/dashboard/budget'); } catch {/* ignore */}
       }
     })();
     return () => { alive = false; };
   }, [load]);
 
-  // real 6-month spend trend
-  useEffect(() => {
-    let alive = true;
-    const months = Array.from({ length: 6 }, (_, i) => {
-      const idx = MONTH - 5 + i;            // Jan..Jun for MONTH=6
-      const m = ((idx - 1) % 12 + 12) % 12 + 1;
-      const y = YEAR + Math.floor((idx - 1) / 12);
-      return { m, y };
-    });
-    Promise.all(months.map(({ m, y }) =>
-      getBudgetDashboard(m, y).then((d) => d.total_expenses).catch(() => 0)))
-      .then((vals) => { if (alive) setTrend(months.map((mm, i) => ({ m: monthShort(mm.m), v: Math.round(vals[i]) }))); });
-    return () => { alive = false; };
-  }, []);
-
+  // ── derived view model ──
   const cats = toCats(data.categories);
   const totalLimit = data.categories.reduce((s, c) => s + (c.limit ?? 0), 0);
   const spent = Math.round(data.total_expenses);
+  const income = Math.round(data.total_income);
   const net = Math.round(data.net_balance);
   const balance = data.bank_balance;                 // number | null
   const target = budget || Math.round(totalLimit) || 0;
-  const remain = Math.max(target - spent, 0);
-  const spentPct = target > 0 ? Math.min((spent / target) * 100, 100) : 0;
-  const daysLeft = daysLeftInMonth(data.month);
+  const spentPct = target > 0 ? Math.min(Math.round((spent / target) * 100), 999) : 0;
+  const bankConnected = data.bank_connected || balance != null;
 
   const goalByCategory = new Map(goals.map((g) => [g.category, g.id]));
   const categoryNames = Array.from(new Set([...data.categories.map((c) => c.category), ...goals.map((g) => g.category)]));
 
-  const txView = txs.map((t, i) => ({
+  const txView: TxView[] = txs.map((t, i) => ({
     id: t.id,
     name: t.description || t.merchant_name || t.category,
-    sub: `${t.category} · ${fmtTxDate(t.date)}`,
+    cat: t.category,
+    dateLabel: fmtTxDate(t.date),
     amount: t.transaction_type === 'expense' ? -t.amount : t.amount,
     color: colorFor(t.category, i),
-    cat: t.category,
     label: t.description || t.category,
   }));
+
+  // cash-flow breakdowns (Flusso)
+  const incomeMap = new Map<string, number>();
+  txs.filter((t) => t.transaction_type === 'income').forEach((t) => {
+    const k = t.description || t.merchant_name || t.category || 'Entrata';
+    incomeMap.set(k, (incomeMap.get(k) || 0) + t.amount);
+  });
+  const incomeRows = [...incomeMap.entries()].map(([name, v]) => ({ name, v })).sort((a, b) => b.v - a.v);
+  const incomeTotal = income || incomeRows.reduce((s, r) => s + r.v, 0);
 
   /* ── handlers ── */
   const handleFile = async (f: File) => {
@@ -228,12 +194,10 @@ export default function BudgetPage() {
       const res = await importCSV(f);
       setImportMsg(`${res.imported} importate · ${res.skipped} saltate${res.errors ? ` · ${res.errors} errori` : ''}`);
       await load();
-    } catch {
-      setImportErr('Import non riuscito. Usa un estratto conto Revolut in formato .csv.');
-    } finally { setImporting(false); setDragOver(false); }
+    } catch { setImportErr('Import non riuscito. Usa un estratto conto Revolut in formato .csv.'); }
+    finally { setImporting(false); }
   };
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; };
-  const onDrop = (e: React.DragEvent) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f); };
 
   const submitGoal = async (b: { category: string; monthly_limit: number }) => {
     await createGoal({ category: b.category, monthly_limit: b.monthly_limit, month: FIRST_DAY_ISO });
@@ -252,86 +216,159 @@ export default function BudgetPage() {
     } finally { setBusy(false); }
   };
 
-  const hasData = cats.length > 0 || txView.length > 0 || balance != null;
-  const bankConnected = data.bank_connected || balance != null;
-
   return (
     <div>
       <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={onPick} style={{ display: 'none' }} />
 
-      {/* Header + view toggle */}
-      <header className="sd-reveal" style={{ ['--i' as string]: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap', marginBottom: 26 }}>
+      {/* ═══ HEADER ═══ */}
+      <header className="sd-reveal" style={{ ['--i' as string]: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap', marginBottom: 24 }}>
         <div>
-          <div style={{ fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgb(16 185 129)', fontFamily: mono, marginBottom: 12, fontWeight: 600 }}>Finanze · {fmtMonthLabel(data.month)}</div>
-          <h1 style={{ margin: 0, fontSize: 38, lineHeight: 1.05, letterSpacing: '-.02em', color: 'rgb(var(--color-heading))', fontWeight: 600 }}>Le tue <span style={{ fontFamily: "'Fraunces',serif", fontStyle: 'italic', fontWeight: 500 }}>finanze</span>.</h1>
-          <p style={{ margin: '11px 0 0', fontSize: 15, color: 'rgb(var(--color-tertiary))' }}>Saldo, spese e pagamenti in arrivo · tutto in un posto.</p>
+          <div style={{ fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgb(16 185 129)', fontFamily: mono, marginBottom: 10, fontWeight: 600 }}>Banca · {fmtMonthLabel(data.month)}</div>
+          <h1 style={{ margin: 0, fontSize: 36, lineHeight: 1, letterSpacing: '.06em', color: 'rgb(var(--color-heading))', fontWeight: 700 }}>Budget</h1>
         </div>
-        <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 13, border: '1px solid rgb(var(--color-border))', background: 'rgb(var(--color-card-inner))' }}>
-          <ViewTab active={view === 'a'} dot="16 185 129" label="Panoramica" onClick={() => setViewP('a')} />
-          <ViewTab active={view === 'b'} dot="99 102 241" label="Flusso" onClick={() => setViewP('b')} />
-          <ViewTab active={view === 'c'} dot="245 158 11" label="Scadenze" onClick={() => setViewP('c')} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgb(var(--color-tertiary))', whiteSpace: 'nowrap' }}>Budget mensile
+            <span style={{ display: 'inline-flex', alignItems: 'center', background: 'rgb(var(--color-card))', border: '1px solid rgb(var(--color-border))', borderRadius: 9, padding: '6px 10px', fontFamily: mono, color: 'rgb(var(--color-heading))' }}>€
+              <input type="number" min={0} value={budget || ''} placeholder={String(Math.round(totalLimit) || 900)} onChange={(e) => onBudget(parseInt(e.target.value, 10) || 0)} style={{ width: 58, background: 'transparent', border: 'none', outline: 'none', color: 'inherit', fontFamily: 'inherit', fontSize: 13, marginLeft: 2 }} />
+            </span>
+          </label>
+          <Button size="md" variant="secondary" isLoading={importing} onClick={() => fileRef.current?.click()}><FileUp size={15} style={{ marginRight: 6 }} />Importa CSV</Button>
+          {bankConnected
+            ? <Button size="md" variant="secondary" isLoading={syncing} onClick={doSync}><RefreshCw size={15} style={{ marginRight: 6 }} />Sincronizza</Button>
+            : <Button size="md" variant="primary" onClick={() => setBankOpen(true)}><Landmark size={15} style={{ marginRight: 6 }} />Aggiungi banca</Button>}
         </div>
       </header>
 
-      {/* Bank-connect callback banner (after EB redirect) */}
+      {(importMsg || importErr) && (
+        <div className="sd-reveal" style={{ ['--i' as string]: 0, marginBottom: 14, fontSize: 12.5, color: importErr ? 'rgb(245 158 11)' : 'rgb(16 185 129)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: importErr ? 'rgb(245 158 11)' : 'rgb(16 185 129)', flex: 'none' }} />{importErr ?? importMsg}
+        </div>
+      )}
+
+      {/* Bank-connect callback banner */}
       {bankCallback !== 'idle' && (
         <div className="sd-reveal" style={{ ['--i' as string]: 0, marginBottom: 18 }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px', borderRadius: 14,
-            border: `1px solid rgb(${bankCallback === 'error' ? '239 68 68' : '16 185 129'}/0.32)`,
-            background: `rgb(${bankCallback === 'error' ? '239 68 68' : '16 185 129'}/0.08)`,
-          }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px', borderRadius: 14, border: `1px solid rgb(${bankCallback === 'error' ? '239 68 68' : '16 185 129'}/0.32)`, background: `rgb(${bankCallback === 'error' ? '239 68 68' : '16 185 129'}/0.08)` }}>
             <span style={{ width: 9, height: 9, borderRadius: '50%', flex: 'none', background: `rgb(${bankCallback === 'error' ? '239 68 68' : '16 185 129'})` }} />
             <span style={{ fontSize: 13.5, fontWeight: 500, color: 'rgb(var(--color-heading))' }}>{bankCallbackMsg}</span>
           </div>
         </div>
       )}
 
-      {/* CSV import — hidden on the Scadenze view */}
-      {view !== 'c' && (
-      <div className="sd-reveal" style={{ ['--i' as string]: 0, marginBottom: 18 }}>
-        <div
-          onDragOver={(e) => { e.preventDefault(); if (!dragOver) setDragOver(true); }}
-          onDragLeave={(e) => { e.preventDefault(); setDragOver(false); }}
-          onDrop={onDrop}
-          style={{ border: `1px dashed ${dragOver ? 'rgb(99 102 241)' : 'rgb(var(--color-border))'}`, background: 'rgb(var(--color-card-inner))', borderRadius: 16, padding: '15px 18px', display: 'flex', alignItems: 'center', gap: 15, flexWrap: 'wrap', transition: 'border-color .15s ease' }}
-        >
-          <span style={{ width: 42, height: 42, borderRadius: 12, background: 'rgb(99 102 241/0.14)', color: 'rgb(99 102 241)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}><FileUp size={20} /></span>
-          <div style={{ flex: 1, minWidth: 170 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>Importa il tuo estratto conto Revolut</div>
-            <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>
-              {importMsg ?? <>Trascina qui il file <span style={{ fontFamily: mono }}>.csv</span> o sfoglia · vengono categorizzate automaticamente</>}
+      {/* ═══ CONTO CARD / EMPTY STATE ═══ */}
+      {bankConnected ? (
+        <Card i={1} pad="24px 28px" style={{ marginBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'space-between', gap: 36, flexWrap: 'wrap' }}>
+            <div style={{ minWidth: 220 }}>
+              <div style={eyebrow}>Saldo disponibile</div>
+              <div style={{ fontFamily: mono, fontSize: 44, fontWeight: 600, letterSpacing: '-.03em', color: 'rgb(var(--color-heading))', lineHeight: 1, marginTop: 10 }}>{balance != null ? eur(balance, true) : '€ —'}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 15 }}>
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: 'rgb(16 185 129)', flex: 'none' }} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'rgb(16 185 129)' }}>Connesso</span>
+                <span style={{ fontSize: 13, color: 'rgb(var(--color-tertiary))' }}>· {data.bank_currency} · ultimo sync {fmtSync(data.bank_last_sync)}</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 36, alignItems: 'center', paddingLeft: 36, borderLeft: '1px solid rgb(var(--color-border))', flexWrap: 'wrap' }}>
+              <Stat label="Entrate" value={eur(income)} color="rgb(16 185 129)" />
+              <Stat label="Uscite" value={eur(spent)} color="rgb(239 68 68)" />
+              <Stat label="Netto" value={(net >= 0 ? '+' : '−') + eur(Math.abs(net)).replace('−', '')} />
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgb(var(--color-tertiary))', whiteSpace: 'nowrap' }}>Budget mensile
-              <span style={{ display: 'inline-flex', alignItems: 'center', background: 'rgb(var(--color-card))', border: '1px solid rgb(var(--color-border))', borderRadius: 9, padding: '6px 10px', fontFamily: mono, color: 'rgb(var(--color-heading))' }}>€
-                <input type="number" min={0} value={budget || ''} placeholder={String(Math.round(totalLimit) || 900)} onChange={(e) => onBudget(parseInt(e.target.value, 10) || 0)} style={{ width: 62, background: 'transparent', border: 'none', outline: 'none', color: 'inherit', fontFamily: 'inherit', fontSize: 13, marginLeft: 2 }} />
-              </span>
-            </label>
-            {!bankConnected ? (
-              <Button size="sm" variant="secondary" onClick={() => setBankOpen(true)}>
-                <Landmark size={15} style={{ marginRight: 6 }} />Collega banca
-              </Button>
-            ) : (
-              <Button size="sm" variant="secondary" isLoading={syncing} onClick={doSync}>
-                <RefreshCw size={15} style={{ marginRight: 6 }} />Sincronizza
-              </Button>
-            )}
-            <Button size="sm" variant="primary" isLoading={importing} onClick={() => fileRef.current?.click()}>Carica CSV</Button>
+        </Card>
+      ) : (
+        <Card i={1} pad="34px 28px" style={{ marginBottom: 18 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 10 }}>
+            <span style={{ width: 52, height: 52, borderRadius: 14, background: 'rgb(99 102 241/0.12)', color: 'rgb(99 102 241)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Landmark size={24} /></span>
+            <div style={{ fontSize: 17, fontWeight: 600, color: 'rgb(var(--color-heading))', marginTop: 4 }}>Nessuna banca collegata</div>
+            <p style={{ margin: 0, fontSize: 13.5, color: 'rgb(var(--color-tertiary))', maxWidth: 420, lineHeight: 1.5 }}>Collega il tuo conto per vedere saldo, entrate, uscite e scadenze in un unico posto. Banche italiane e spagnole, sola lettura.</p>
+            <div style={{ marginTop: 8, display: 'flex', gap: 10 }}>
+              <Button variant="primary" onClick={() => setBankOpen(true)}><Landmark size={15} style={{ marginRight: 6 }} />Collega banca</Button>
+              <Button variant="secondary" onClick={() => fileRef.current?.click()}>Importa CSV</Button>
+            </div>
           </div>
-        </div>
-        {importErr && <div style={{ marginTop: 10, fontSize: 12.5, color: 'rgb(245 158 11)', display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: 'rgb(245 158 11)', flex: 'none' }} />{importErr}</div>}
-      </div>
+        </Card>
       )}
 
-      {view === 'a'
-        ? <Panoramica cats={cats} spent={spent} net={net} balance={balance} target={target} remain={remain} spentPct={spentPct} trend={trend} txView={txView} scadenze={data.upcoming_scadenze} hasData={hasData} bankConnected={bankConnected} onConnectBank={() => setBankOpen(true)} onAddTx={() => setTxOpen(true)} onAddCat={() => setGoalOpen(true)} onDelTx={(t) => setDel({ kind: 'tx', id: t.id, label: t.label })} goalByCategory={goalByCategory} onDelCat={(name, id) => setDel({ kind: 'goal', id, label: name })} />
-        : view === 'b'
-          ? <Flusso cats={cats} spent={spent} net={net} balance={balance} target={target} remain={remain} spentPct={spentPct} trend={trend} txView={txView} scadenze={data.upcoming_scadenze} daysLeft={daysLeft} hasData={hasData} onDelTx={(t) => setDel({ kind: 'tx', id: t.id, label: t.label })} goalByCategory={goalByCategory} onDelCat={(name, id) => setDel({ kind: 'goal', id, label: name })} />
-          : <ScadenzeMese />}
+      {/* ═══ TABS ═══ */}
+      <div className="sd-reveal" style={{ ['--i' as string]: 2, marginBottom: 20 }}>
+        <div style={{ display: 'inline-flex', gap: 4, padding: 4, borderRadius: 13, border: '1px solid rgb(var(--color-border))', background: 'rgb(var(--color-card-inner))' }}>
+          <ViewTab active={view === 'a'} dot="16 185 129" label="Panoramica" onClick={() => setViewP('a')} />
+          <ViewTab active={view === 'b'} dot="99 102 241" label="Flusso" onClick={() => setViewP('b')} />
+          <ViewTab active={view === 'c'} dot="245 158 11" label="Scadenze" onClick={() => setViewP('c')} />
+        </div>
+      </div>
 
-      {/* Sheets */}
+      {view === 'a' && (
+        <div className="sd-twocol">
+          {/* Spese per categoria */}
+          <Card i={3} pad="22px 24px">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <h3 style={h3}>Spese per categoria</h3>
+              <span style={{ fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{eur(spent)} / {eur(target)}</span>
+            </div>
+            {cats.length === 0 ? <Empty>Nessuna spesa registrata.</Empty> : (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 20px' }}><DonutRing pct={spentPct} /></div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {cats.map((c) => {
+                    const gid = goalByCategory.get(c.name);
+                    return <CatRow key={c.name} cat={c} spent={spent} gid={gid} onDel={() => gid && setDel({ kind: 'goal', id: gid, label: c.name })} />;
+                  })}
+                </div>
+                <div style={{ marginTop: 16, display: 'flex', justifyContent: 'center' }}>
+                  <Button variant="ghost" size="sm" onClick={() => setGoalOpen(true)}>+ Categoria</Button>
+                </div>
+              </>
+            )}
+          </Card>
+
+          {/* Transazioni recenti */}
+          <Card i={4} pad="22px 24px">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <h3 style={h3}>Transazioni recenti</h3>
+              <button onClick={() => setTxOpen(true)} style={{ fontSize: 12, color: 'rgb(99 102 241)', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', background: 'none', border: 'none', fontFamily: 'inherit' }}>+ Spesa</button>
+            </div>
+            <TxList txs={txView} onDel={(t) => setDel({ kind: 'tx', id: t.id, label: t.label })} />
+          </Card>
+        </div>
+      )}
+
+      {view === 'b' && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 18 }} className="sd-grid3">
+            <SurfaceStat i={3} label={`Entrate · ${fmtMonthLabel(data.month).split(' ')[0]}`} value={eur(income, true)} color="rgb(16 185 129)" />
+            <SurfaceStat i={4} label={`Uscite · ${fmtMonthLabel(data.month).split(' ')[0]}`} value={eur(spent, true)} color="rgb(239 68 68)" />
+            <SurfaceStat i={5} label="Netto" value={(net >= 0 ? '+' : '−') + eur(Math.abs(net), true).replace('−', '')} accent />
+          </div>
+          <div className="sd-twocol">
+            <Card i={6} pad="22px 24px">
+              <h3 style={{ ...h3, marginBottom: 16 }}>Entrate</h3>
+              {incomeRows.length === 0 ? <Empty>Nessuna entrata registrata.</Empty> : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {incomeRows.map((r) => <FlowRow key={r.name} name={r.name} value={r.v} frac={incomeTotal ? r.v / incomeTotal : 0} color="16 185 129" />)}
+                </div>
+              )}
+            </Card>
+            <Card i={7} pad="22px 24px">
+              <h3 style={{ ...h3, marginBottom: 16 }}>Uscite</h3>
+              {cats.length === 0 ? <Empty>Nessuna uscita registrata.</Empty> : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
+                  {cats.map((c) => <FlowRow key={c.name} name={c.name} value={c.amount} frac={spent ? c.amount / spent : 0} color={c.color} />)}
+                </div>
+              )}
+            </Card>
+          </div>
+        </>
+      )}
+
+      {view === 'c' && (
+        <>
+          <Timeline scadenze={data.upcoming_scadenze} />
+          <ScadenzeMese />
+        </>
+      )}
+
+      {/* ═══ SHEETS ═══ */}
       <Sheet open={goalOpen} onClose={() => setGoalOpen(false)} title="Nuova categoria" subtitle="Limite di spesa mensile">
         <GoalForm key={goalOpen ? 'g' : 'c'} onSubmit={submitGoal} onCancel={() => setGoalOpen(false)} />
       </Sheet>
@@ -345,252 +382,101 @@ export default function BudgetPage() {
           <Button variant="danger" isLoading={busy} onClick={confirmDelete}>Elimina</Button>
         </div>
       </Sheet>
-      <Sheet open={bankOpen} onClose={() => setBankOpen(false)} title="Collega banca" subtitle="Open Banking · Enable Banking">
+      <Sheet open={bankOpen} onClose={() => setBankOpen(false)} title="Aggiungi banca" subtitle="Open Banking · Enable Banking · sola lettura">
         <BankConnectForm key={bankOpen ? 'open' : 'closed'} onCancel={() => setBankOpen(false)} />
       </Sheet>
     </div>
   );
 }
 
-/* ════════════════ VARIANT A — PANORAMICA ════════════════ */
-function Panoramica(p: {
-  cats: Cat[]; spent: number; net: number; balance: number | null; target: number; remain: number; spentPct: number;
-  trend: { m: string; v: number }[]; txView: TxView[]; scadenze: ScadenzaPreview[]; hasData: boolean;
-  bankConnected: boolean; onConnectBank: () => void;
-  onAddTx: () => void; onAddCat: () => void; onDelTx: (t: TxView) => void;
-  goalByCategory: Map<string, string>; onDelCat: (name: string, id: string) => void;
-}) {
-  return (
-    <>
-      {/* ROW 1 · balance + donut */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.05fr) minmax(0,0.95fr)', gap: 18, marginBottom: 18 }} className="sd-fin-row1">
-        <div className="sd-reveal sd-accentcard" style={{ ['--i' as string]: 1, borderRadius: 20, padding: '28px 30px', color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: 252 }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-              <div style={{ fontSize: 10.5, letterSpacing: '.16em', textTransform: 'uppercase', opacity: .85, fontWeight: 600 }}>Saldo disponibile</div>
-              <span style={{ fontFamily: mono, fontSize: 11, background: 'rgb(255 255 255/0.18)', padding: '5px 10px', borderRadius: 8, whiteSpace: 'nowrap' }}>Conto · EUR</span>
-            </div>
-            <div style={{ fontFamily: mono, fontSize: 44, fontWeight: 700, letterSpacing: '-.02em', marginTop: 16, lineHeight: 1 }}>{p.balance != null ? eur(p.balance, true) : '€ —'}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 13, fontSize: 13 }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgb(255 255 255/0.18)', padding: '5px 10px', borderRadius: 8, fontFamily: mono, fontWeight: 600 }}>{p.net >= 0 ? '▲' : '▼'} {eur(Math.abs(p.net))}</span>
-              <span style={{ opacity: .82 }}>{p.balance != null ? 'netto questo mese' : 'collega un conto o importa il CSV'}</span>
-            </div>
-          </div>
-          <Sparkline trend={p.trend} />
-          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <button className="sd-press" onClick={p.onAddTx} style={{ flex: 1, background: '#fff', color: 'rgb(79 70 229)', border: 'none', padding: '11px 14px', borderRadius: 11, fontWeight: 600, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }}>+ Aggiungi spesa</button>
-            {p.bankConnected
-              ? <button className="sd-press" onClick={p.onAddCat} style={{ flex: 1, background: 'rgb(255 255 255/0.16)', color: '#fff', border: '1px solid rgb(255 255 255/0.28)', padding: '11px 14px', borderRadius: 11, fontWeight: 600, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }}>+ Categoria</button>
-              : <button className="sd-press" onClick={p.onConnectBank} style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, background: 'rgb(255 255 255/0.16)', color: '#fff', border: '1px solid rgb(255 255 255/0.28)', padding: '11px 14px', borderRadius: 11, fontWeight: 600, fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }}><Landmark size={15} />Collega banca</button>}
-          </div>
-        </div>
-
-        <Card i={2} pad="24px 26px" radius={20}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <h3 style={h3}>Spese per categoria</h3>
-            <span style={{ fontSize: 11, color: 'rgb(var(--color-tertiary))', textTransform: 'uppercase', letterSpacing: '.12em', whiteSpace: 'nowrap' }}>Mese</span>
-          </div>
-          {p.cats.length === 0 ? <Empty>Nessuna spesa registrata.</Empty> : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 22, flexWrap: 'wrap' }}>
-              <Donut cats={p.cats} total={p.spent} budget={p.target} size={140} />
-              <div style={{ flex: 1, minWidth: 148, display: 'flex', flexDirection: 'column', gap: 11 }}>
-                {p.cats.map((c) => {
-                  const gid = p.goalByCategory.get(c.name);
-                  return (
-                    <div key={c.name} className="sd-fin-legend" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ width: 9, height: 9, borderRadius: 3, background: `rgb(${c.color})`, flex: 'none' }} />
-                      <span style={{ flex: 1, fontSize: 13, color: c.amount > 0 ? 'rgb(var(--color-body))' : 'rgb(var(--color-tertiary))' }}>{c.name}</span>
-                      <span style={{ fontFamily: mono, fontSize: 12.5, color: c.amount > 0 ? 'rgb(var(--color-heading))' : 'rgb(var(--color-tertiary))', fontWeight: 500 }}>{eur(c.amount)}</span>
-                      {gid && <button className="sd-iconbtn sd-fin-del" aria-label="Elimina categoria" onClick={() => p.onDelCat(c.name, gid)}><Trash2 size={12} /></button>}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </Card>
-      </div>
-
-      {/* ROW 2 · budget rings */}
-      {p.cats.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 16, marginBottom: 18 }}>
-          {p.cats.slice(0, 5).map((c, i) => <Ring key={c.name} cat={c} total={p.spent} i={i} />)}
-        </div>
-      )}
-
-      {/* ROW 3 · transactions + scheduled */}
-      <div className="sd-twocol">
-        <Card i={8} pad="22px 24px">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-            <h3 style={h3}>Transazioni recenti</h3>
-            <button onClick={p.onAddTx} style={{ fontSize: 12, color: 'rgb(99 102 241)', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', background: 'none', border: 'none', fontFamily: 'inherit' }}>+ Spesa</button>
-          </div>
-          <TxList txs={p.txView} onDel={p.onDelTx} />
-        </Card>
-
-        <Card i={9} pad="22px 24px">
-          <h3 style={{ ...h3, margin: '0 0 2px' }}>Pagamenti in arrivo</h3>
-          <Scheduled scadenze={p.scadenze} />
-        </Card>
-      </div>
-    </>
-  );
-}
-
-/* ════════════════ VARIANT B — FLUSSO ════════════════ */
-function Flusso(p: {
-  cats: Cat[]; spent: number; net: number; balance: number | null; target: number; remain: number; spentPct: number;
-  trend: { m: string; v: number }[]; txView: TxView[]; scadenze: ScadenzaPreview[]; daysLeft: number; hasData: boolean;
-  onDelTx: (t: TxView) => void; goalByCategory: Map<string, string>; onDelCat: (name: string, id: string) => void;
-}) {
-  const avg = p.trend.length ? Math.round(p.trend.reduce((s, t) => s + t.v, 0) / p.trend.length) : 0;
-  return (
-    <>
-      {/* balance strip + trend */}
-      <div className="sd-reveal sd-accentcard" style={{ ['--i' as string]: 1, borderRadius: 20, padding: '26px 30px', color: '#fff', marginBottom: 18 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,0.9fr) minmax(0,1.1fr)', gap: 34, alignItems: 'center' }} className="sd-fin-strip">
-          <div>
-            <div style={{ fontSize: 10.5, letterSpacing: '.16em', textTransform: 'uppercase', opacity: .85, fontWeight: 600 }}>Saldo disponibile</div>
-            <div style={{ fontFamily: mono, fontSize: 42, fontWeight: 700, letterSpacing: '-.02em', marginTop: 12, lineHeight: 1 }}>{p.balance != null ? eur(p.balance, true) : '€ —'}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, margin: '16px 0 14px', fontSize: 13, flexWrap: 'wrap' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: mono, fontWeight: 600 }}>{p.net >= 0 ? '▲' : '▼'} {eur(Math.abs(p.net))} netto</span>
-              <span style={{ opacity: .55 }}>·</span>
-              <span style={{ opacity: .85 }}><span style={{ fontFamily: mono, fontWeight: 600 }}>{eur(p.remain)}</span> rimasti di {eur(p.target)}</span>
-            </div>
-            <div style={{ height: 8, borderRadius: 8, background: 'rgb(255 255 255/0.22)', overflow: 'hidden' }}><div style={{ height: '100%', width: `${p.spentPct.toFixed(0)}%`, borderRadius: 8, background: '#fff' }} /></div>
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <span style={{ fontSize: 10.5, letterSpacing: '.16em', textTransform: 'uppercase', opacity: .85, fontWeight: 600 }}>Andamento spese · 6 mesi</span>
-              {avg > 0 && <span style={{ fontFamily: mono, fontSize: 12, opacity: .85 }}>media {eur(avg)}</span>}
-            </div>
-            <TrendBars trend={p.trend} />
-          </div>
-        </div>
-      </div>
-
-      {/* category pills */}
-      {p.cats.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 14, marginBottom: 18 }}>
-          {p.cats.slice(0, 5).map((c, i) => <Pill key={c.name} cat={c} i={i} />)}
-        </div>
-      )}
-
-      {/* timeline + side rail */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,1fr)', gap: 18 }} className="sd-fin-flow">
-        <Card i={7} pad="22px 24px">
-          <h3 style={{ ...h3, margin: '0 0 2px' }}>Movimenti &amp; scadenze</h3>
-          <div style={{ fontSize: 10.5, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgb(245 158 11)', fontWeight: 600, margin: '16px 0 0' }}>In arrivo</div>
-          <ScheduledTimeline scadenze={p.scadenze} />
-          <div style={{ fontSize: 10.5, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgb(var(--color-tertiary))', fontWeight: 600, margin: '20px 0 0' }}>Recenti</div>
-          <TxList txs={p.txView} onDel={p.onDelTx} />
-        </Card>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          <Card i={8} pad="22px 24px">
-            <h3 style={{ ...h3, margin: '0 0 16px', fontSize: 15 }}>Dove vanno i soldi</h3>
-            {p.cats.length === 0 ? <Empty>Nessuna spesa.</Empty> : (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
-                <Donut cats={p.cats} total={p.spent} budget={p.target} size={128} />
-                <div style={{ width: '100%', display: 'flex', flexWrap: 'wrap', gap: '8px 14px', justifyContent: 'center' }}>
-                  {p.cats.filter((c) => c.amount > 0).slice(0, 5).map((c) => (
-                    <span key={c.name} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'rgb(var(--color-body))' }}>
-                      <span style={{ width: 8, height: 8, borderRadius: 3, background: `rgb(${c.color})` }} />{c.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </Card>
-
-          <div className="sd-reveal sd-accentcard" style={{ ['--i' as string]: 9, borderRadius: 16, padding: '22px 24px', color: '#fff' }}>
-            <div style={{ fontSize: 10.5, letterSpacing: '.16em', textTransform: 'uppercase', opacity: .85, fontWeight: 600, marginBottom: 10 }}>Budget di {fmtMonthLabel(FIRST_DAY_ISO).split(' ')[0].toLowerCase()}</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}><span style={{ fontFamily: mono, fontSize: 26, fontWeight: 700 }}>{eur(p.remain)}</span><span style={{ fontSize: 12, opacity: .85 }}>rimasti · {p.daysLeft} giorni</span></div>
-            <div style={{ height: 7, borderRadius: 7, background: 'rgb(255 255 255/0.22)', overflow: 'hidden', marginTop: 14 }}><div style={{ height: '100%', width: `${p.spentPct.toFixed(0)}%`, borderRadius: 7, background: '#fff' }} /></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, opacity: .8, marginTop: 8, fontFamily: mono }}><span>{eur(p.spent)} spesi</span><span>{eur(p.target)} totale</span></div>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
 /* ════════════════ shared bits ════════════════ */
-type TxView = { id: string; name: string; sub: string; amount: number; color: string; cat: string; label: string };
-
-const h3: React.CSSProperties = { margin: 0, fontSize: 16, fontWeight: 600, color: 'rgb(var(--color-heading))' };
+const h3: React.CSSProperties = { margin: 0, fontSize: 15, fontWeight: 600, color: 'rgb(var(--color-heading))' };
+const eyebrow: React.CSSProperties = { fontSize: 10.5, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgb(var(--color-tertiary))', fontWeight: 600 };
 const cardBase: React.CSSProperties = { background: 'rgb(var(--color-card))', border: '1px solid rgb(var(--color-border))', boxShadow: '0 1px 2px rgba(17,17,26,.04)' };
 
-function Card({ i, pad, radius = 16, children }: { i: number; pad: string; radius?: number; children: React.ReactNode }) {
-  return <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: i, ...cardBase, borderRadius: radius, padding: pad }}>{children}</div>;
+function Card({ i, pad, radius = 16, style, children }: { i: number; pad: string; radius?: number; style?: React.CSSProperties; children: React.ReactNode }) {
+  return <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: i, ...cardBase, borderRadius: radius, padding: pad, ...style }}>{children}</div>;
 }
 function Empty({ children }: { children: React.ReactNode }) {
   return <p style={{ margin: '4px 0 0', fontSize: 14, color: 'rgb(var(--color-muted))' }}>{children}</p>;
 }
+function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ ...eyebrow, marginBottom: 6 }}>{label}</div>
+      <div style={{ fontFamily: mono, fontSize: 22, fontWeight: 600, color: color ?? 'rgb(var(--color-heading))', whiteSpace: 'nowrap' }}>{value}</div>
+    </div>
+  );
+}
+function SurfaceStat({ i, label, value, color, accent }: { i: number; label: string; value: string; color?: string; accent?: boolean }) {
+  return (
+    <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: i, ...cardBase, borderRadius: 14, padding: '18px 20px', ...(accent ? { background: 'rgb(99 102 241/0.10)', borderColor: 'rgb(99 102 241/0.30)' } : null) }}>
+      <div style={{ ...eyebrow, marginBottom: 8 }}>{label}</div>
+      <div style={{ fontFamily: mono, fontSize: 26, fontWeight: 600, lineHeight: 1, color: color ?? 'rgb(var(--color-heading))' }}>{value}</div>
+    </div>
+  );
+}
 function ViewTab({ active, dot, label, onClick }: { active: boolean; dot: string; label: string; onClick: () => void }) {
   return (
-    <button className="sd-press" onClick={onClick} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 15px', background: 'transparent', border: 'none', borderRadius: 9, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: 'rgb(var(--color-heading))', whiteSpace: 'nowrap' }}>
+    <button className="sd-press" onClick={onClick} style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', background: 'transparent', border: 'none', borderRadius: 9, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: 'rgb(var(--color-heading))', whiteSpace: 'nowrap' }}>
       {active && <span style={{ position: 'absolute', inset: 0, borderRadius: 9, background: `rgb(${dot}/0.16)`, border: `1px solid rgb(${dot}/0.42)` }} />}
       <span style={{ position: 'relative', width: 8, height: 8, borderRadius: 2, background: `rgb(${dot})` }} /><span style={{ position: 'relative' }}>{label}</span>
     </button>
   );
 }
 
-function Donut({ cats, total, budget, size }: { cats: Cat[]; total: number; budget: number; size: number }) {
+function DonutRing({ pct }: { pct: number }) {
   const R = 52, C = 2 * Math.PI * R;
-  let acc = 0;
-  const segs = cats.filter((c) => c.amount > 0).map((c, i) => {
-    const len = total > 0 ? C * (c.amount / total) : 0;
-    const vis = Math.max(len - 6, 0);
-    const el = <circle key={i} cx={60} cy={60} r={R} fill="none" stroke={`rgb(${c.color})`} strokeWidth={13} strokeDasharray={`${vis} ${C - vis}`} strokeDashoffset={-acc} />;
-    acc += len; return el;
-  });
+  const over = pct > 100;
+  const off = C * (1 - Math.min(Math.max(pct, 0), 100) / 100);
+  const stroke = over ? 'rgb(239 68 68)' : 'rgb(99 102 241)';
   return (
-    <div style={{ position: 'relative', width: size, height: size, flex: 'none' }}>
-      <svg viewBox="0 0 120 120" style={{ width: size, height: size, transform: 'rotate(-90deg)' }}>
+    <div style={{ position: 'relative', width: 150, height: 150, flex: 'none' }}>
+      <svg viewBox="0 0 120 120" width={150} height={150} style={{ transform: 'rotate(-90deg)' }}>
         <circle cx={60} cy={60} r={R} fill="none" stroke="rgb(var(--color-card-inner))" strokeWidth={13} />
-        {segs}
+        <circle cx={60} cy={60} r={R} fill="none" stroke={stroke} strokeWidth={13} strokeLinecap="round" strokeDasharray={C} strokeDashoffset={off} />
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ fontFamily: mono, fontSize: size >= 140 ? 23 : 21, fontWeight: 700, color: 'rgb(var(--color-heading))', lineHeight: 1 }}>{eur(total)}</div>
-        {budget > 0 && <div style={{ fontSize: 11, color: 'rgb(var(--color-tertiary))', marginTop: 3 }}>di {eur(budget)}</div>}
+        <span style={{ fontFamily: mono, fontSize: 30, fontWeight: 600, letterSpacing: '-.02em', color: over ? 'rgb(239 68 68)' : 'rgb(var(--color-heading))', lineHeight: 1 }}>{pct}%</span>
+        <span style={{ ...eyebrow, marginTop: 6 }}>budget usato</span>
       </div>
     </div>
   );
 }
 
-function Ring({ cat, total, i }: { cat: Cat; total: number; i: number }) {
-  const R = 26, C = 2 * Math.PI * R;
-  const pct = cat.budget ? Math.min((cat.amount / cat.budget) * 100, 100) : (total ? (cat.amount / total) * 100 : 0);
-  const off = C * (1 - Math.min(Math.max(pct, 0), 100) / 100);
-  const sub = cat.budget ? `${eur(cat.amount)}/${eur(cat.budget)}` : eur(cat.amount);
+function CatRow({ cat, spent, gid, onDel }: { cat: Cat; spent: number; gid?: string; onDel: () => void }) {
+  const hasBudget = cat.budget > 0;
+  const over = hasBudget && cat.amount > cat.budget;
+  const frac = hasBudget ? Math.min(cat.amount / cat.budget, 1) : (spent ? cat.amount / spent : 0);
+  const remaining = cat.budget - cat.amount;
   return (
-    <div className="sd-reveal sd-lift" style={{ ['--i' as string]: 3 + i, ...cardBase, borderRadius: 16, padding: '18px 14px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12 }}>
-      <div style={{ position: 'relative', width: 64, height: 64 }}>
-        <svg viewBox="0 0 64 64" width={64} height={64} style={{ transform: 'rotate(-90deg)' }}>
-          <circle cx={32} cy={32} r={R} fill="none" stroke="rgb(var(--color-card-inner))" strokeWidth={6} />
-          <circle cx={32} cy={32} r={R} fill="none" stroke={`rgb(${cat.color})`} strokeWidth={6} strokeLinecap="round" strokeDasharray={C} strokeDashoffset={off} />
-        </svg>
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: mono, fontSize: 13, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{Math.round(pct)}%</div>
+    <div className="sd-fin-legend">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 7 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: 'rgb(var(--color-heading))', background: 'rgb(var(--color-card-inner))', border: '1px solid rgb(var(--color-border))', borderRadius: 999, padding: '3px 10px' }}>
+          <span style={{ width: 7, height: 7, borderRadius: 9, background: `rgb(${cat.color})` }} />{cat.name}
+        </span>
+        <span style={{ fontSize: 12, color: over ? 'rgb(248 113 113)' : 'rgb(var(--color-tertiary))', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span><span style={{ fontFamily: mono, fontWeight: 600, color: over ? 'inherit' : 'rgb(var(--color-heading))' }}>{eur(cat.amount)}</span>{hasBudget && <> · {over ? `${eur(Math.abs(remaining))} sopra` : `${eur(remaining)} rimasti`}</>}</span>
+          {gid && <button className="sd-iconbtn sd-fin-del" aria-label="Elimina categoria" onClick={onDel}><Trash2 size={12} /></button>}
+        </span>
       </div>
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{cat.name}</div>
-        <div style={{ fontFamily: mono, fontSize: 11.5, color: 'rgb(var(--color-tertiary))', marginTop: 2 }}>{sub}</div>
+      <div style={{ height: 8, borderRadius: 8, background: 'rgb(var(--color-card-inner))', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${(frac * 100).toFixed(0)}%`, borderRadius: 8, background: over ? 'rgb(239 68 68)' : `rgb(${cat.color})` }} />
       </div>
     </div>
   );
 }
 
-function Pill({ cat, i }: { cat: Cat; i: number }) {
-  const frac = cat.budget ? Math.min(cat.amount / cat.budget, 1) : 0;
+function FlowRow({ name, value, frac, color }: { name: string; value: number; frac: number; color: string }) {
   return (
-    <div className="sd-reveal sd-lift" style={{ ['--i' as string]: 2 + i, ...cardBase, borderRadius: 14, padding: '15px 16px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <span style={{ width: 8, height: 8, borderRadius: 3, background: `rgb(${cat.color})`, flex: 'none' }} />
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{cat.name}</span>
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 7 }}>
+        <span style={{ fontSize: 13.5, color: 'rgb(var(--color-body))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</span>
+        <span style={{ fontFamily: mono, fontSize: 13, fontWeight: 600, color: 'rgb(var(--color-heading))', flex: 'none' }}>{eur(value, true)}</span>
       </div>
-      <div style={{ fontFamily: mono, fontSize: 15, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{eur(cat.amount)}{cat.budget ? <span style={{ color: 'rgb(var(--color-muted))', fontSize: 11 }}> /{eur(cat.budget).replace('€', '')}</span> : null}</div>
-      <div style={{ height: 5, borderRadius: 5, background: 'rgb(var(--color-card-inner))', overflow: 'hidden', marginTop: 9 }}><div style={{ height: '100%', width: `${(frac * 100).toFixed(0)}%`, borderRadius: 5, background: `rgb(${cat.color})` }} /></div>
+      <div style={{ height: 8, borderRadius: 8, background: 'rgb(var(--color-card-inner))', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${Math.round(frac * 100)}%`, borderRadius: 8, background: `rgb(${color})` }} />
+      </div>
     </div>
   );
 }
@@ -600,106 +486,63 @@ function TxList({ txs, onDel }: { txs: TxView[]; onDel: (t: TxView) => void }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {txs.map((t) => (
-        <div key={t.id} className="sd-fin-tx" style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '13px 0', borderTop: '1px solid rgb(var(--color-border))' }}>
-          <span style={{ width: 38, height: 38, borderRadius: 11, background: `rgb(${t.color}/0.14)`, color: `rgb(${t.color})`, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}><IconFor cat={t.cat} /></span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 500, color: 'rgb(var(--color-heading))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</div>
-            <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{t.sub}</div>
+        <div key={t.id} className="sd-fin-tx" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, padding: '13px 0', borderTop: '1px solid rgb(var(--color-border))' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
+            <span style={{ flex: 'none', width: 9, height: 9, borderRadius: 9, background: `rgb(${t.color})` }} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 500, color: 'rgb(var(--color-heading))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</div>
+              <div style={{ fontSize: 11.5, color: 'rgb(var(--color-muted))', marginTop: 2 }}>{t.cat}</div>
+            </div>
           </div>
-          <div style={{ fontFamily: mono, fontSize: 13.5, fontWeight: 600, color: t.amount > 0 ? 'rgb(16 185 129)' : 'rgb(var(--color-heading))', flex: 'none' }}>{eur(t.amount, true)}</div>
-          <button className="sd-iconbtn sd-fin-del" aria-label="Elimina movimento" onClick={() => onDel(t)} style={{ flex: 'none' }}><Trash2 size={14} /></button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 'none' }}>
+            <span style={{ fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-muted))' }}>{t.dateLabel}</span>
+            <span style={{ fontFamily: mono, fontSize: 14, fontWeight: 600, color: t.amount > 0 ? 'rgb(16 185 129)' : 'rgb(239 68 68)', minWidth: 80, textAlign: 'right' }}>{eur(t.amount, true)}</span>
+            <button className="sd-iconbtn sd-fin-del" aria-label="Elimina movimento" onClick={() => onDel(t)}><Trash2 size={14} /></button>
+          </div>
         </div>
       ))}
     </div>
   );
 }
 
-function Scheduled({ scadenze }: { scadenze: ScadenzaPreview[] }) {
-  if (scadenze.length === 0) return <Empty>Nessun pagamento in arrivo.</Empty>;
+/* ── Scadenze timeline (forward, next 30 days) ── */
+function Timeline({ scadenze }: { scadenze: ScadenzaPreview[] }) {
+  const MAXD = 30;
+  const items = scadenze.filter((s) => s.days_until >= 0 && s.days_until <= MAXD).slice(0, 7);
+  if (items.length === 0) return null;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {scadenze.map((s) => (
-        <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '13px 0', borderTop: '1px solid rgb(var(--color-border))' }}>
-          <span style={{ width: 38, height: 38, borderRadius: 11, background: `rgb(${colorFor(s.desc + s.tipo)}/0.14)`, color: `rgb(${colorFor(s.desc + s.tipo)})`, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}><IconFor cat={s.desc + ' ' + s.tipo} /></span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 500, color: 'rgb(var(--color-heading))' }}>{s.desc}</div>
-            <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{s.tipo} · {s.scadenza_gg_mm}</div>
-          </div>
-          {s.importo > 0
-            ? <div style={{ fontFamily: mono, fontSize: 13.5, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{eur(s.importo, true)}</div>
-            : <DaysBadge days={s.days_until} />}
+    <Card i={1} pad="22px 24px" style={{ marginBottom: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <h3 style={h3}>Linea del tempo</h3>
+        <span style={{ fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>prossimi {MAXD} giorni</span>
+      </div>
+      <div style={{ position: 'relative', height: 150, margin: '6px 12px 0' }}>
+        <div style={{ position: 'absolute', left: 0, right: 0, top: 75, height: 2, borderRadius: 2, background: 'rgb(var(--color-border))' }} />
+        {/* OGGI marker */}
+        <div style={{ position: 'absolute', left: 0, top: 40, bottom: 40, width: 2, transform: 'translateX(-1px)', background: 'rgb(99 102 241)' }} />
+        <div style={{ position: 'absolute', left: 0, top: 16, transform: 'translateX(-50%)' }}>
+          <span style={{ fontFamily: mono, display: 'inline-block', padding: '3px 9px', borderRadius: 999, fontSize: 10, fontWeight: 600, letterSpacing: '.12em', color: 'rgb(165 180 252)', background: 'rgb(99 102 241/0.18)', border: '1px solid rgb(99 102 241/0.45)' }}>OGGI</span>
         </div>
-      ))}
-    </div>
-  );
-}
-
-function ScheduledTimeline({ scadenze }: { scadenze: ScadenzaPreview[] }) {
-  if (scadenze.length === 0) return <Empty>Niente in arrivo.</Empty>;
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {scadenze.map((s) => {
-        const [dd, mm] = s.scadenza_gg_mm.split('/');
-        const col = colorFor(s.desc + s.tipo);
-        return (
-          <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 0', borderTop: '1px solid rgb(var(--color-border))' }}>
-            <div style={{ width: 48, flex: 'none', textAlign: 'center' }}>
-              <div style={{ fontFamily: mono, fontSize: 19, fontWeight: 700, color: `rgb(${col})`, lineHeight: 1 }}>{dd}</div>
-              <div style={{ fontSize: 10, letterSpacing: '.1em', color: 'rgb(var(--color-tertiary))', textTransform: 'uppercase' }}>{mm ? monthShort(Number(mm)) : ''}</div>
+        <span style={{ position: 'absolute', right: 0, top: 86, fontFamily: mono, fontSize: 10, color: 'rgb(var(--color-muted))' }}>+{MAXD}g</span>
+        {items.map((s, i) => {
+          const pct = 2 + (s.days_until / MAXD) * 94;
+          const above = i % 2 === 0;
+          const warn = s.days_until <= 7;
+          const col = warn ? '245 158 11' : '99 102 241';
+          return (
+            <div key={s.id} style={{ position: 'absolute', left: `${pct}%`, top: 0, bottom: 0, width: 0 }}>
+              <div style={{ position: 'absolute', left: 0, transform: 'translateX(-50%)', width: 2, borderRadius: 2, background: 'rgb(var(--color-border))', top: above ? 56 : 75, height: 19 }} />
+              <div style={{ position: 'absolute', left: 0, top: 69, width: 13, height: 13, borderRadius: 999, transform: 'translateX(-50%)', background: `rgb(${col})`, boxShadow: `0 0 0 4px rgb(${col}/0.22)` }} />
+              <div style={{ position: 'absolute', left: 0, width: 100, textAlign: 'center', transform: 'translateX(-50%)', ...(above ? { bottom: 96 } : { top: 96 }) }}>
+                <div style={{ fontSize: 11.5, fontWeight: 500, lineHeight: 1.2, color: 'rgb(var(--color-body))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.desc}</div>
+                {s.importo > 0 && <div style={{ fontFamily: mono, fontSize: 11, fontWeight: 600, color: `rgb(${col})`, lineHeight: 1.3 }}>{eur(s.importo, true)}</div>}
+                <div style={{ fontSize: 9.5, color: 'rgb(var(--color-muted))', lineHeight: 1.3 }}>{s.days_until === 0 ? 'oggi' : `tra ${s.days_until}g`}</div>
+              </div>
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 500, color: 'rgb(var(--color-heading))' }}>{s.desc}</div>
-              <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{s.tipo}{s.importo > 0 ? '' : ' · scadenza'}</div>
-            </div>
-            {s.importo > 0
-              ? <div style={{ fontFamily: mono, fontSize: 13.5, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{eur(s.importo, true)}</div>
-              : <DaysBadge days={s.days_until} />}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function DaysBadge({ days }: { days: number }) {
-  const warn = days <= 7;
-  const col = warn ? '245 158 11' : '99 102 241';
-  return <span style={{ flex: 'none', whiteSpace: 'nowrap', fontSize: 11.5, fontWeight: 600, color: `rgb(${col})`, background: `rgb(${col}/0.14)`, border: `1px solid rgb(${col}/0.3)`, borderRadius: 999, padding: '3px 9px' }}>{days} {days === 1 ? 'giorno' : 'giorni'}</span>;
-}
-
-function Sparkline({ trend }: { trend: { m: string; v: number }[] }) {
-  if (trend.length < 2) return <div style={{ height: 46, marginTop: 14 }} />;
-  const max = Math.max(...trend.map((t) => t.v), 1);
-  const pts = trend.map((t, i) => {
-    const x = (i / (trend.length - 1)) * 340;
-    const y = 50 - (t.v / max) * 42;
-    return `${x.toFixed(0)},${y.toFixed(0)}`;
-  }).join(' ');
-  return (
-    <svg viewBox="0 0 340 56" preserveAspectRatio="none" style={{ width: '100%', height: 46, marginTop: 14 }}>
-      <polyline fill="none" stroke="rgba(255,255,255,.5)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" points={pts} />
-    </svg>
-  );
-}
-
-function TrendBars({ trend }: { trend: { m: string; v: number }[] }) {
-  if (trend.length === 0) return <div style={{ height: 84, display: 'flex', alignItems: 'center', fontSize: 12, opacity: .7 }}>Storico non disponibile.</div>;
-  const max = Math.max(...trend.map((t) => t.v), 1);
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
-      {trend.map((t, i) => {
-        const last = i === trend.length - 1;
-        const h = Math.max((t.v / max) * 100, 3);
-        return (
-          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: '100%', height: 76, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-              <div style={{ width: '100%', maxWidth: 30, height: `${h}%`, borderRadius: '6px 6px 0 0', background: last ? '#fff' : 'rgb(255 255 255/0.32)', boxShadow: last ? '0 0 0 1px rgb(255 255 255/0.4)' : 'none' }} />
-            </div>
-            <span style={{ fontSize: 10, opacity: last ? 1 : .7, fontWeight: last ? 600 : 400, fontFamily: mono }}>{t.m}</span>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 
@@ -712,7 +555,6 @@ function FormActions({ onCancel, submitting }: { onCancel: () => void; submittin
     </div>
   );
 }
-
 function GoalForm({ onSubmit, onCancel }: { onSubmit: (b: { category: string; monthly_limit: number }) => Promise<void>; onCancel: () => void }) {
   const [category, setCategory] = useState('');
   const [limit, setLimit] = useState('');
@@ -734,7 +576,6 @@ function GoalForm({ onSubmit, onCancel }: { onSubmit: (b: { category: string; mo
     </form>
   );
 }
-
 function TransactionForm({ categoryNames, onSubmit, onCancel }: { categoryNames: string[]; onSubmit: (b: { amount: number; category: string; description: string; date: string }) => Promise<void>; onCancel: () => void }) {
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
@@ -788,74 +629,50 @@ function BankConnectForm({ onCancel }: { onCancel: () => void }) {
     setConnectingId(bankId); setError('');
     try {
       const res = await initBankAuth(bankId, country);
-      if (res.auth_link) {
-        window.location.href = res.auth_link;
-      } else {
-        setError('Il provider non ha restituito un link di autorizzazione.');
-        setConnectingId(null);
-      }
-    } catch {
-      setError('Avvio del collegamento non riuscito. Riprova.');
-      setConnectingId(null);
-    }
+      if (res.auth_link) window.location.href = res.auth_link;
+      else { setError('Il provider non ha restituito un link di autorizzazione.'); setConnectingId(null); }
+    } catch { setError('Avvio del collegamento non riuscito. Riprova.'); setConnectingId(null); }
   };
 
   return (
     <div>
-      <Field label="Paese">
-        <div style={{ display: 'flex', gap: 8 }}>
-          {(['ES', 'IT'] as const).map((cc) => (
-            <button
-              key={cc}
-              type="button"
-              className="sd-press"
-              onClick={() => setCountry(cc)}
-              style={{
-                flex: 1, padding: '9px 14px', borderRadius: 10, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                color: country === cc ? '#fff' : 'rgb(var(--color-heading))',
-                background: country === cc ? 'rgb(99 102 241)' : 'rgb(var(--color-card-inner))',
-                border: `1px solid ${country === cc ? 'rgb(99 102 241)' : 'rgb(var(--color-border))'}`,
-              }}
-            >{cc === 'ES' ? 'Spagna' : 'Italia'}</button>
+      <p style={{ ...eyebrow, margin: '0 0 10px' }}>Paese</p>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
+        {(['IT', 'ES'] as const).map((cc) => {
+          const on = country === cc;
+          return (
+            <button key={cc} type="button" className="sd-press" onClick={() => setCountry(cc)}
+              style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start', padding: '13px 15px', borderRadius: 12, cursor: 'pointer',
+                background: on ? 'rgb(99 102 241/0.12)' : 'rgb(var(--color-card-inner))', border: `1px solid ${on ? 'rgb(99 102 241/0.6)' : 'rgb(var(--color-border))'}`, color: on ? 'rgb(165 180 252)' : 'rgb(var(--color-tertiary))', fontFamily: 'inherit' }}>
+              <span style={{ fontFamily: mono, fontSize: 15, fontWeight: 600 }}>{cc}</span>
+              <span style={{ fontSize: 13 }}>{cc === 'IT' ? 'Italia' : 'Spagna'}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <p style={{ ...eyebrow, margin: '0 0 10px' }}>Banche disponibili</p>
+      {loading ? (
+        <p style={{ margin: '4px 0', fontSize: 13.5, color: 'rgb(var(--color-muted))' }}>Caricamento banche…</p>
+      ) : institutions.length === 0 ? (
+        <p style={{ margin: '4px 0', fontSize: 13.5, color: 'rgb(var(--color-muted))' }}>Nessuna banca disponibile per questo paese.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
+          {institutions.map((inst) => (
+            <button key={inst.id} type="button" className="sd-press" disabled={connectingId !== null} onClick={() => connect(inst.id)}
+              style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', width: '100%', padding: '11px 13px', borderRadius: 12, cursor: connectingId !== null ? 'default' : 'pointer', background: 'rgb(var(--color-card-inner))', border: '1px solid rgb(var(--color-border))', fontFamily: 'inherit', opacity: connectingId && connectingId !== inst.id ? 0.55 : 1 }}>
+              <span style={{ width: 34, height: 34, borderRadius: 9, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgb(99 102 241/0.14)', color: 'rgb(99 102 241)', overflow: 'hidden' }}>
+                {inst.logo
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  ? <img src={inst.logo} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  : <Landmark size={17} />}
+              </span>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 500, color: 'rgb(var(--color-heading))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{inst.name}</span>
+              {connectingId === inst.id && <span style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>Avvio…</span>}
+            </button>
           ))}
         </div>
-      </Field>
-
-      <div style={{ marginTop: 4 }}>
-        <span style={{ display: 'block', fontSize: 12.5, fontWeight: 500, color: 'rgb(var(--color-tertiary))', marginBottom: 6 }}>Banca</span>
-        {loading ? (
-          <p style={{ margin: '4px 0', fontSize: 13.5, color: 'rgb(var(--color-muted))' }}>Caricamento banche…</p>
-        ) : institutions.length === 0 ? (
-          <p style={{ margin: '4px 0', fontSize: 13.5, color: 'rgb(var(--color-muted))' }}>Nessuna banca disponibile per questo paese.</p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 320, overflowY: 'auto' }}>
-            {institutions.map((inst) => (
-              <button
-                key={inst.id}
-                type="button"
-                className="sd-press"
-                disabled={connectingId !== null}
-                onClick={() => connect(inst.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', width: '100%',
-                  padding: '11px 13px', borderRadius: 12, cursor: connectingId !== null ? 'default' : 'pointer',
-                  background: 'rgb(var(--color-card-inner))', border: '1px solid rgb(var(--color-border))',
-                  fontFamily: 'inherit', opacity: connectingId && connectingId !== inst.id ? 0.55 : 1,
-                }}
-              >
-                <span style={{ width: 34, height: 34, borderRadius: 9, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgb(99 102 241/0.14)', color: 'rgb(99 102 241)', overflow: 'hidden' }}>
-                  {inst.logo
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    ? <img src={inst.logo} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                    : <Landmark size={17} />}
-                </span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 500, color: 'rgb(var(--color-heading))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{inst.name}</span>
-                {connectingId === inst.id && <span style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>Avvio…</span>}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      )}
 
       {error && <p style={errStyle}>{error}</p>}
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 14 }}>
