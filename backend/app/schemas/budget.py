@@ -121,6 +121,10 @@ class TransactionUpdate(BaseModel):
 class TransactionResponse(TransactionBase):
     """Transaction response schema."""
 
+    # Override TransactionBase's gt=0 constraint: bank feeds legitimately include
+    # €0 entries (authorisation holds, reversals). Output must never reject them.
+    amount: float
+
     id: uuid.UUID
     user_id: uuid.UUID
     source: TransactionSource = TransactionSource.MANUAL

@@ -302,6 +302,9 @@ async def sync_bank_transactions(
                 if not ext_id:
                     errors += 1
                     continue
+                if not tx.amount:  # skip €0 entries (auth holds, reversals)
+                    skipped += 1
+                    continue
 
                 # Check dedup
                 existing = await db.execute(
