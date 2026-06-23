@@ -44,13 +44,13 @@ export function Sheet({
         className="sd-sheet"
         onMouseDown={(e) => e.stopPropagation()}
         style={{
-          width: '100%', maxWidth, maxHeight: '88vh', overflowY: 'auto',
+          width: '100%', maxWidth, maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
           background: 'rgb(var(--color-card))',
           borderRadius: 22, border: '1px solid rgb(var(--color-border))',
           boxShadow: '0 24px 64px rgba(17,17,26,.22), 0 2px 8px rgba(17,17,26,.08)',
         }}
       >
-        <div style={{ padding: '22px 24px 0', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ padding: '22px 24px 0', flex: 'none', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 19, fontWeight: 600, letterSpacing: '-.01em', color: 'rgb(var(--color-heading))' }}>{title}</h2>
             {subtitle && <p style={{ margin: '4px 0 0', fontSize: 13, color: 'rgb(var(--color-tertiary))' }}>{subtitle}</p>}
@@ -59,8 +59,8 @@ export function Sheet({
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
           </button>
         </div>
-        <div style={{ padding: '18px 24px 6px' }}>{children}</div>
-        {footer && <div style={{ padding: '8px 24px 22px', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>{footer}</div>}
+        <div style={{ padding: '18px 24px 8px', flex: '1 1 auto', overflowY: 'auto', minHeight: 0 }}>{children}</div>
+        {footer && <div style={{ padding: '12px 24px 18px', flex: 'none', display: 'flex', gap: 10, justifyContent: 'flex-end', borderTop: '1px solid rgb(var(--color-border))' }}>{footer}</div>}
       </div>
     </div>
   );
