@@ -5,19 +5,19 @@ import { Trash2, FileUp, Landmark, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Sheet, Field, FieldRow } from '@/components/sd/FormSheet';
 import {
-  getBudgetDashboard, listGoals, createGoal, deleteGoal,
+  getBudgetDashboard,
   listTransactions, createTransaction, deleteTransaction, importCSV,
   initBankAuth, completeBankAuth, listInstitutions, syncBankTransactions,
-  type BudgetDashboard, type CategorySpending, type BudgetGoal,
+  type BudgetDashboard, type CategorySpending,
   type Transaction, type ScadenzaPreview, type Institution,
 } from '@/services/budgetService';
 import { ScadenzeMese } from '@/components/sd/ScadenzeMese';
 
-/* ── Budget / Banking (design Banking.dc.html) ─────────────────────────────────
+/* ── Gestione finanziaria / Banking (design Banking.dc.html) ───────────────────
    Clean banking page wired to real data: account balance + income/expenses/net,
-   category budget donut, recent transactions, cash-flow breakdown, an upcoming
-   deadline timeline, the Enable Banking connect flow, Revolut CSV import and the
-   scadenze CRUD list. No fabricated data — honest empty states throughout. */
+   spending-composition donut, recent transactions, cash-flow breakdown, an
+   upcoming deadline timeline, the Enable Banking connect flow, Revolut CSV import
+   and the scadenze list. No budgeting/targets — just what actually happened. */
 
 const mono = "'JetBrains Mono',monospace";
 const MONTH = 6;
@@ -59,29 +59,26 @@ const fmtMonthLabel = (iso: string) =>
 const fmtSync = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'mai';
 
-type Cat = { name: string; color: string; amount: number; budget: number };
+type Cat = { name: string; color: string; amount: number };
 function toCats(categories: CategorySpending[]): Cat[] {
   return [...categories]
     .sort((a, b) => b.spent - a.spent)
-    .map((c, i) => ({ name: c.category, color: colorFor(c.category, i), amount: c.spent, budget: c.limit ?? 0 }));
+    .map((c, i) => ({ name: c.category, color: colorFor(c.category, i), amount: c.spent }));
 }
 type TxView = { id: string; name: string; cat: string; dateLabel: string; amount: number; color: string; label: string };
 
 export default function BudgetPage() {
   const [data, setData] = useState<BudgetDashboard>(FALLBACK);
-  const [goals, setGoals] = useState<BudgetGoal[]>([]);
   const [txs, setTxs] = useState<Transaction[]>([]);
 
   const [view, setView] = useState<'a' | 'b' | 'c'>('a');
-  const [budget, setBudget] = useState(0);          // monthly target (localStorage)
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [importErr, setImportErr] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [goalOpen, setGoalOpen] = useState(false);
   const [txOpen, setTxOpen] = useState(false);
-  const [del, setDel] = useState<{ kind: 'goal' | 'tx'; id: string; label: string } | null>(null);
+  const [del, setDel] = useState<{ id: string; label: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
   // ── Bank connection (Enable Banking) ──
@@ -92,20 +89,18 @@ export default function BudgetPage() {
 
   const load = useCallback(async () => {
     try {
-      const [dash, gls, tx] = await Promise.all([
+      const [dash, tx] = await Promise.all([
         getBudgetDashboard(MONTH, YEAR),
-        listGoals(),
         listTransactions({ month: MONTH, year: YEAR, limit: 30 }),
       ]);
-      setData(dash); setGoals(gls); setTxs(tx);
+      setData(dash); setTxs(tx);
     } catch {/* keep current */}
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  // restore prefs (view + budget target)
+  // restore prefs (active tab)
   useEffect(() => {
     try {
-      const b = localStorage.getItem('sd-fin-budget'); if (b) setBudget(parseInt(b, 10) || 0);
       const map: Record<string, 'a' | 'b' | 'c'> = { a: 'a', b: 'b', c: 'c', panoramica: 'a', flusso: 'b', scadenze: 'c' };
       const param = new URLSearchParams(window.location.search).get('view');
       if (param && map[param]) setView(map[param]);
@@ -113,7 +108,6 @@ export default function BudgetPage() {
     } catch {/* ignore */}
   }, []);
   const setViewP = (v: 'a' | 'b' | 'c') => { setView(v); try { localStorage.setItem('sd-fin-view', v); } catch {/**/} };
-  const onBudget = (v: number) => { setBudget(v); try { localStorage.setItem('sd-fin-budget', String(v)); } catch {/**/} };
 
   // Manual bank sync (pull transactions for an already-connected account).
   const doSync = async () => {
@@ -156,17 +150,13 @@ export default function BudgetPage() {
 
   // ── derived view model ──
   const cats = toCats(data.categories);
-  const totalLimit = data.categories.reduce((s, c) => s + (c.limit ?? 0), 0);
   const spent = Math.round(data.total_expenses);
   const income = Math.round(data.total_income);
   const net = Math.round(data.net_balance);
   const balance = data.bank_balance;                 // number | null
-  const target = budget || Math.round(totalLimit) || 0;
-  const spentPct = target > 0 ? Math.min(Math.round((spent / target) * 100), 999) : 0;
   const bankConnected = data.bank_connected || balance != null;
 
-  const goalByCategory = new Map(goals.map((g) => [g.category, g.id]));
-  const categoryNames = Array.from(new Set([...data.categories.map((c) => c.category), ...goals.map((g) => g.category)]));
+  const categoryNames = Array.from(new Set(data.categories.map((c) => c.category)));
 
   const txView: TxView[] = txs.map((t, i) => ({
     id: t.id,
@@ -199,10 +189,6 @@ export default function BudgetPage() {
   };
   const onPick = (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; };
 
-  const submitGoal = async (b: { category: string; monthly_limit: number }) => {
-    await createGoal({ category: b.category, monthly_limit: b.monthly_limit, month: FIRST_DAY_ISO });
-    setGoalOpen(false); await load();
-  };
   const submitTx = async (b: { amount: number; category: string; description: string; date: string }) => {
     await createTransaction({ amount: b.amount, category: b.category, description: b.description, transaction_type: 'expense', date: b.date });
     setTxOpen(false); await load();
@@ -211,7 +197,7 @@ export default function BudgetPage() {
     if (!del) return;
     setBusy(true);
     try {
-      if (del.kind === 'goal') await deleteGoal(del.id); else await deleteTransaction(del.id);
+      await deleteTransaction(del.id);
       setDel(null); await load();
     } finally { setBusy(false); }
   };
@@ -224,14 +210,9 @@ export default function BudgetPage() {
       <header className="sd-reveal" style={{ ['--i' as string]: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap', marginBottom: 24 }}>
         <div>
           <div style={{ fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgb(16 185 129)', fontFamily: mono, marginBottom: 10, fontWeight: 600 }}>Banca · {fmtMonthLabel(data.month)}</div>
-          <h1 style={{ margin: 0, fontSize: 36, lineHeight: 1, letterSpacing: '.06em', color: 'rgb(var(--color-heading))', fontWeight: 700 }}>Budget</h1>
+          <h1 style={{ margin: 0, fontSize: 32, lineHeight: 1.05, letterSpacing: '.02em', color: 'rgb(var(--color-heading))', fontWeight: 700 }}>Gestione finanziaria</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'rgb(var(--color-tertiary))', whiteSpace: 'nowrap' }}>Budget mensile
-            <span style={{ display: 'inline-flex', alignItems: 'center', background: 'rgb(var(--color-card))', border: '1px solid rgb(var(--color-border))', borderRadius: 9, padding: '6px 10px', fontFamily: mono, color: 'rgb(var(--color-heading))' }}>€
-              <input type="number" min={0} value={budget || ''} placeholder={String(Math.round(totalLimit) || 900)} onChange={(e) => onBudget(parseInt(e.target.value, 10) || 0)} style={{ width: 58, background: 'transparent', border: 'none', outline: 'none', color: 'inherit', fontFamily: 'inherit', fontSize: 13, marginLeft: 2 }} />
-            </span>
-          </label>
           <Button size="md" variant="secondary" isLoading={importing} onClick={() => fileRef.current?.click()}><FileUp size={15} style={{ marginRight: 6 }} />Importa CSV</Button>
           {bankConnected
             ? <Button size="md" variant="secondary" isLoading={syncing} onClick={doSync}><RefreshCw size={15} style={{ marginRight: 6 }} />Sincronizza</Button>
@@ -304,19 +285,13 @@ export default function BudgetPage() {
           <Card i={3} pad="22px 24px">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
               <h3 style={h3}>Spese per categoria</h3>
-              <span style={{ fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{eur(spent)} / {eur(target)}</span>
+              <span style={{ fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{fmtMonthLabel(data.month).split(' ')[0]}</span>
             </div>
             {cats.length === 0 ? <Empty>Nessuna spesa registrata.</Empty> : (
               <>
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 20px' }}><DonutRing pct={spentPct} /></div>
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 20px' }}><CompositionDonut cats={cats} total={spent} /></div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {cats.map((c) => {
-                    const gid = goalByCategory.get(c.name);
-                    return <CatRow key={c.name} cat={c} spent={spent} gid={gid} onDel={() => gid && setDel({ kind: 'goal', id: gid, label: c.name })} />;
-                  })}
-                </div>
-                <div style={{ marginTop: 16, display: 'flex', justifyContent: 'center' }}>
-                  <Button variant="ghost" size="sm" onClick={() => setGoalOpen(true)}>+ Categoria</Button>
+                  {cats.map((c) => <CatRow key={c.name} cat={c} spent={spent} />)}
                 </div>
               </>
             )}
@@ -328,7 +303,7 @@ export default function BudgetPage() {
               <h3 style={h3}>Transazioni recenti</h3>
               <button onClick={() => setTxOpen(true)} style={{ fontSize: 12, color: 'rgb(99 102 241)', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', background: 'none', border: 'none', fontFamily: 'inherit' }}>+ Spesa</button>
             </div>
-            <TxList txs={txView} onDel={(t) => setDel({ kind: 'tx', id: t.id, label: t.label })} />
+            <TxList txs={txView} onDel={(t) => setDel({ id: t.id, label: t.label })} />
           </Card>
         </div>
       )}
@@ -369,9 +344,6 @@ export default function BudgetPage() {
       )}
 
       {/* ═══ SHEETS ═══ */}
-      <Sheet open={goalOpen} onClose={() => setGoalOpen(false)} title="Nuova categoria" subtitle="Limite di spesa mensile">
-        <GoalForm key={goalOpen ? 'g' : 'c'} onSubmit={submitGoal} onCancel={() => setGoalOpen(false)} />
-      </Sheet>
       <Sheet open={txOpen} onClose={() => setTxOpen(false)} title="Nuova spesa" subtitle="Movimento del mese">
         <TransactionForm key={txOpen ? 't' : 'c'} categoryNames={categoryNames} onSubmit={submitTx} onCancel={() => setTxOpen(false)} />
       </Sheet>
@@ -425,43 +397,44 @@ function ViewTab({ active, dot, label, onClick }: { active: boolean; dot: string
   );
 }
 
-function DonutRing({ pct }: { pct: number }) {
+/* Spending-composition ring: each category is a slice of the month's expenses. */
+function CompositionDonut({ cats, total }: { cats: Cat[]; total: number }) {
   const R = 52, C = 2 * Math.PI * R;
-  const over = pct > 100;
-  const off = C * (1 - Math.min(Math.max(pct, 0), 100) / 100);
-  const stroke = over ? 'rgb(239 68 68)' : 'rgb(99 102 241)';
+  let acc = 0;
   return (
     <div style={{ position: 'relative', width: 150, height: 150, flex: 'none' }}>
       <svg viewBox="0 0 120 120" width={150} height={150} style={{ transform: 'rotate(-90deg)' }}>
         <circle cx={60} cy={60} r={R} fill="none" stroke="rgb(var(--color-card-inner))" strokeWidth={13} />
-        <circle cx={60} cy={60} r={R} fill="none" stroke={stroke} strokeWidth={13} strokeLinecap="round" strokeDasharray={C} strokeDashoffset={off} />
+        {total > 0 && cats.map((c) => {
+          const seg = (c.amount / total) * C;
+          const off = -acc;
+          acc += seg;
+          return <circle key={c.name} cx={60} cy={60} r={R} fill="none" stroke={`rgb(${c.color})`} strokeWidth={13} strokeDasharray={`${seg} ${C - seg}`} strokeDashoffset={off} />;
+        })}
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ fontFamily: mono, fontSize: 30, fontWeight: 600, letterSpacing: '-.02em', color: over ? 'rgb(239 68 68)' : 'rgb(var(--color-heading))', lineHeight: 1 }}>{pct}%</span>
-        <span style={{ ...eyebrow, marginTop: 6 }}>budget usato</span>
+        <span style={{ fontFamily: mono, fontSize: 24, fontWeight: 600, letterSpacing: '-.02em', color: 'rgb(var(--color-heading))', lineHeight: 1 }}>{eur(total)}</span>
+        <span style={{ ...eyebrow, marginTop: 6 }}>speso</span>
       </div>
     </div>
   );
 }
 
-function CatRow({ cat, spent, gid, onDel }: { cat: Cat; spent: number; gid?: string; onDel: () => void }) {
-  const hasBudget = cat.budget > 0;
-  const over = hasBudget && cat.amount > cat.budget;
-  const frac = hasBudget ? Math.min(cat.amount / cat.budget, 1) : (spent ? cat.amount / spent : 0);
-  const remaining = cat.budget - cat.amount;
+function CatRow({ cat, spent }: { cat: Cat; spent: number }) {
+  const frac = spent ? cat.amount / spent : 0;
+  const pct = Math.round(frac * 100);
   return (
     <div className="sd-fin-legend">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 7 }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: 'rgb(var(--color-heading))', background: 'rgb(var(--color-card-inner))', border: '1px solid rgb(var(--color-border))', borderRadius: 999, padding: '3px 10px' }}>
           <span style={{ width: 7, height: 7, borderRadius: 9, background: `rgb(${cat.color})` }} />{cat.name}
         </span>
-        <span style={{ fontSize: 12, color: over ? 'rgb(248 113 113)' : 'rgb(var(--color-tertiary))', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span><span style={{ fontFamily: mono, fontWeight: 600, color: over ? 'inherit' : 'rgb(var(--color-heading))' }}>{eur(cat.amount)}</span>{hasBudget && <> · {over ? `${eur(Math.abs(remaining))} sopra` : `${eur(remaining)} rimasti`}</>}</span>
-          {gid && <button className="sd-iconbtn sd-fin-del" aria-label="Elimina categoria" onClick={onDel}><Trash2 size={12} /></button>}
+        <span style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontFamily: mono, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{eur(cat.amount)}</span> · {pct}%
         </span>
       </div>
       <div style={{ height: 8, borderRadius: 8, background: 'rgb(var(--color-card-inner))', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${(frac * 100).toFixed(0)}%`, borderRadius: 8, background: over ? 'rgb(239 68 68)' : `rgb(${cat.color})` }} />
+        <div style={{ height: '100%', width: `${(frac * 100).toFixed(0)}%`, borderRadius: 8, background: `rgb(${cat.color})` }} />
       </div>
     </div>
   );
@@ -553,27 +526,6 @@ function FormActions({ onCancel, submitting }: { onCancel: () => void; submittin
       <Button type="button" variant="secondary" onClick={onCancel} disabled={submitting}>Annulla</Button>
       <Button type="submit" variant="primary" isLoading={submitting}>Aggiungi</Button>
     </div>
-  );
-}
-function GoalForm({ onSubmit, onCancel }: { onSubmit: (b: { category: string; monthly_limit: number }) => Promise<void>; onCancel: () => void }) {
-  const [category, setCategory] = useState('');
-  const [limit, setLimit] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!category.trim() || !limit) { setError('Nome categoria e limite sono obbligatori.'); return; }
-    setSubmitting(true); setError('');
-    try { await onSubmit({ category: category.trim(), monthly_limit: Number(limit) || 0 }); }
-    catch { setError('Salvataggio non riuscito. Riprova.'); setSubmitting(false); }
-  };
-  return (
-    <form onSubmit={submit}>
-      <Field label="Nome categoria"><input className="sd-input" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Spesa" autoFocus /></Field>
-      <Field label="Limite mensile (€)"><input className="sd-input" type="number" min={0} step="0.01" value={limit} onChange={(e) => setLimit(e.target.value)} placeholder="300" /></Field>
-      {error && <p style={errStyle}>{error}</p>}
-      <FormActions onCancel={onCancel} submitting={submitting} />
-    </form>
   );
 }
 function TransactionForm({ categoryNames, onSubmit, onCancel }: { categoryNames: string[]; onSubmit: (b: { amount: number; category: string; description: string; date: string }) => Promise<void>; onCancel: () => void }) {
