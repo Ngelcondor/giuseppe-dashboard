@@ -78,13 +78,27 @@ export async function getStudyOverview(): Promise<StudyOverview> {
 // plan + modules live server-side (one per user); progress starts at zero on
 // reset and Obsidian links are empty until the user pastes them.
 
-export interface StudyModule {
+export interface StudyModuleSection {
   id: string;
   order_index: number;
   title: string;
   completed: boolean;
   completed_at: string | null;
   obsidian_link: string | null;
+}
+
+export interface StudyModule {
+  id: string;
+  order_index: number;
+  title: string;
+  brief: string | null;
+  htb_url: string | null;
+  completed: boolean;
+  completed_at: string | null;
+  obsidian_link: string | null;
+  sections: StudyModuleSection[];
+  sections_done: number;
+  sections_total: number;
 }
 
 export interface StudyPlan {
@@ -94,6 +108,8 @@ export interface StudyPlan {
   modules: StudyModule[];
   completed_count: number;
   total_count: number;
+  sections_done: number;
+  sections_total: number;
 }
 
 // Real HTB profile/stats, or an honest not-connected payload. Never fabricated.
@@ -123,13 +139,22 @@ export async function resetStudyPlan(startDate: string): Promise<StudyPlan> {
   return data;
 }
 
-// Update a module's completion flag and/or Obsidian link (editor-only).
-// Pass obsidian_link: '' to clear it.
+// Update a module's completion, Obsidian link and/or HTB URL (editor-only).
+// completed cascades to all sections. Pass '' to clear a link field.
 export async function updateStudyModule(
+  id: string,
+  body: { completed?: boolean; obsidian_link?: string; htb_url?: string },
+): Promise<StudyModule> {
+  const { data } = await api.put<StudyModule>(`/study/modules/${id}`, body);
+  return data;
+}
+
+// Update a single subchapter; returns the refreshed parent module (editor-only).
+export async function updateStudySection(
   id: string,
   body: { completed?: boolean; obsidian_link?: string },
 ): Promise<StudyModule> {
-  const { data } = await api.put<StudyModule>(`/study/modules/${id}`, body);
+  const { data } = await api.put<StudyModule>(`/study/sections/${id}`, body);
   return data;
 }
 

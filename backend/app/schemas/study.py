@@ -33,9 +33,9 @@ class StudyBatchEntry(StudyTaskUpsert):
     task_id: str
 
 
-# ── CPTS plan (server-persisted modules) ──────────────────────────────────────
-class StudyModuleOut(BaseModel):
-    """A single CPTS module surfaced to the Studio page."""
+# ── CPTS plan (server-persisted modules + sections) ───────────────────────────
+class StudyModuleSectionOut(BaseModel):
+    """A single subchapter (HTB section) inside a module."""
 
     id: UUID
     order_index: int
@@ -48,12 +48,40 @@ class StudyModuleOut(BaseModel):
         from_attributes = True
 
 
-class StudyModuleUpdate(BaseModel):
-    """Editable per-module fields. Omitted fields keep their current value."""
+class StudyModuleSectionUpdate(BaseModel):
+    """Editable per-section fields. Omitted fields keep their current value."""
 
     completed: Optional[bool] = None
     # Empty string clears the link; null leaves it unchanged.
     obsidian_link: Optional[str] = None
+
+
+class StudyModuleOut(BaseModel):
+    """A single CPTS module surfaced to the Studio page, with its sections."""
+
+    id: UUID
+    order_index: int
+    title: str
+    brief: Optional[str] = None
+    htb_url: Optional[str] = None
+    completed: bool
+    completed_at: Optional[datetime] = None
+    obsidian_link: Optional[str] = None
+    sections: List[StudyModuleSectionOut] = []
+    sections_done: int = 0
+    sections_total: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class StudyModuleUpdate(BaseModel):
+    """Editable per-module fields. Omitted fields keep their current value."""
+
+    completed: Optional[bool] = None
+    # Empty string clears the value; null leaves it unchanged.
+    obsidian_link: Optional[str] = None
+    htb_url: Optional[str] = None
 
 
 class StudyPlanOut(BaseModel):
@@ -63,8 +91,10 @@ class StudyPlanOut(BaseModel):
     current_week: int
     total_weeks: int
     modules: List[StudyModuleOut]
-    completed_count: int
-    total_count: int
+    completed_count: int            # modules fully completed
+    total_count: int               # modules
+    sections_done: int = 0         # subchapters completed across all modules
+    sections_total: int = 0        # subchapters across all modules
 
 
 class StudyResetRequest(BaseModel):
