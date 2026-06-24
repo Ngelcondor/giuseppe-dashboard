@@ -23,6 +23,7 @@ from app.schemas.smarthome import (
     HueLight, HueLightsResponse, HueLightUpdate,
     ShellyDevice, ShellyDevicesResponse,
     ShellyConsumptionDevice, ShellyConsumptionResponse,
+    ShellyRelayUpdate, ShellyTimeseriesDevice, ShellyTimeseriesResponse,
 )
 
 router = APIRouter(prefix="/smarthome", tags=["smarthome"])
@@ -134,6 +135,123 @@ async def shelly_devices(
         devices=points,
         total_power_w=round(sum(p.power_w for p in points), 1),
         total_kwh=round(sum(p.total_kwh for p in points), 3),
+    )
+
+
+@router.put("/shelly/devices/{device_id}", response_model=ShellyDevice, dependencies=[Depends(require_editor)])
+async def update_shelly_relay(
+    device_id: str,
+    body: ShellyRelayUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ShellyDevice:
+    """Switch a Shelly relay on/off, then return the device's refreshed status."""
+    cfg = await get_setting(db, current_user["sub"], SHELLY_KEY)
+    if not _shelly_ready(cfg):
+        raise HTTPException(status_code=409, detail="Shelly non configurato")
+
+    try:
+        await sh.shelly_set_relay(cfg["auth_key"], cfg["server"], device_id, body.channel, body.output)
+        devices = await sh.shelly_devices(cfg["auth_key"], cfg["server"])
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"Errore Shelly Cloud: {exc}")
+
+    updated = next((d for d in devices if str(d["device_id"]) == str(device_id)), None)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Dispositivo non trovato")
+    return ShellyDevice(**updated)
+
+
+@router.get("/shelly/timeseries", response_model=ShellyTimeseriesResponse)
+async def shelly_timeseries(
+    days: int = Query(7, ge=1, le=14),
+    tz_offset: int = Query(0, ge=-840, le=840),  # minutes to ADD to UTC to get local time
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ShellyTimeseriesResponse:
+    """Per-hour household + per-device kWh, derived from the cumulative-counter
+    snapshots. Energy in an hour = positive delta between consecutive snapshots,
+    attributed to the later snapshot's LOCAL hour bucket (tz_offset). History
+    accumulates from the first snapshot, so sparse windows read mostly 0 —
+    samples/data_since make that explicit. Never fabricated.
+    """
+    cfg = await get_setting(db, current_user["sub"], SHELLY_KEY)
+    if not _shelly_ready(cfg):
+        return ShellyTimeseriesResponse(connected=False)
+
+    uid = current_user["sub"]
+    offset = timedelta(minutes=tz_offset)
+    now_local = datetime.utcnow() + offset
+    today_local = datetime(now_local.year, now_local.month, now_local.day)
+    window_start_local = today_local - timedelta(days=days - 1)
+    # Fetch from window start (in UTC) minus a small lookback so the first hour
+    # has an anchor snapshot just before it.
+    fetch_from_utc = (window_start_local - offset) - timedelta(hours=2)
+
+    result = await db.execute(
+        select(ShellyReading)
+        .where(
+            ShellyReading.user_id == uid,
+            ShellyReading.recorded_at >= fetch_from_utc,
+        )
+        .order_by(ShellyReading.device_id, ShellyReading.recorded_at)
+    )
+    rows = result.scalars().all()
+
+    dates = [(window_start_local + timedelta(days=i)).date() for i in range(days)]
+    date_index = {d: i for i, d in enumerate(dates)}
+    today_idx = days - 1
+
+    household: List[List[float]] = [[0.0] * 24 for _ in range(days)]
+    by_device: Dict[str, list] = {}
+    names: Dict[str, str] = {}
+    for r in rows:
+        by_device.setdefault(r.device_id, []).append(r)
+        names[r.device_id] = r.name or r.device_id
+
+    samples = 0
+    device_today: Dict[str, List[float]] = {}
+    for dev_id, readings in by_device.items():
+        hours_today = [0.0] * 24
+        for a, b in zip(readings, readings[1:]):
+            delta = float(b.total_kwh) - float(a.total_kwh)
+            if delta <= 0:  # counter reset / no change
+                continue
+            b_local = b.recorded_at + offset
+            di = date_index.get(b_local.date())
+            if di is None:
+                continue
+            household[di][b_local.hour] += delta
+            if di == today_idx:
+                hours_today[b_local.hour] += delta
+            samples += 1
+        device_today[dev_id] = hours_today
+
+    household = [[round(v, 4) for v in row] for row in household]
+    devices_today = [
+        ShellyTimeseriesDevice(
+            device_id=dev, name=names.get(dev, dev), hours=[round(v, 4) for v in hrs],
+        )
+        for dev, hrs in device_today.items()
+    ]
+    devices_today.sort(key=lambda d: d.name.lower())
+
+    first = await db.execute(
+        select(ShellyReading.recorded_at)
+        .where(ShellyReading.user_id == uid)
+        .order_by(ShellyReading.recorded_at)
+        .limit(1)
+    )
+    data_since = first.scalars().first()
+
+    return ShellyTimeseriesResponse(
+        connected=True,
+        days=days,
+        dates=[d.isoformat() for d in dates],
+        household_hourly=household,
+        devices_today=devices_today,
+        data_since=data_since.isoformat() if data_since else None,
+        samples=samples,
     )
 
 

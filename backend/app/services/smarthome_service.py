@@ -146,6 +146,37 @@ async def shelly_devices(auth_key: str, server: str) -> List[Dict[str, Any]]:
     return out
 
 
+async def shelly_set_relay(
+    auth_key: str, server: str, device_id: str, channel: int, turn_on: bool,
+) -> None:
+    """Switch a Shelly relay on/off via the Cloud control API.
+
+    POST {server}/device/relay/control  (auth_key, id, channel, turn). Works for
+    Gen1 relays and Gen2/3 switch components addressed by `channel`. Raises on
+    transport/API failure (handled by caller). Nothing fabricated.
+    """
+    base = server.rstrip("/")
+    if not base.startswith("http"):
+        base = f"https://{base}"
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            f"{base}/device/relay/control",
+            data={
+                "auth_key": auth_key,
+                "id": device_id,
+                "channel": channel,
+                "turn": "on" if turn_on else "off",
+            },
+            timeout=SHELLY_TIMEOUT,
+        )
+        resp.raise_for_status()
+        payload = resp.json()
+
+    if not payload.get("isok", False):
+        raise ValueError(str(payload.get("errors") or "Shelly Cloud error"))
+
+
 def consumption_kwh(readings, period_start) -> float:
     """Energy consumed in [period_start, now] from cumulative snapshots.
 
