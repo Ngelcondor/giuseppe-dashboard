@@ -51,7 +51,7 @@ const ALL_SECTIONS: DockItem[] = [
   { label: 'Calendario',   href: '/dashboard/calendar',  icon: Calendar },
   { label: 'CTF',          href: '/dashboard/ctf',       icon: Shield },
   { label: 'Cyber Feed',   href: '/dashboard/feed',      icon: Rss },
-  { label: 'Budget',       href: '/dashboard/budget',    icon: Wallet },
+  { label: 'Finanze',      href: '/dashboard/budget',    icon: Wallet },
   { label: 'Pasti',        href: '/dashboard/meals',     icon: Utensils },
   { label: 'Sensoriale',   href: '/dashboard/sensory',   icon: Zap },
   { label: 'Impostazioni', href: '/dashboard/settings',  icon: Settings },

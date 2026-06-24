@@ -67,3 +67,27 @@ class ShellyConsumptionResponse(BaseModel):
     data_since: Optional[str] = None  # ISO ts of the earliest snapshot (honesty)
     samples: int = 0                  # snapshots in the window
     error: Optional[str] = None
+
+
+# ── Shelly relay control ──
+class ShellyRelayUpdate(BaseModel):
+    output: bool       # desired relay state
+    channel: int = 0   # switch/relay channel (0 for single-output plugs)
+
+
+# ── Shelly hourly timeseries (derived from the cumulative-counter snapshots) ──
+class ShellyTimeseriesDevice(BaseModel):
+    device_id: str
+    name: str
+    hours: List[float]  # 24 hourly kWh values for the local "today"
+
+
+class ShellyTimeseriesResponse(BaseModel):
+    connected: bool
+    days: int = 0
+    dates: List[str] = []                      # local ISO dates, oldest→today (len == days)
+    household_hourly: List[List[float]] = []   # [day][hour] household kWh, local time
+    devices_today: List[ShellyTimeseriesDevice] = []
+    data_since: Optional[str] = None
+    samples: int = 0                           # positive hourly deltas placed in-window
+    error: Optional[str] = None

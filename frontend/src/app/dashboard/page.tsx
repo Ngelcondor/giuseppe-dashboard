@@ -172,9 +172,8 @@ export default function HomePage() {
 
   // ── Stats ───────────────────────────────────────────────────────────────────
   const cfuPct = profilo.cfu_totali ? Math.round((profilo.cfu_superati / profilo.cfu_totali) * 100) : 0;
-  const budgetLimit = budget.categories.reduce((s, c) => s + (c.limit ?? 0), 0);
   const budgetSpent = budget.total_expenses;
-  const budgetPct = budgetLimit ? Math.min(100, Math.round((budgetSpent / budgetLimit) * 100)) : 0;
+  const topCat = [...budget.categories].sort((a, b) => b.spent - a.spent)[0] ?? null;
   const studioHint = !today || today.isRest ? 'Riposo' : totalCount === 0 ? 'Nessun piano' : doneCount >= totalCount ? 'Tutto fatto ✓' : 'Continua così';
   const studioHintColor = !today || today.isRest || totalCount === 0 ? 'rgb(var(--color-tertiary))' : `rgb(${EMERALD})`;
 
@@ -360,10 +359,10 @@ export default function HomePage() {
           </div>
         </div>
         <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ ...statLabel, marginBottom: 7 }}>Budget {budgetMonthLabel}</div>
-          <div style={statValue}>€{Math.round(budgetSpent)}<span style={statUnit}> / {Math.round(budgetLimit)}</span></div>
-          <div style={{ marginTop: 10, height: 5, borderRadius: 5, background: 'rgb(var(--color-card-inner))', overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${budgetPct}%`, borderRadius: 5, background: `rgb(${EMERALD})` }} />
+          <div style={{ ...statLabel, marginBottom: 7 }}>Speso · {budgetMonthLabel}</div>
+          <div style={statValue}>€{Math.round(budgetSpent)}</div>
+          <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))', marginTop: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {topCat ? `${topCat.category} · €${Math.round(topCat.spent)}` : 'Nessuna spesa'}
           </div>
         </div>
         <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>

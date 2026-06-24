@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Lightbulb, Zap, Settings as SettingsIcon, RefreshCw } from 'lucide-react';
+import Link from 'next/link';
+import { Lightbulb, Zap, Settings as SettingsIcon, RefreshCw, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { getMe } from '@/services/settingsService';
 import {
@@ -189,9 +190,14 @@ function ShellySection() {
         <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'rgb(var(--color-heading))', display: 'flex', alignItems: 'center', gap: 9 }}>
           <Zap size={18} style={{ color: 'rgb(99 102 241)' }} /> Consumi · Shelly
         </h3>
-        {resp?.connected && !resp.error && (
-          <button className="sd-iconbtn" aria-label="Aggiorna" onClick={load}><RefreshCw size={15} /></button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Link href="/dashboard/smart-home/consumi" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 500, color: 'rgb(99 102 241)', textDecoration: 'none' }}>
+            Consumi live <ArrowRight size={14} />
+          </Link>
+          {resp?.connected && !resp.error && (
+            <button className="sd-iconbtn" aria-label="Aggiorna" onClick={load}><RefreshCw size={15} /></button>
+          )}
+        </div>
       </div>
 
       {!resp || loading ? (

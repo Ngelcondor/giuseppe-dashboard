@@ -83,3 +83,39 @@ export async function getShellyConsumption(period: ShellyPeriod): Promise<Shelly
   });
   return data;
 }
+
+// ── Shelly relay control (switch a plug on/off via the Cloud control API) ──
+export async function setShellyRelay(
+  deviceId: string,
+  output: boolean,
+  channel = 0,
+): Promise<ShellyDevice> {
+  const { data } = await api.put<ShellyDevice>(`/smarthome/shelly/devices/${deviceId}`, { output, channel });
+  return data;
+}
+
+// ── Shelly hourly timeseries (per-hour kWh, derived from snapshots) ──
+export interface ShellyTimeseriesDevice {
+  device_id: string;
+  name: string;
+  hours: number[]; // 24 hourly kWh values for the local "today"
+}
+export interface ShellyTimeseriesResponse {
+  connected: boolean;
+  days: number;
+  dates: string[];               // local ISO dates, oldest→today
+  household_hourly: number[][];  // [day][hour] household kWh, local time
+  devices_today: ShellyTimeseriesDevice[];
+  data_since?: string | null;
+  samples: number;
+  error?: string | null;
+}
+export async function getShellyTimeseries(days = 7): Promise<ShellyTimeseriesResponse> {
+  // getTimezoneOffset() is minutes to ADD to local to reach UTC; the API wants
+  // minutes to ADD to UTC to reach local, hence the sign flip.
+  const tz_offset = -new Date().getTimezoneOffset();
+  const { data } = await api.get<ShellyTimeseriesResponse>('/smarthome/shelly/timeseries', {
+    params: { days, tz_offset },
+  });
+  return data;
+}
