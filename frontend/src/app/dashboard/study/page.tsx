@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   Link2, ExternalLink, RotateCcw, Trophy, Award, Server, Cpu, Plug,
-  CheckCircle2, Circle, ChevronDown, ChevronRight, ArrowRight, BookOpen, Pencil,
+  CheckCircle2, Circle, ChevronDown, ChevronRight, ArrowRight, BookOpen, Pencil, FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Sheet, Field } from '@/components/sd/FormSheet';
@@ -29,6 +29,10 @@ const card: React.CSSProperties = {
   boxShadow: '0 1px 2px rgba(17,17,26,.04)',
 };
 const DEFAULT_START = '2026-06-22';
+// Obsidian desktop deep-link. Opens the app on this vault; change the name if
+// your vault is registered under a different label in Obsidian.
+const OBSIDIAN_VAULT = 'oscp-vault';
+const OBSIDIAN_APP = `obsidian://open?vault=${encodeURIComponent(OBSIDIAN_VAULT)}`;
 const fmtDate = (iso: string) =>
   new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -145,11 +149,16 @@ export default function StudyPage() {
           <h1 style={{ margin: 0, fontSize: 38, lineHeight: 1.05, letterSpacing: '-.02em', color: 'rgb(var(--color-heading))', fontWeight: 600 }}>Percorso <span style={{ fontFamily: "'Fraunces',serif", fontStyle: 'italic', fontWeight: 500 }}>CPTS</span></h1>
           <p style={{ margin: '11px 0 0', fontSize: 15, color: 'rgb(var(--color-tertiary))' }}>{subtitle}</p>
         </div>
-        {isEditor && hasPlan && (
-          <Button size="sm" variant="secondary" onClick={() => setResetOpen(true)}>
-            <RotateCcw size={15} style={{ marginRight: 6 }} />Reset percorso
-          </Button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <a href={OBSIDIAN_APP} style={{ textDecoration: 'none' }}>
+            <Button size="sm" variant="secondary"><FileText size={15} style={{ marginRight: 6 }} />Apri Obsidian</Button>
+          </a>
+          {isEditor && hasPlan && (
+            <Button size="sm" variant="secondary" onClick={() => setResetOpen(true)}>
+              <RotateCcw size={15} style={{ marginRight: 6 }} />Reset percorso
+            </Button>
+          )}
+        </div>
       </header>
 
       {errored && (
