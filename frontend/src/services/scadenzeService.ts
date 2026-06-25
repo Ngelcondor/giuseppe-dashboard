@@ -122,6 +122,8 @@ export interface DeadlineInput {
   installments_paid?: number | null;
   recurrence_interval?: RecurrenceInterval | null;
   amount?: number | null;
+  // Paid/done flag (single deadlines + subscriptions). The PUT accepts it.
+  is_completed?: boolean;
 }
 
 export async function createDeadline(b: DeadlineInput): Promise<Deadline> {
