@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Search, Plus, Pencil, Trash2, Check } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, CheckCircle2, Circle } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/sd/FormSheet';
@@ -78,7 +78,7 @@ export function ScadenzeMese() {
   const [ed, setEd] = useState<{ open: boolean; editing: Deadline | null }>({ open: false, editing: null });
   const [del, setDel] = useState<{ id: string; label: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [payingId, setPayingId] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try { setItems(await getScadenze()); } catch {/* keep */}
@@ -95,7 +95,29 @@ export function ScadenzeMese() {
     setBusy(true);
     try { await deleteDeadline(del.id); setDel(null); await load(); } finally { setBusy(false); }
   };
-  const onPay = async (id: string) => { setPayingId(id); try { await payInstallment(id); await load(); } finally { setPayingId(null); } };
+  // Mark a deadline paid via the left checkbox. Single/subscription toggle the
+  // is_completed flag; installments pay the next rata (fully paid → done).
+  const patchItem = (id: string, raw: Deadline) =>
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, raw } : it)));
+
+  const onCheck = async (it: ScadenzaItem) => {
+    if (it.source !== 'deadline' || isGuest || !it.raw) return;
+    const d = it.raw;
+    const isInst = d.recurrence_type === 'installments';
+    const paidN = d.installments_paid ?? 0;
+    const total = d.installments_total ?? 0;
+    if (isInst && total > 0 && paidN >= total) return; // fully paid → undo via edit
+    setSavingId(it.id);
+    try {
+      if (isInst) {
+        patchItem(it.id, await payInstallment(it.id));
+      } else {
+        const next = !d.is_completed;
+        patchItem(it.id, { ...d, is_completed: next }); // optimistic
+        patchItem(it.id, await updateDeadline(it.id, { is_completed: next }));
+      }
+    } catch { await load(); } finally { setSavingId(null); }
+  };
 
   // filter → group by month (ascending)
   const groups = useMemo(() => {
@@ -157,28 +179,49 @@ export function ScadenzeMese() {
             {g.list.map((it, idx) => {
               const d = it.raw;
               const isInstallment = it.source === 'deadline' && d?.recurrence_type === 'installments';
-              const allPaid = isInstallment && (d!.installments_paid ?? 0) >= (d!.installments_total ?? 0);
+              const paidN = d?.installments_paid ?? 0;
+              const total = d?.installments_total ?? 0;
+              const allPaid = isInstallment && total > 0 && paidN >= total;
+              const paid = it.source === 'deadline' && (!!d?.is_completed || allPaid);
+              const interactive = it.source === 'deadline' && !isGuest && !(isInstallment && allPaid);
               const secondary = amountLine(d) || it.sottotitolo;
               return (
-                <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 0', borderTop: idx === 0 ? undefined : '1px solid rgb(var(--color-border))' }}>
-                  <div style={{ width: 50, flex: 'none', textAlign: 'center' }}>
+                <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderTop: idx === 0 ? undefined : '1px solid rgb(var(--color-border))' }}>
+                  {/* Paid checkbox — deadlines only; academic rows keep the slot empty for alignment */}
+                  <div style={{ width: 22, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {it.source === 'deadline' && (
+                      <button
+                        type="button"
+                        onClick={() => onCheck(it)}
+                        disabled={!interactive || savingId === it.id}
+                        className={interactive ? 'sd-press' : undefined}
+                        aria-label={paid ? 'Segna non pagata' : isInstallment ? 'Segna rata pagata' : 'Segna pagata'}
+                        title={paid ? 'Pagata' : isInstallment ? `Paga rata ${Math.min(paidN + 1, total)}/${total}` : 'Segna pagata'}
+                        style={{ border: 'none', background: 'transparent', padding: 0, display: 'flex', cursor: interactive ? 'pointer' : 'default', color: paid ? 'rgb(16 185 129)' : 'rgb(var(--color-muted))', opacity: savingId === it.id ? 0.5 : 1 }}
+                      >
+                        {paid ? <CheckCircle2 size={18} /> : <Circle size={18} />}
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ width: 46, flex: 'none', textAlign: 'center', opacity: paid ? 0.55 : 1 }}>
                     <div style={{ fontFamily: mono, fontSize: 20, fontWeight: 700, color: dayColor(it), lineHeight: 1 }}>{dayNum(it.data)}</div>
                     <div style={{ fontSize: 10, letterSpacing: '.1em', color: 'rgb(var(--color-tertiary))', textTransform: 'uppercase' }}>{monthAbbr(it.data)}</div>
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ flex: 1, minWidth: 0, opacity: paid ? 0.6 : 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 14.5, fontWeight: 500, color: 'rgb(var(--color-heading))' }}>{it.titolo}</span>
+                      <span style={{ fontSize: 14.5, fontWeight: 500, color: paid ? 'rgb(var(--color-tertiary))' : 'rgb(var(--color-heading))', textDecoration: paid ? 'line-through' : 'none' }}>{it.titolo}</span>
                       {it.source === 'academic' && <span style={{ fontSize: 9.5, letterSpacing: '.1em', fontWeight: 600, color: 'rgb(var(--color-muted))', fontFamily: mono, background: 'rgb(128 128 128 / 0.12)', padding: '2px 6px', borderRadius: 5 }}>UOC</span>}
-                      {recurrenceBadge(d)}
+                      {paid
+                        ? <span style={{ flex: 'none', width: 'max-content', fontSize: 10.5, fontWeight: 600, color: 'rgb(16 185 129)', background: 'rgb(16 185 129 / 0.12)', border: '1px solid rgb(16 185 129 / 0.3)', borderRadius: 6, padding: '1px 7px' }}>Pagata</span>
+                        : recurrenceBadge(d)}
                     </div>
                     {secondary && <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{secondary}</div>}
                   </div>
                   {itemAmount(it) != null
-                    ? <span style={{ flex: 'none', fontFamily: mono, fontSize: 13.5, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{fmtEur(itemAmount(it)!)}</span>
+                    ? <span style={{ flex: 'none', fontFamily: mono, fontSize: 13.5, fontWeight: 600, color: paid ? 'rgb(var(--color-muted))' : 'rgb(var(--color-heading))', textDecoration: paid ? 'line-through' : 'none' }}>{fmtEur(itemAmount(it)!)}</span>
                     : daysBadge(it)}
                   {it.source === 'deadline' && !isGuest && (
                     <div style={{ display: 'flex', gap: 2, flex: 'none' }}>
-                      {isInstallment && !allPaid && <button className="sd-iconbtn" aria-label="Segna rata pagata" title="Segna rata pagata" disabled={payingId === it.id} onClick={() => onPay(it.id)}><Check size={14} /></button>}
                       <button className="sd-iconbtn" aria-label="Modifica" onClick={() => setEd({ open: true, editing: it.raw ?? null })}><Pencil size={14} /></button>
                       <button className="sd-iconbtn" aria-label="Elimina" onClick={() => setDel({ id: it.id, label: it.titolo })}><Trash2 size={14} /></button>
                     </div>
