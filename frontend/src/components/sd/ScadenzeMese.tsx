@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/sd/FormSheet';
 import { DeadlineForm, INTERVAL_LABEL, toAmount, fmtEur } from '@/components/sd/DeadlineForm';
 import {
-  getScadenze, createDeadline, updateDeadline, deleteDeadline, payInstallment, getCurrentUserRole,
+  getScadenze, createDeadline, updateDeadline, deleteDeadline, getCurrentUserRole,
   type ScadenzaItem, type Deadline, type DeadlineInput,
 } from '@/services/scadenzeService';
 
@@ -95,28 +95,20 @@ export function ScadenzeMese() {
     setBusy(true);
     try { await deleteDeadline(del.id); setDel(null); await load(); } finally { setBusy(false); }
   };
-  // Mark a deadline paid via the left checkbox. Single/subscription toggle the
-  // is_completed flag; installments pay the next rata (fully paid → done).
   const patchItem = (id: string, raw: Deadline) =>
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, raw } : it)));
 
+  // Binary, fully reversible: the checkbox just toggles `is_completed` for any
+  // deadline (single, subscription or installment). Rata counts stay editable
+  // in the form; the checkbox never silently advances or loses progress.
   const onCheck = async (it: ScadenzaItem) => {
     if (it.source !== 'deadline' || isGuest || !it.raw) return;
-    const d = it.raw;
-    const isInst = d.recurrence_type === 'installments';
-    const paidN = d.installments_paid ?? 0;
-    const total = d.installments_total ?? 0;
-    if (isInst && total > 0 && paidN >= total) return; // fully paid → undo via edit
+    const next = !it.raw.is_completed;
     setSavingId(it.id);
-    try {
-      if (isInst) {
-        patchItem(it.id, await payInstallment(it.id));
-      } else {
-        const next = !d.is_completed;
-        patchItem(it.id, { ...d, is_completed: next }); // optimistic
-        patchItem(it.id, await updateDeadline(it.id, { is_completed: next }));
-      }
-    } catch { await load(); } finally { setSavingId(null); }
+    patchItem(it.id, { ...it.raw, is_completed: next }); // optimistic
+    try { patchItem(it.id, await updateDeadline(it.id, { is_completed: next })); }
+    catch { await load(); }
+    finally { setSavingId(null); }
   };
 
   // filter → group by month (ascending)
@@ -178,12 +170,8 @@ export function ScadenzeMese() {
           <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: gi + 1, ...card, padding: '6px 22px' }}>
             {g.list.map((it, idx) => {
               const d = it.raw;
-              const isInstallment = it.source === 'deadline' && d?.recurrence_type === 'installments';
-              const paidN = d?.installments_paid ?? 0;
-              const total = d?.installments_total ?? 0;
-              const allPaid = isInstallment && total > 0 && paidN >= total;
-              const paid = it.source === 'deadline' && (!!d?.is_completed || allPaid);
-              const interactive = it.source === 'deadline' && !isGuest && !(isInstallment && allPaid);
+              const paid = it.source === 'deadline' && !!d?.is_completed;
+              const interactive = it.source === 'deadline' && !isGuest;
               const secondary = amountLine(d) || it.sottotitolo;
               return (
                 <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderTop: idx === 0 ? undefined : '1px solid rgb(var(--color-border))' }}>
@@ -195,8 +183,8 @@ export function ScadenzeMese() {
                         onClick={() => onCheck(it)}
                         disabled={!interactive || savingId === it.id}
                         className={interactive ? 'sd-press' : undefined}
-                        aria-label={paid ? 'Segna non pagata' : isInstallment ? 'Segna rata pagata' : 'Segna pagata'}
-                        title={paid ? 'Pagata' : isInstallment ? `Paga rata ${Math.min(paidN + 1, total)}/${total}` : 'Segna pagata'}
+                        aria-label={paid ? 'Segna come non pagata' : 'Segna come pagata'}
+                        title={paid ? 'Pagata · clic per annullare' : 'Segna come pagata'}
                         style={{ border: 'none', background: 'transparent', padding: 0, display: 'flex', cursor: interactive ? 'pointer' : 'default', color: paid ? 'rgb(16 185 129)' : 'rgb(var(--color-muted))', opacity: savingId === it.id ? 0.5 : 1 }}
                       >
                         {paid ? <CheckCircle2 size={18} /> : <Circle size={18} />}
