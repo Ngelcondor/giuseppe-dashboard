@@ -57,14 +57,15 @@ export function Abbonamenti() {
     try { await deleteDeadline(del.id); setDel(null); await load(); } finally { setBusy(false); }
   };
 
-  // view model: amount + monthly-normalized cost, sorted by monthly cost desc
+  // view model: amount + monthly-normalized cost, ordered by charge day-of-month
+  // (when in the month the money leaves), then by soonest next charge.
   const rows = useMemo(() => subs
     .map((d) => {
       const interval = (d.recurrence_interval ?? 'monthly') as RecurrenceInterval;
       const amt = toAmount(d.amount) ?? 0;
       return { d, interval, amt, monthly: amt / INTERVAL_MONTHS[interval], next: nextCharge(d.due_date, interval) };
     })
-    .sort((a, b) => b.monthly - a.monthly), [subs]);
+    .sort((a, b) => a.next.getDate() - b.next.getDate() || a.next.getTime() - b.next.getTime()), [subs]);
 
   const monthlyTotal = rows.reduce((s, r) => s + r.monthly, 0);
   const yearlyTotal = monthlyTotal * 12;
