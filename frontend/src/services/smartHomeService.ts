@@ -94,6 +94,15 @@ export async function setShellyRelay(
   return data;
 }
 
+// ── Shelly device alias (custom display name; empty name clears it) ──
+export async function setShellyDeviceName(
+  deviceId: string,
+  name: string,
+): Promise<{ device_id: string; name: string }> {
+  const { data } = await api.put<{ device_id: string; name: string }>(`/smarthome/shelly/devices/${deviceId}/alias`, { name });
+  return data;
+}
+
 // ── Shelly hourly timeseries (per-hour kWh, derived from snapshots) ──
 export interface ShellyTimeseriesDevice {
   device_id: string;

@@ -75,6 +75,16 @@ class ShellyRelayUpdate(BaseModel):
     channel: int = 0   # switch/relay channel (0 for single-output plugs)
 
 
+# ── Shelly device alias (custom display name) ──
+class ShellyAliasUpdate(BaseModel):
+    name: str  # custom label; empty string clears the alias (revert to Shelly's name)
+
+
+class ShellyAliasResponse(BaseModel):
+    device_id: str
+    name: str  # applied name ('' when cleared)
+
+
 # ── Shelly hourly timeseries (derived from the cumulative-counter snapshots) ──
 class ShellyTimeseriesDevice(BaseModel):
     device_id: str
