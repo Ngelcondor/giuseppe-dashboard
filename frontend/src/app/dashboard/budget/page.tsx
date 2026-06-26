@@ -12,6 +12,7 @@ import {
   type Transaction, type ScadenzaPreview, type Institution,
 } from '@/services/budgetService';
 import { ScadenzeMese } from '@/components/sd/ScadenzeMese';
+import { Abbonamenti } from '@/components/sd/Abbonamenti';
 
 /* ── Gestione finanziaria / Banking (design Banking.dc.html) ───────────────────
    Clean banking page wired to real data: account balance + income/expenses/net,
@@ -71,7 +72,7 @@ export default function BudgetPage() {
   const [data, setData] = useState<BudgetDashboard>(FALLBACK);
   const [txs, setTxs] = useState<Transaction[]>([]);
 
-  const [view, setView] = useState<'a' | 'b' | 'c'>('a');
+  const [view, setView] = useState<'a' | 'b' | 'c' | 'd'>('a');
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [importErr, setImportErr] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
@@ -101,13 +102,13 @@ export default function BudgetPage() {
   // restore prefs (active tab)
   useEffect(() => {
     try {
-      const map: Record<string, 'a' | 'b' | 'c'> = { a: 'a', b: 'b', c: 'c', panoramica: 'a', flusso: 'b', scadenze: 'c' };
+      const map: Record<string, 'a' | 'b' | 'c' | 'd'> = { a: 'a', b: 'b', c: 'c', d: 'd', panoramica: 'a', flusso: 'b', scadenze: 'c', abbonamenti: 'd' };
       const param = new URLSearchParams(window.location.search).get('view');
       if (param && map[param]) setView(map[param]);
-      else { const v = localStorage.getItem('sd-fin-view'); if (v === 'a' || v === 'b' || v === 'c') setView(v); }
+      else { const v = localStorage.getItem('sd-fin-view'); if (v === 'a' || v === 'b' || v === 'c' || v === 'd') setView(v); }
     } catch {/* ignore */}
   }, []);
-  const setViewP = (v: 'a' | 'b' | 'c') => { setView(v); try { localStorage.setItem('sd-fin-view', v); } catch {/**/} };
+  const setViewP = (v: 'a' | 'b' | 'c' | 'd') => { setView(v); try { localStorage.setItem('sd-fin-view', v); } catch {/**/} };
 
   // Manual bank sync (pull transactions for an already-connected account).
   const doSync = async () => {
@@ -271,11 +272,12 @@ export default function BudgetPage() {
       )}
 
       {/* ═══ TABS ═══ */}
-      <div className="sd-reveal" style={{ ['--i' as string]: 2, marginBottom: 20 }}>
+      <div className="sd-reveal" style={{ ['--i' as string]: 2, marginBottom: 20, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
         <div style={{ display: 'inline-flex', gap: 4, padding: 4, borderRadius: 13, border: '1px solid rgb(var(--color-border))', background: 'rgb(var(--color-card-inner))' }}>
           <ViewTab active={view === 'a'} dot="16 185 129" label="Panoramica" onClick={() => setViewP('a')} />
           <ViewTab active={view === 'b'} dot="99 102 241" label="Flusso" onClick={() => setViewP('b')} />
           <ViewTab active={view === 'c'} dot="245 158 11" label="Scadenze" onClick={() => setViewP('c')} />
+          <ViewTab active={view === 'd'} dot="236 72 153" label="Abbonamenti" onClick={() => setViewP('d')} />
         </div>
       </div>
 
@@ -342,6 +344,8 @@ export default function BudgetPage() {
           <ScadenzeMese />
         </>
       )}
+
+      {view === 'd' && <Abbonamenti />}
 
       {/* ═══ SHEETS ═══ */}
       <Sheet open={txOpen} onClose={() => setTxOpen(false)} title="Nuova spesa" subtitle="Movimento del mese">

@@ -46,13 +46,13 @@ export const fmtEur = (n: number) => `€${n.toLocaleString('it-IT', { minimumFr
 
 const errStyle: React.CSSProperties = { margin: '2px 0 0', fontSize: 12.5, color: 'rgb(239 68 68)' };
 
-export function DeadlineForm({ initial, onSubmit, onCancel }: { initial: Deadline | null; onSubmit: (b: DeadlineInput) => Promise<void>; onCancel: () => void }) {
+export function DeadlineForm({ initial, defaultType, onSubmit, onCancel }: { initial: Deadline | null; defaultType?: RecurrenceType; onSubmit: (b: DeadlineInput) => Promise<void>; onCancel: () => void }) {
   const [titolo, setTitolo] = useState(initial?.title ?? '');
   const [dataISO, setDataISO] = useState(initial?.due_date ?? '');
   const [category, setCategory] = useState(initial?.category ?? 'certification');
   const [priority, setPriority] = useState(initial?.priority ?? 'medium');
   const [descrizione, setDescrizione] = useState(initial?.description ?? '');
-  const [recType, setRecType] = useState<RecurrenceType>(initial?.recurrence_type ?? 'none');
+  const [recType, setRecType] = useState<RecurrenceType>(initial?.recurrence_type ?? defaultType ?? 'none');
   const [installmentsTotal, setInstallmentsTotal] = useState(initial?.installments_total != null ? String(initial.installments_total) : '');
   const [installmentsPaid, setInstallmentsPaid] = useState(initial?.installments_paid != null ? String(initial.installments_paid) : '0');
   const [interval, setInterval] = useState<RecurrenceInterval>(initial?.recurrence_interval ?? 'monthly');

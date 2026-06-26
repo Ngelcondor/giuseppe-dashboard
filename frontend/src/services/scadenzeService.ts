@@ -59,6 +59,12 @@ async function getDeadlines(): Promise<Deadline[]> {
   return data;
 }
 
+// Only the subscription deadlines (recurring services — not installments/one-offs).
+export async function getSubscriptions(): Promise<Deadline[]> {
+  const all = await getDeadlines();
+  return all.filter((d) => d.recurrence_type === 'subscription');
+}
+
 // Compose the academic subtitle in the design's format:
 //   "Esame · UOC · {aula}"  /  "Consegna · UOC[ · {dettaglio}]"
 // The design shows a short dettaglio only for some items; we surface the API
