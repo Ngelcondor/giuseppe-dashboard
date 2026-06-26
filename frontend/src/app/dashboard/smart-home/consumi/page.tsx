@@ -2,13 +2,14 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Zap, Plug, Flame, Cpu, Monitor, RefreshCw, Settings as SettingsIcon } from 'lucide-react';
+import { ArrowLeft, Zap, Plug, Flame, Cpu, Monitor, RefreshCw, Settings as SettingsIcon, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Sheet, Field } from '@/components/sd/FormSheet';
 import { CircularProgress } from '@/components/ui/ProgressBar';
 import { StatBlock, Tabs } from '@/components/ui/Surface';
 import { getMe } from '@/services/settingsService';
 import {
-  getShellyDevices, getShellyTimeseries, setShellyRelay,
+  getShellyDevices, getShellyTimeseries, setShellyRelay, setShellyDeviceName,
   type ShellyDevice, type ShellyDevicesResponse, type ShellyTimeseriesResponse,
 } from '@/services/smartHomeService';
 
@@ -54,6 +55,7 @@ export default function ConsumiPage() {
   const [canEdit, setCanEdit] = useState(false);
   const [dateLabel, setDateLabel] = useState('');
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<ShellyDevice | null>(null);
 
   const [cmpMode, setCmpMode] = useState<'giorni' | 'prese'>('giorni');
   const [selDays, setSelDays] = useState<number[]>([]);
@@ -193,6 +195,16 @@ export default function ConsumiPage() {
     }
   };
 
+  // Rename a plug (custom alias persisted server-side). Empty name reverts to
+  // the Shelly default — reload to fetch the original back.
+  const renameDevice = async (dev: ShellyDevice, name: string) => {
+    const trimmed = name.trim();
+    setRenaming(null);
+    if (trimmed) setResp((r) => r && { ...r, devices: r.devices.map((d) => d.device_id === dev.device_id ? { ...d, name: trimmed } : d) });
+    try { await setShellyDeviceName(dev.device_id, trimmed); if (!trimmed) await poll(false); }
+    catch { await poll(false); }
+  };
+
   /* ── render ── */
   return (
     <div>
@@ -282,6 +294,7 @@ export default function ConsumiPage() {
                         <div style={{ fontFamily: mono, fontSize: 14, color: 'rgb(var(--color-heading))', whiteSpace: 'nowrap' }}>{fmtW(d.power_w)} W</div>
                         <div style={{ fontSize: 10, color: 'rgb(var(--color-muted))' }}>{d.output ? 'attiva' : 'spenta'}</div>
                       </div>
+                      {canEdit && <button className="sd-iconbtn" aria-label="Rinomina presa" title="Rinomina presa" onClick={() => setRenaming(d)} style={{ flex: 'none' }}><Pencil size={14} /></button>}
                       {canEdit
                         ? <PlugToggle on={d.output} disabled={!d.online || togglingId === d.device_id} onClick={() => onToggle(d)} />
                         : <span style={{ fontSize: 11, fontFamily: mono, color: d.output ? 'rgb(16 185 129)' : 'rgb(var(--color-muted))' }}>{d.output ? 'ON' : 'OFF'}</span>}
@@ -335,6 +348,11 @@ export default function ConsumiPage() {
           </div>
         </div>
       )}
+
+      {/* Rename plug */}
+      <Sheet open={!!renaming} onClose={() => setRenaming(null)} title="Rinomina presa" subtitle={renaming?.name} maxWidth={420}>
+        {renaming && <RenameForm key={renaming.device_id} device={renaming} onSubmit={(name) => renameDevice(renaming, name)} onCancel={() => setRenaming(null)} />}
+      </Sheet>
     </div>
   );
 }
@@ -477,6 +495,24 @@ function CompareBars({ groups, series, thin, dataSince }: { groups: Group[]; ser
         ))}
       </div>
     </div>
+  );
+}
+
+function RenameForm({ device, onSubmit, onCancel }: { device: ShellyDevice; onSubmit: (name: string) => void; onCancel: () => void }) {
+  const [value, setValue] = useState(device.name);
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); onSubmit(value); }}>
+      <Field label="Nome presa" hint="Etichetta personalizzata mostrata nella dashboard. Svuota per tornare al nome Shelly.">
+        <input className="sd-input" value={value} onChange={(e) => setValue(e.target.value)} placeholder="Scaldabagno" autoFocus />
+      </Field>
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 6 }}>
+        <button type="button" onClick={() => setValue('')} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: 'rgb(var(--color-tertiary))', padding: 0 }}>Nome Shelly</button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Button type="button" variant="secondary" onClick={onCancel}>Annulla</Button>
+          <Button type="submit" variant="primary">Salva</Button>
+        </div>
+      </div>
+    </form>
   );
 }
 

@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_editor
-from app.services.settings_store import get_setting
+from app.services.settings_store import get_setting, set_setting
 from app.services import smarthome_service as sh
 from app.models.shelly_reading import ShellyReading
 from app.schemas.smarthome import (
@@ -24,12 +24,19 @@ from app.schemas.smarthome import (
     ShellyDevice, ShellyDevicesResponse,
     ShellyConsumptionDevice, ShellyConsumptionResponse,
     ShellyRelayUpdate, ShellyTimeseriesDevice, ShellyTimeseriesResponse,
+    ShellyAliasUpdate, ShellyAliasResponse,
 )
 
 router = APIRouter(prefix="/smarthome", tags=["smarthome"])
 
 HUE_KEY = "hue"
 SHELLY_KEY = "shelly"
+SHELLY_ALIAS_KEY = "shelly_aliases"  # { device_id: custom_name }
+
+
+async def _shelly_aliases(db: AsyncSession, user_id: str) -> Dict[str, str]:
+    cfg = await get_setting(db, user_id, SHELLY_ALIAS_KEY)
+    return {str(k): str(v) for k, v in cfg.items()} if isinstance(cfg, dict) else {}
 
 
 def _hue_ready(cfg: Optional[Dict[str, Any]]) -> bool:
@@ -129,6 +136,11 @@ async def shelly_devices(
             error=f"Shelly Cloud non raggiungibile: {exc}",
         )
 
+    aliases = await _shelly_aliases(db, current_user["sub"])
+    for d in devices:
+        alias = aliases.get(d["device_id"])
+        if alias:
+            d["name"] = alias
     points = [ShellyDevice(**d) for d in devices]
     return ShellyDevicesResponse(
         connected=True,
@@ -162,6 +174,28 @@ async def update_shelly_relay(
     return ShellyDevice(**updated)
 
 
+@router.put("/shelly/devices/{device_id}/alias", response_model=ShellyAliasResponse, dependencies=[Depends(require_editor)])
+async def set_shelly_alias(
+    device_id: str,
+    body: ShellyAliasUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ShellyAliasResponse:
+    """Set (or clear, with an empty name) a custom display name for a device.
+
+    Stored as an alias map in settings — the live Shelly name is never changed.
+    """
+    uid = current_user["sub"]
+    aliases = await _shelly_aliases(db, uid)
+    name = body.name.strip()
+    if name:
+        aliases[device_id] = name
+    else:
+        aliases.pop(device_id, None)
+    await set_setting(db, uid, SHELLY_ALIAS_KEY, aliases)
+    return ShellyAliasResponse(device_id=device_id, name=name)
+
+
 @router.get("/shelly/timeseries", response_model=ShellyTimeseriesResponse)
 async def shelly_timeseries(
     days: int = Query(7, ge=1, le=14),
@@ -180,6 +214,7 @@ async def shelly_timeseries(
         return ShellyTimeseriesResponse(connected=False)
 
     uid = current_user["sub"]
+    aliases = await _shelly_aliases(db, uid)
     offset = timedelta(minutes=tz_offset)
     now_local = datetime.utcnow() + offset
     today_local = datetime(now_local.year, now_local.month, now_local.day)
@@ -230,7 +265,7 @@ async def shelly_timeseries(
     household = [[round(v, 4) for v in row] for row in household]
     devices_today = [
         ShellyTimeseriesDevice(
-            device_id=dev, name=names.get(dev, dev), hours=[round(v, 4) for v in hrs],
+            device_id=dev, name=aliases.get(dev) or names.get(dev, dev), hours=[round(v, 4) for v in hrs],
         )
         for dev, hrs in device_today.items()
     ]
