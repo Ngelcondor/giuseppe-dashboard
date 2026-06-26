@@ -23,8 +23,8 @@ import {
    No fabricated numbers — empty/in-raccolta states throughout. */
 
 const mono = "'JetBrains Mono',monospace";
-const CAP_W = 3300;   // contract power (≈3 kW IT residential) — scales the live ring
-const TARIFF = 0.25;  // €/kWh estimate for the cost figures
+const CAP_W = 5750;   // contracted power P1/P2 = 5,750 kW (bolletta 2.0TD) — scales the live ring
+const TARIFF = 0.18;  // €/kWh: media pesata 3 fasce (0,202/0,143/0,118) + imposta luce 5,11% + IVA 21%
 const POLL_MS = 5000;
 const HIST = 44;      // live samples kept (~4 min at POLL_MS)
 const TS_DAYS = 7;
@@ -247,7 +247,7 @@ export default function ConsumiPage() {
             <Card pad="18px">
               <Row>
                 <Eyebrow>Consumo ora</Eyebrow>
-                <span style={{ fontSize: 11, color: 'rgb(var(--color-muted))' }}>capacità {(CAP_W / 1000).toFixed(1)} kW</span>
+                <span style={{ fontSize: 11, color: 'rgb(var(--color-muted))' }}>capacità {(CAP_W / 1000).toLocaleString('it-IT', { maximumFractionDigits: 2 })} kW</span>
               </Row>
               <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginTop: 14 }}>
                 <CircularProgress value={ringPct} size="lg" variant={ringVariant} />

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Giuseppe Dashboard">
+  <rect width="100" height="100" rx="22" fill="#6366f1"/>
+  <path d="M31 33 L49 50 L31 67" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="54" y1="67" x2="73" y2="67" stroke="#ffffff" stroke-width="9" stroke-linecap="round"/>
+</svg>
