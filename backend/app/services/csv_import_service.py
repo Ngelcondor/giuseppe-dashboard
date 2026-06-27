@@ -12,62 +12,10 @@ import logging
 from datetime import datetime, date
 from typing import Optional
 
-from app.models.budget import TransactionType, TransactionSource, DEFAULT_CATEGORY_MAP
+from app.models.budget import TransactionType, TransactionSource
+from app.services.category_service import categorize
 
 logger = logging.getLogger(__name__)
-
-
-def _guess_category(description: str) -> str:
-    """
-    Guess a budget category from the transaction description.
-    Uses keyword matching as fallback when no MCC is available.
-    """
-    desc_lower = description.lower()
-
-    keyword_map = {
-        "Alimentari": [
-            "carrefour", "lidl", "aldi", "monoprix", "franprix", "picard",
-            "supermarche", "supermercato", "grocery", "boulangerie",
-        ],
-        "Ristorazione": [
-            "restaurant", "mcdonalds", "burger", "pizza", "kebab", "sushi",
-            "uber eats", "deliveroo", "just eat", "glovo",
-        ],
-        "Trasporti": [
-            "uber", "bolt", "taxi", "ratp", "sncf", "metro", "bus",
-            "train", "essence", "total energies", "shell", "bp ",
-        ],
-        "Abbonamenti": [
-            "spotify", "netflix", "disney", "apple", "openai", "claude",
-            "amazon prime", "youtube", "adobe", "notion",
-        ],
-        "Salute": [
-            "pharmacie", "medecin", "docteur", "psichiatra", "psicologa",
-            "hospital", "clinique", "dentist",
-        ],
-        "Tech": [
-            "amazon", "apple store", "fnac", "darty", "mediaworld",
-            "keychron", "logitech",
-        ],
-        "Casa": [
-            "affitto", "loyer", "ikea", "leroy merlin", "castorama",
-            "assicurazione", "edf", "engie",
-        ],
-        "Shopping": [
-            "zara", "h&m", "uniqlo", "decathlon", "nike", "adidas",
-            "asos", "shein", "pvh",
-        ],
-        "Svago": [
-            "cinema", "theatre", "concert", "steam", "playstation",
-            "nintendo", "lootbar", "gaming",
-        ],
-    }
-
-    for category, keywords in keyword_map.items():
-        if any(kw in desc_lower for kw in keywords):
-            return category
-
-    return "Altro"
 
 
 def parse_revolut_csv(
@@ -139,7 +87,11 @@ def parse_revolut_csv(
             raw_type = _get(row, "type")
 
             # Category
-            category = _guess_category(description)
+            category = categorize(
+                description=description,
+                merchant=description,
+                is_income=(txn_type == TransactionType.INCOME),
+            )
 
             # Currency
             currency = _get(row, "currency") or "EUR"
