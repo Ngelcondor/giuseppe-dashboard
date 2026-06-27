@@ -485,7 +485,7 @@ function TxList({ txs, onDel }: { txs: TxView[]; onDel: (t: TxView) => void }) {
 /* ── Scadenze timeline (forward, next 30 days) ── */
 function Timeline({ scadenze }: { scadenze: ScadenzaPreview[] }) {
   const MAXD = 30;
-  const items = scadenze.filter((s) => s.days_until >= 0 && s.days_until <= MAXD).slice(0, 7);
+  const items = scadenze.filter((s) => s.days_until >= 0 && s.days_until <= MAXD).slice(0, 8);
   if (items.length === 0) return null;
   return (
     <Card i={1} pad="22px 24px" style={{ marginBottom: 18 }}>
@@ -493,28 +493,26 @@ function Timeline({ scadenze }: { scadenze: ScadenzaPreview[] }) {
         <h3 style={h3}>Linea del tempo</h3>
         <span style={{ fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>prossimi {MAXD} giorni</span>
       </div>
-      <div style={{ position: 'relative', height: 150, margin: '6px 12px 0' }}>
-        <div style={{ position: 'absolute', left: 0, right: 0, top: 75, height: 2, borderRadius: 2, background: 'rgb(var(--color-border))' }} />
-        {/* OGGI marker */}
-        <div style={{ position: 'absolute', left: 0, top: 40, bottom: 40, width: 2, transform: 'translateX(-1px)', background: 'rgb(99 102 241)' }} />
-        <div style={{ position: 'absolute', left: 0, top: 16, transform: 'translateX(-50%)' }}>
-          <span style={{ fontFamily: mono, display: 'inline-block', padding: '3px 9px', borderRadius: 999, fontSize: 10, fontWeight: 600, letterSpacing: '.12em', color: 'rgb(165 180 252)', background: 'rgb(99 102 241/0.18)', border: '1px solid rgb(99 102 241/0.45)' }}>OGGI</span>
+      <div style={{ position: 'relative', marginTop: 4 }}>
+        {/* vertical rail */}
+        <div style={{ position: 'absolute', left: 5, top: 16, bottom: 16, width: 2, background: 'rgb(var(--color-border))' }} />
+
+        {/* Oggi anchor */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', position: 'relative' }}>
+          <span style={{ width: 12, height: 12, borderRadius: '50%', flex: 'none', background: 'rgb(var(--color-card))', border: '2px solid rgb(99 102 241)', boxShadow: '0 0 0 4px rgb(var(--color-card))' }} />
+          <span style={{ fontFamily: mono, fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: 600, color: 'rgb(99 102 241)' }}>Oggi</span>
         </div>
-        <span style={{ position: 'absolute', right: 0, top: 86, fontFamily: mono, fontSize: 10, color: 'rgb(var(--color-muted))' }}>+{MAXD}g</span>
-        {items.map((s, i) => {
-          const pct = 2 + (s.days_until / MAXD) * 94;
-          const above = i % 2 === 0;
-          const warn = s.days_until <= 7;
-          const col = warn ? '245 158 11' : '99 102 241';
+
+        {items.map((s) => {
+          const col = s.pagato ? '16 185 129' : s.days_until === 0 ? '239 68 68' : s.days_until <= 7 ? '245 158 11' : '99 102 241';
+          const rel = s.pagato ? 'pagata' : s.days_until === 0 ? 'oggi' : s.days_until === 1 ? 'domani' : `tra ${s.days_until}g`;
           return (
-            <div key={s.id} style={{ position: 'absolute', left: `${pct}%`, top: 0, bottom: 0, width: 0 }}>
-              <div style={{ position: 'absolute', left: 0, transform: 'translateX(-50%)', width: 2, borderRadius: 2, background: 'rgb(var(--color-border))', top: above ? 56 : 75, height: 19 }} />
-              <div style={{ position: 'absolute', left: 0, top: 69, width: 13, height: 13, borderRadius: 999, transform: 'translateX(-50%)', background: `rgb(${col})`, boxShadow: `0 0 0 4px rgb(${col}/0.22)` }} />
-              <div style={{ position: 'absolute', left: 0, width: 100, textAlign: 'center', transform: 'translateX(-50%)', ...(above ? { bottom: 96 } : { top: 96 }) }}>
-                <div style={{ fontSize: 11.5, fontWeight: 500, lineHeight: 1.2, color: 'rgb(var(--color-body))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.desc}</div>
-                {s.importo > 0 && <div style={{ fontFamily: mono, fontSize: 11, fontWeight: 600, color: `rgb(${col})`, lineHeight: 1.3 }}>{eur(s.importo, true)}</div>}
-                <div style={{ fontSize: 9.5, color: 'rgb(var(--color-muted))', lineHeight: 1.3 }}>{s.days_until === 0 ? 'oggi' : `tra ${s.days_until}g`}</div>
-              </div>
+            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', position: 'relative', opacity: s.pagato ? 0.6 : 1 }}>
+              <span style={{ width: 12, height: 12, borderRadius: '50%', flex: 'none', background: `rgb(${col})`, boxShadow: '0 0 0 4px rgb(var(--color-card))' }} />
+              <span style={{ width: 46, flex: 'none', fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{s.scadenza_gg_mm}</span>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: 'rgb(var(--color-heading))', textDecoration: s.pagato ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.desc}</span>
+              {s.importo > 0 && <span style={{ flex: 'none', fontFamily: mono, fontSize: 13, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{eur(s.importo, true)}</span>}
+              <span style={{ flex: 'none', fontSize: 11, fontWeight: 600, color: `rgb(${col})`, background: `rgb(${col} / 0.12)`, border: `1px solid rgb(${col} / 0.28)`, borderRadius: 999, padding: '2px 9px', minWidth: 58, textAlign: 'center' }}>{rel}</span>
             </div>
           );
         })}
