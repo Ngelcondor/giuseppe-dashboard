@@ -209,6 +209,12 @@ export async function deleteTransaction(id: string): Promise<void> {
   await api.delete(`/budget/transactions/${id}`);
 }
 
+/** Re-run the categoriser over imported transactions. Returns how many changed. */
+export async function recategorizeTransactions(): Promise<{ updated: number; total: number }> {
+  const { data } = await api.post('/budget/transactions/recategorize');
+  return data;
+}
+
 // ─── CSV Import ──────────────────────────────────────────────────────────────
 
 export async function importCSV(file: File): Promise<ImportResult> {

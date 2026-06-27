@@ -17,7 +17,6 @@ from app.models.budget import (
     BankConnectionStatus,
     TransactionType,
     TransactionSource,
-    DEFAULT_CATEGORY_MAP,
 )
 from app.models.scadenza import Scadenza
 from app.schemas.budget import (
@@ -41,6 +40,7 @@ from app.schemas.budget import (
     CSVImportResponse,
 )
 from app.services.bank_factory import get_bank_provider
+from app.services.category_service import categorize
 from app.services.csv_import_service import parse_revolut_csv
 
 logger = logging.getLogger(__name__)
@@ -316,9 +316,14 @@ async def sync_bank_transactions(
 
                 txn_type = TransactionType.INCOME if tx.amount > 0 else TransactionType.EXPENSE
 
-                # Category from MCC
+                # Category: MCC first, then merchant/description keyword match.
                 mcc = tx.merchant_category_code or ""
-                category = DEFAULT_CATEGORY_MAP.get(mcc, "Altro")
+                category = categorize(
+                    description=tx.description,
+                    merchant=tx.creditor_name or tx.debtor_name,
+                    mcc=mcc,
+                    is_income=(txn_type == TransactionType.INCOME),
+                )
 
                 new_tx = Transaction(
                     user_id=current_user["sub"],
@@ -575,6 +580,44 @@ async def delete_transaction(
 
     await db.delete(transaction)
     await db.commit()
+
+
+@router.post("/transactions/recategorize")
+async def recategorize_transactions(
+    only_uncategorized: bool = Query(False),
+    current_user: dict = Depends(require_editor),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """
+    Re-run the categoriser over imported transactions (CSV + bank sync) so the
+    "Spese per categoria" panel reflects the current rules. Manual transactions
+    are left untouched. With only_uncategorized=true, only re-buckets entries
+    currently in "Altro" (or empty). Returns how many were updated.
+    """
+    result = await db.execute(
+        select(Transaction).where(Transaction.user_id == current_user["sub"])
+    )
+    transactions = result.scalars().all()
+
+    updated = 0
+    for txn in transactions:
+        if txn.source == TransactionSource.MANUAL:
+            continue
+        if only_uncategorized and txn.category not in (None, "", "Altro"):
+            continue
+        new_cat = categorize(
+            description=txn.description,
+            merchant=txn.merchant_name,
+            mcc=txn.merchant_category_code,
+            is_income=(txn.transaction_type == TransactionType.INCOME),
+        )
+        if new_cat != txn.category:
+            txn.category = new_cat
+            db.add(txn)
+            updated += 1
+
+    await db.commit()
+    return {"updated": updated, "total": len(transactions)}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

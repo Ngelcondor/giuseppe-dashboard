@@ -1,16 +1,18 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Trash2, FileUp, Landmark, RefreshCw } from 'lucide-react';
+import { Trash2, FileUp, Landmark, RefreshCw, Tags } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Sheet, Field, FieldRow } from '@/components/sd/FormSheet';
 import {
   getBudgetDashboard,
   listTransactions, createTransaction, deleteTransaction, importCSV,
+  recategorizeTransactions,
   initBankAuth, completeBankAuth, listInstitutions, syncBankTransactions,
   type BudgetDashboard, type CategorySpending,
   type Transaction, type ScadenzaPreview, type Institution,
 } from '@/services/budgetService';
+import { getCurrentUserRole } from '@/services/scadenzeService';
 import { ScadenzeMese } from '@/components/sd/ScadenzeMese';
 import { Abbonamenti } from '@/components/sd/Abbonamenti';
 
@@ -35,16 +37,27 @@ const FALLBACK: BudgetDashboard = {
 };
 
 const PALETTE = ['99 102 241', '16 185 129', '245 158 11', '236 72 153', '148 163 184', '34 197 94'];
+// Canonical category → colour, kept in sync with the backend categoriser.
+const CAT_COLORS: Record<string, string> = {
+  Alimentari: '99 102 241', Trasporti: '16 185 129', Casa: '245 158 11',
+  Bollette: '234 179 8', Ristorazione: '236 72 153', Abbonamenti: '139 92 246',
+  Studio: '168 85 247', Salute: '244 63 94', Tech: '14 165 233',
+  Shopping: '249 115 22', Svago: '148 163 184', Viaggi: '6 182 212',
+  Prelievi: '120 113 108', Commissioni: '113 113 122', Entrate: '34 197 94',
+  Altro: '100 116 139',
+};
 function colorFor(cat: string, i = 0): string {
+  if (CAT_COLORS[cat]) return CAT_COLORS[cat];
   const k = (cat || '').toLowerCase();
   if (/affitt|casa|rent|alloggi/.test(k)) return '245 158 11';
   if (/spesa|cibo|aliment|mercad|grocer|super|lidl/.test(k)) return '99 102 241';
   if (/trasport|treno|renfe|metro|bus|rodalies|tmb/.test(k)) return '16 185 129';
-  if (/studi|htb|libr|corso|hack|uoc/.test(k)) return '236 72 153';
+  if (/studi|htb|libr|corso|hack|uoc/.test(k)) return '168 85 247';
   if (/svago|spotif|abbon|leisure|netflix|intratten/.test(k)) return '148 163 184';
   if (/stipend|borsa|entrat|salar|income|tirocin/.test(k)) return '34 197 94';
   return PALETTE[i % PALETTE.length];
 }
+const round2 = (n: number) => Math.round(n * 100) / 100;
 
 const eur = (n: number, dec = false) => {
   const s = Math.abs(n).toLocaleString('it-IT', dec
@@ -81,6 +94,8 @@ export default function BudgetPage() {
   const [txOpen, setTxOpen] = useState(false);
   const [del, setDel] = useState<{ id: string; label: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
+  const [recatting, setRecatting] = useState(false);
 
   // ── Bank connection (Enable Banking) ──
   const [bankOpen, setBankOpen] = useState(false);
@@ -98,6 +113,18 @@ export default function BudgetPage() {
     } catch {/* keep current */}
   }, []);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { getCurrentUserRole().then((u) => setIsGuest(u?.role === 'guest')).catch(() => {}); }, []);
+
+  // Re-bucket imported transactions with the current category rules.
+  const doRecat = async () => {
+    setRecatting(true); setImportErr(null); setImportMsg(null);
+    try {
+      const r = await recategorizeTransactions();
+      setImportMsg(r.updated > 0 ? `${r.updated} transazioni ricategorizzate` : 'Categorie già aggiornate');
+      await load();
+    } catch { setImportErr('Ricategorizzazione non riuscita. Riprova.'); }
+    finally { setRecatting(false); }
+  };
 
   // restore prefs (active tab)
   useEffect(() => {
@@ -151,6 +178,9 @@ export default function BudgetPage() {
 
   // ── derived view model ──
   const cats = toCats(data.categories);
+  // Donut + legend reconcile against the exact sum of the category rows, so the
+  // centre figure always equals what the rows add up to (down to the cent).
+  const catTotal = round2(cats.reduce((s, c) => s + c.amount, 0));
   const spent = Math.round(data.total_expenses);
   const income = Math.round(data.total_income);
   const net = Math.round(data.net_balance);
@@ -285,15 +315,23 @@ export default function BudgetPage() {
         <div className="sd-twocol">
           {/* Spese per categoria */}
           <Card i={3} pad="22px 24px">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 6 }}>
               <h3 style={h3}>Spese per categoria</h3>
-              <span style={{ fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{fmtMonthLabel(data.month).split(' ')[0]}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {!isGuest && (
+                  <button onClick={doRecat} disabled={recatting} title="Riassegna le categorie alle transazioni importate"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 500, color: 'rgb(99 102 241)', cursor: recatting ? 'default' : 'pointer', background: 'none', border: 'none', fontFamily: 'inherit', opacity: recatting ? 0.6 : 1 }}>
+                    <Tags size={13} />{recatting ? 'Ricategorizzo…' : 'Ricategorizza'}
+                  </button>
+                )}
+                <span style={{ fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{fmtMonthLabel(data.month).split(' ')[0]}</span>
+              </div>
             </div>
             {cats.length === 0 ? <Empty>Nessuna spesa registrata.</Empty> : (
               <>
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 20px' }}><CompositionDonut cats={cats} total={spent} /></div>
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 20px' }}><CompositionDonut cats={cats} total={catTotal} /></div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {cats.map((c) => <CatRow key={c.name} cat={c} spent={spent} />)}
+                  {cats.map((c) => <CatRow key={c.name} cat={c} spent={catTotal} />)}
                 </div>
               </>
             )}
@@ -417,7 +455,7 @@ function CompositionDonut({ cats, total }: { cats: Cat[]; total: number }) {
         })}
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ fontFamily: mono, fontSize: 24, fontWeight: 600, letterSpacing: '-.02em', color: 'rgb(var(--color-heading))', lineHeight: 1 }}>{eur(total)}</span>
+        <span style={{ fontFamily: mono, fontSize: 20, fontWeight: 600, letterSpacing: '-.02em', color: 'rgb(var(--color-heading))', lineHeight: 1, whiteSpace: 'nowrap' }}>{eur(total, true)}</span>
         <span style={{ ...eyebrow, marginTop: 6 }}>speso</span>
       </div>
     </div>
@@ -434,7 +472,7 @@ function CatRow({ cat, spent }: { cat: Cat; spent: number }) {
           <span style={{ width: 7, height: 7, borderRadius: 9, background: `rgb(${cat.color})` }} />{cat.name}
         </span>
         <span style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontFamily: mono, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{eur(cat.amount)}</span> · {pct}%
+          <span style={{ fontFamily: mono, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{eur(cat.amount, true)}</span> · {pct}%
         </span>
       </div>
       <div style={{ height: 8, borderRadius: 8, background: 'rgb(var(--color-card-inner))', overflow: 'hidden' }}>
