@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Trash2, FileUp, Landmark, RefreshCw, Tags } from 'lucide-react';
+import { Trash2, FileUp, Landmark, RefreshCw, Tags, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Sheet, Field, FieldRow } from '@/components/sd/FormSheet';
 import {
   getBudgetDashboard,
-  listTransactions, createTransaction, deleteTransaction, importCSV,
+  listTransactions, createTransaction, updateTransaction, deleteTransaction, importCSV,
   recategorizeTransactions,
   initBankAuth, completeBankAuth, listInstitutions, syncBankTransactions,
   type BudgetDashboard, type CategorySpending,
@@ -93,6 +93,7 @@ export default function BudgetPage() {
 
   const [txOpen, setTxOpen] = useState(false);
   const [del, setDel] = useState<{ id: string; label: string } | null>(null);
+  const [editTx, setEditTx] = useState<TxView | null>(null);
   const [busy, setBusy] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
   const [recatting, setRecatting] = useState(false);
@@ -187,7 +188,10 @@ export default function BudgetPage() {
   const balance = data.bank_balance;                 // number | null
   const bankConnected = data.bank_connected || balance != null;
 
-  const categoryNames = Array.from(new Set(data.categories.map((c) => c.category)));
+  // All categories offered in pickers: the canonical set + whatever's in use.
+  const categoryNames = Array.from(
+    new Set([...Object.keys(CAT_COLORS), ...data.categories.map((c) => c.category)]),
+  );
 
   const txView: TxView[] = txs.map((t, i) => ({
     id: t.id,
@@ -231,6 +235,11 @@ export default function BudgetPage() {
       await deleteTransaction(del.id);
       setDel(null); await load();
     } finally { setBusy(false); }
+  };
+  const saveCategory = async (category: string) => {
+    if (!editTx) return;
+    await updateTransaction(editTx.id, { category });
+    setEditTx(null); await load();
   };
 
   return (
@@ -343,7 +352,7 @@ export default function BudgetPage() {
               <h3 style={h3}>Transazioni recenti</h3>
               <button onClick={() => setTxOpen(true)} style={{ fontSize: 12, color: 'rgb(99 102 241)', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', background: 'none', border: 'none', fontFamily: 'inherit' }}>+ Spesa</button>
             </div>
-            <TxList txs={txView} onDel={(t) => setDel({ id: t.id, label: t.label })} />
+            <TxList txs={txView} onDel={(t) => setDel({ id: t.id, label: t.label })} onEdit={isGuest ? undefined : (t) => setEditTx(t)} />
           </Card>
         </div>
       )}
@@ -388,6 +397,9 @@ export default function BudgetPage() {
       {/* ═══ SHEETS ═══ */}
       <Sheet open={txOpen} onClose={() => setTxOpen(false)} title="Nuova spesa" subtitle="Movimento del mese">
         <TransactionForm key={txOpen ? 't' : 'c'} categoryNames={categoryNames} onSubmit={submitTx} onCancel={() => setTxOpen(false)} />
+      </Sheet>
+      <Sheet open={!!editTx} onClose={() => setEditTx(null)} title="Cambia categoria" subtitle={editTx?.name} maxWidth={420}>
+        <CategoryEditForm key={editTx?.id ?? 'none'} current={editTx?.cat ?? ''} categoryNames={categoryNames} onSubmit={saveCategory} onCancel={() => setEditTx(null)} />
       </Sheet>
       <Sheet open={!!del} onClose={() => setDel(null)} title="Eliminare?" subtitle={del?.label} maxWidth={400}>
         <p style={{ margin: '0 0 4px', fontSize: 14, color: 'rgb(var(--color-tertiary))' }}>L&apos;elemento verrà rimosso definitivamente.</p>
@@ -496,7 +508,7 @@ function FlowRow({ name, value, frac, color }: { name: string; value: number; fr
   );
 }
 
-function TxList({ txs, onDel }: { txs: TxView[]; onDel: (t: TxView) => void }) {
+function TxList({ txs, onDel, onEdit }: { txs: TxView[]; onDel: (t: TxView) => void; onEdit?: (t: TxView) => void }) {
   if (txs.length === 0) return <Empty>Nessun movimento registrato.</Empty>;
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -506,7 +518,14 @@ function TxList({ txs, onDel }: { txs: TxView[]; onDel: (t: TxView) => void }) {
             <span style={{ flex: 'none', width: 9, height: 9, borderRadius: 9, background: `rgb(${t.color})` }} />
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 13.5, fontWeight: 500, color: 'rgb(var(--color-heading))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</div>
-              <div style={{ fontSize: 11.5, color: 'rgb(var(--color-muted))', marginTop: 2 }}>{t.cat}</div>
+              {onEdit ? (
+                <button onClick={() => onEdit(t)} title="Cambia categoria"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 3, padding: 0, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 11.5, color: `rgb(${t.color})` }}>
+                  <Tag size={10} />{t.cat}
+                </button>
+              ) : (
+                <div style={{ fontSize: 11.5, color: 'rgb(var(--color-muted))', marginTop: 2 }}>{t.cat}</div>
+              )}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 'none' }}>
@@ -595,6 +614,49 @@ function TransactionForm({ categoryNames, onSubmit, onCancel }: { categoryNames:
       <Field label="Descrizione"><input className="sd-input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Mercadona" /></Field>
       {error && <p style={errStyle}>{error}</p>}
       <FormActions onCancel={onCancel} submitting={submitting} />
+    </form>
+  );
+}
+
+/* Change a transaction's category — pick an existing one or type a new name. */
+function CategoryEditForm({ current, categoryNames, onSubmit, onCancel }: { current: string; categoryNames: string[]; onSubmit: (category: string) => Promise<void>; onCancel: () => void }) {
+  const [value, setValue] = useState(current);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const quick = Object.keys(CAT_COLORS).filter((c) => c !== 'Altro' && c !== 'Entrate');
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const v = value.trim();
+    if (!v) { setError('Scegli o scrivi una categoria.'); return; }
+    setSubmitting(true); setError('');
+    try { await onSubmit(v); }
+    catch { setError('Salvataggio non riuscito. Riprova.'); setSubmitting(false); }
+  };
+  return (
+    <form onSubmit={submit}>
+      <Field label="Categoria">
+        <input className="sd-input" list="tx-categorie" value={value} onChange={(e) => setValue(e.target.value)} placeholder="Es. Alimentari" autoFocus />
+        <datalist id="tx-categorie">{categoryNames.map((n) => <option key={n} value={n} />)}</datalist>
+      </Field>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 10 }}>
+        {quick.map((c) => {
+          const on = value.trim().toLowerCase() === c.toLowerCase();
+          const col = colorFor(c);
+          return (
+            <button type="button" key={c} className="sd-press" onClick={() => setValue(c)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 600,
+                color: on ? `rgb(${col})` : 'rgb(var(--color-tertiary))', background: on ? `rgb(${col} / 0.14)` : 'rgb(var(--color-card-inner))', border: `1px solid ${on ? `rgb(${col} / 0.5)` : 'rgb(var(--color-border))'}` }}>
+              <span style={{ width: 7, height: 7, borderRadius: 9, background: `rgb(${col})` }} />{c}
+            </button>
+          );
+        })}
+      </div>
+      <p style={{ margin: '12px 0 0', fontSize: 12, color: 'rgb(var(--color-muted))' }}>Scrivi un nome nuovo per creare una categoria.</p>
+      {error && <p style={errStyle}>{error}</p>}
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+        <Button type="button" variant="secondary" onClick={onCancel} disabled={submitting}>Annulla</Button>
+        <Button type="submit" variant="primary" isLoading={submitting}>Salva</Button>
+      </div>
     </form>
   );
 }

@@ -99,6 +99,31 @@ KEYWORD_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("Commissioni", ("fee", "comision", "commissione", "comissio")),
 ]
 
+# Brand prefixes that sell far more than subscriptions — for these, only the full
+# subscription title (e.g. "amazon prime") is matched, never the bare brand, so a
+# one-off Amazon order doesn't get tagged as a subscription.
+_GENERIC_BRANDS = {"amazon", "apple", "google", "microsoft", "paypal", "samsung"}
+
+
+def subscription_keywords(titles: list[str] | None) -> set[str]:
+    """Turn the user's subscription titles into match phrases.
+
+    Keeps the full normalised title (so "Amazon Prime" matches only Prime) and,
+    for non-generic brands, the leading word too (so "Spotify Premium" still
+    matches a "SPOTIFY P3..." charge). Mirrors the dedicated Abbonamenti page so
+    categorisation stays in sync with it.
+    """
+    kws: set[str] = set()
+    for title in titles or []:
+        n = " ".join((title or "").lower().split())
+        if len(n) < 4:
+            continue
+        kws.add(n)
+        first = n.split()[0]
+        if len(first) >= 4 and first not in _GENERIC_BRANDS:
+            kws.add(first)
+    return kws
+
 
 def categorize(
     description: str | None = None,
@@ -106,23 +131,28 @@ def categorize(
     mcc: str | None = None,
     *,
     is_income: bool = False,
+    sub_keywords: set[str] | None = None,
 ) -> str:
     """Best-guess budget category for a transaction.
 
     Income is always grouped as "Entrate" (the spending breakdown only counts
-    expenses, so income categories are never split). For expenses, MCC wins when
-    present and known; otherwise keyword-match merchant + description, falling
-    back to "Altro".
+    expenses, so income categories are never split). For expenses: a match
+    against the user's own subscriptions wins first (keeps "Abbonamenti" aligned
+    with the dedicated page), then MCC, then keyword rules, else "Altro".
     """
     if is_income:
         return "Entrate"
+
+    haystack = f"{merchant or ''} {description or ''}".lower()
+
+    if sub_keywords and any(kw in haystack for kw in sub_keywords):
+        return "Abbonamenti"
 
     if mcc:
         hit = MCC_CATEGORY_MAP.get(mcc.strip())
         if hit:
             return hit
 
-    haystack = f"{merchant or ''} {description or ''}".lower()
     for category, keywords in KEYWORD_RULES:
         if any(kw in haystack for kw in keywords):
             return category
