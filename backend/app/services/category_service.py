@@ -99,6 +99,20 @@ KEYWORD_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("Commissioni", ("fee", "comision", "commissione", "comissio")),
 ]
 
+# Buy-now-pay-later / consumer-credit providers — always financing, so these win
+# on their own.
+_BNPL_PROVIDERS = (
+    "klarna", "scalapay", "sequra", "clearpay", "afterpay", "cofidis",
+    "findomestic", "younited", "oney", "floa", "agos", "compass",
+)
+# Installment / loan markers. Combined with PayPal (or seen on their own) they
+# mean a rata/prestito rather than a normal purchase.
+_INSTALLMENT_MARKERS = (
+    "ratenzahlung", "ratenkauf", "rateizz", "paga in 3", "paga in 4",
+    "pago en 3", "pago en 4", "en 3 plazos", "en 4 plazos", "installment",
+    "prestito", "prestamo", "finanziamento", "financiacion", "credito al consumo",
+)
+
 # Brand prefixes that sell far more than subscriptions — for these, only the full
 # subscription title (e.g. "amazon prime") is matched, never the bare brand, so a
 # one-off Amazon order doesn't get tagged as a subscription.
@@ -156,5 +170,15 @@ def categorize(
     for category, keywords in KEYWORD_RULES:
         if any(kw in haystack for kw in keywords):
             return category
+
+    # Financing: BNPL providers, explicit installment/loan markers, or a PayPal
+    # charge with no identifiable merchant (Giuseppe's PayPal flow is rate/loans).
+    # Checked last so a recognised merchant paid via PayPal still wins.
+    if (
+        any(p in haystack for p in _BNPL_PROVIDERS)
+        or any(m in haystack for m in _INSTALLMENT_MARKERS)
+        or "paypal" in haystack
+    ):
+        return "Rate"
 
     return "Altro"

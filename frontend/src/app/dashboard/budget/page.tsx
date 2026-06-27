@@ -43,8 +43,8 @@ const CAT_COLORS: Record<string, string> = {
   Bollette: '234 179 8', Ristorazione: '236 72 153', Abbonamenti: '139 92 246',
   Studio: '168 85 247', Salute: '244 63 94', Tech: '14 165 233',
   Shopping: '249 115 22', Svago: '148 163 184', Viaggi: '6 182 212',
-  Prelievi: '120 113 108', Commissioni: '113 113 122', Entrate: '34 197 94',
-  Altro: '100 116 139',
+  Rate: '217 70 239', Prelievi: '120 113 108', Commissioni: '113 113 122',
+  Entrate: '34 197 94', Altro: '100 116 139',
 };
 function colorFor(cat: string, i = 0): string {
   if (CAT_COLORS[cat]) return CAT_COLORS[cat];
@@ -108,7 +108,7 @@ export default function BudgetPage() {
     try {
       const [dash, tx] = await Promise.all([
         getBudgetDashboard(MONTH, YEAR),
-        listTransactions({ month: MONTH, year: YEAR, limit: 30 }),
+        listTransactions({ month: MONTH, year: YEAR, limit: 1000 }),
       ]);
       setData(dash); setTxs(tx);
     } catch {/* keep current */}
@@ -346,13 +346,15 @@ export default function BudgetPage() {
             )}
           </Card>
 
-          {/* Transazioni recenti */}
+          {/* Transazioni del mese */}
           <Card i={4} pad="22px 24px">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-              <h3 style={h3}>Transazioni recenti</h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 4 }}>
+              <h3 style={h3}>Transazioni · <span style={{ fontFamily: mono, fontWeight: 600, color: 'rgb(var(--color-tertiary))' }}>{txView.length}</span></h3>
               <button onClick={() => setTxOpen(true)} style={{ fontSize: 12, color: 'rgb(99 102 241)', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', background: 'none', border: 'none', fontFamily: 'inherit' }}>+ Spesa</button>
             </div>
-            <TxList txs={txView} onDel={(t) => setDel({ id: t.id, label: t.label })} onEdit={isGuest ? undefined : (t) => setEditTx(t)} />
+            <div style={{ maxHeight: 560, overflowY: 'auto', marginRight: -8, paddingRight: 8 }}>
+              <TxList txs={txView} onDel={(t) => setDel({ id: t.id, label: t.label })} onEdit={isGuest ? undefined : (t) => setEditTx(t)} />
+            </div>
           </Card>
         </div>
       )}
