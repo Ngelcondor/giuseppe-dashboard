@@ -205,6 +205,14 @@ export async function createTransaction(tx: {
   return data;
 }
 
+export async function updateTransaction(
+  id: string,
+  body: Partial<{ amount: number; category: string; description: string; date: string }>,
+): Promise<Transaction> {
+  const { data } = await api.put(`/budget/transactions/${id}`, body);
+  return data;
+}
+
 export async function deleteTransaction(id: string): Promise<void> {
   await api.delete(`/budget/transactions/${id}`);
 }

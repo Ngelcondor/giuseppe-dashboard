@@ -19,6 +19,7 @@ from app.models.budget import (
     TransactionSource,
 )
 from app.models.scadenza import Scadenza
+from app.models.deadline import Deadline, RecurrenceType as DeadlineRecurrenceType
 from app.schemas.budget import (
     TransactionCreate,
     TransactionResponse,
@@ -40,12 +41,23 @@ from app.schemas.budget import (
     CSVImportResponse,
 )
 from app.services.bank_factory import get_bank_provider
-from app.services.category_service import categorize
+from app.services.category_service import categorize, subscription_keywords
 from app.services.csv_import_service import parse_revolut_csv
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/budget", tags=["budget"])
+
+
+async def _subscription_keywords(db: AsyncSession, user_id) -> set[str]:
+    """Match phrases for the user's subscriptions (from the Abbonamenti page)."""
+    result = await db.execute(
+        select(Deadline.title).where(
+            (Deadline.user_id == user_id)
+            & (Deadline.recurrence_type == DeadlineRecurrenceType.SUBSCRIPTION)
+        )
+    )
+    return subscription_keywords([t for (t,) in result.all()])
 
 MESI_NUM = {
     "Gennaio": 1, "Febbraio": 2, "Marzo": 3, "Aprile": 4,
@@ -292,6 +304,7 @@ async def sync_bank_transactions(
             date_from=date_from,
         )
 
+        sub_kws = await _subscription_keywords(db, current_user["sub"])
         imported = 0
         skipped = 0
         errors = 0
@@ -323,6 +336,7 @@ async def sync_bank_transactions(
                     merchant=tx.creditor_name or tx.debtor_name,
                     mcc=mcc,
                     is_income=(txn_type == TransactionType.INCOME),
+                    sub_keywords=sub_kws,
                 )
 
                 new_tx = Transaction(
@@ -410,7 +424,8 @@ async def import_csv(
         raise HTTPException(status_code=400, detail="Il file deve essere un CSV")
 
     content = await file.read()
-    parsed = parse_revolut_csv(content, user_id=str(current_user["sub"]))
+    sub_kws = await _subscription_keywords(db, current_user["sub"])
+    parsed = parse_revolut_csv(content, user_id=str(current_user["sub"]), sub_keywords=sub_kws)
 
     imported = 0
     skipped = 0
@@ -598,6 +613,7 @@ async def recategorize_transactions(
         select(Transaction).where(Transaction.user_id == current_user["sub"])
     )
     transactions = result.scalars().all()
+    sub_kws = await _subscription_keywords(db, current_user["sub"])
 
     updated = 0
     for txn in transactions:
@@ -610,6 +626,7 @@ async def recategorize_transactions(
             merchant=txn.merchant_name,
             mcc=txn.merchant_category_code,
             is_income=(txn.transaction_type == TransactionType.INCOME),
+            sub_keywords=sub_kws,
         )
         if new_cat != txn.category:
             txn.category = new_cat

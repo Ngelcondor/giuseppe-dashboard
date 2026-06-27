@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 def parse_revolut_csv(
     csv_content: str | bytes,
     user_id: str,
+    sub_keywords: set[str] | None = None,
 ) -> list[dict]:
     """
     Parse a Revolut CSV export and return a list of transaction dicts
@@ -29,6 +30,8 @@ def parse_revolut_csv(
     Args:
         csv_content: Raw CSV file content (string or bytes).
         user_id: UUID of the user.
+        sub_keywords: Match phrases for the user's subscriptions, so charges from
+            services listed on the Abbonamenti page are tagged "Abbonamenti".
 
     Returns:
         List of dicts with Transaction fields.
@@ -91,6 +94,7 @@ def parse_revolut_csv(
                 description=description,
                 merchant=description,
                 is_income=(txn_type == TransactionType.INCOME),
+                sub_keywords=sub_keywords,
             )
 
             # Currency
