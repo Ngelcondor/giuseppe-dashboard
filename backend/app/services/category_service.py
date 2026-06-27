@@ -33,6 +33,8 @@ MCC_CATEGORY_MAP: dict[str, str] = {
 # Ordered keyword rules — first match wins, so specific/subscription rules come
 # before broad ones. Matched against "<merchant> <description>" lowercased.
 KEYWORD_RULES: list[tuple[str, tuple[str, ...]]] = [
+    # Named payees (both name orders, since transfers vary surname-first).
+    ("420", ("giulio de angelis", "de angelis giulio")),
     ("Abbonamenti", (
         "spotify", "netflix", "disney", "hbo", "prime video", "amazon prime",
         "youtube premium", "youtube music", "apple.com/bill", "apple music",
@@ -79,6 +81,7 @@ KEYWORD_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("Salute", (
         "farmacia", "parafarmacia", "pharmacy", "clinica", "hospital", "dentista",
         "dentist", "psicolog", "psiquiatr", "optica", "fisioterapia", "laboratorio",
+        "dendros", "cristina moro", "moro cristina", "giovanni oriolo", "oriolo giovanni",
     )),
     ("Tech", (
         "amazon", "aliexpress", "pccomponentes", "mediamarkt", "media markt",
