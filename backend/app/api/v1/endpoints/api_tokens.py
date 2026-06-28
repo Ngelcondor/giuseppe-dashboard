@@ -69,7 +69,7 @@ async def create_token(
     # Generate token
     raw_token = _generate_token()
     token_hash = _hash_token(raw_token)
-    token_prefix = raw_token[:11]  # "gd_" + first 8 chars
+    token_prefix = raw_token[:8]  # "gd_" + 5 chars — column is VARCHAR(8)
 
     # Calculate expiry
     expires_at = None
