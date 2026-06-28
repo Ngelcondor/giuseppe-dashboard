@@ -48,8 +48,8 @@ MCC_CATEGORY_MAP: dict[str, str] = {
 # Ordered keyword rules — first match wins, so specific/subscription rules come
 # before broad ones. Matched against "<merchant> <description>" lowercased.
 KEYWORD_RULES: list[tuple[str, tuple[str, ...]]] = [
-    # Named payees (both name orders, since transfers vary surname-first).
-    ("420", ("giulio de angelis", "de angelis giulio")),
+    # Named payees (descriptions often truncate to "To Giulio D").
+    ("420", ("giulio de angelis", "de angelis giulio", "giulio d")),
     ("Abbonamenti", (
         "spotify", "netflix", "disney", "hbo", "prime video", "amazon prime",
         "youtube premium", "youtube music", "apple.com/bill", "apple music",
@@ -66,47 +66,49 @@ KEYWORD_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("Casa", (
         "affitto", "alquiler", "lloguer", "loyer", "inmobiliaria", "ikea",
         "leroy merlin", "bricodepot", "brico depot", "ferreteria", "comunidad",
-        "administracion finca",
+        "administracion finca", "giardiniere",
     )),
     ("Bollette", (
         "endesa", "iberdrola", "naturgy", "holaluz", "repsol luz", "totalenergies",
-        "aigues", "agbar", "gas natural", "enel", "vodafone", "movistar",
+        "aigues", "agbar", "gas natural", "energia", "enel", "vodafone", "movistar",
         "orange", "yoigo", "masmovil", "digi", "pepephone", "lowi", "jazztel",
         "iliad", "fastweb", "fibra", "bolletta",
     )),
     ("Alimentari", (
-        "mercadona", "carrefour", "lidl", "aldi", "consum", "bonpreu", "esclat",
-        "caprabo", "condis", "ametller", "supermercat", "supermercado",
+        "mercadona", "carrefour", "carref", "lidl", "aldi", "consum", "bonpreu",
+        "esclat", "caprabo", "condis", "ametller", "supermercat", "supermercado",
         "supermercato", "grocery", "alimentari", "fruteria", "panaderia",
-        "eroski", "alcampo", "esselunga", "conad", "carniceria", "dia%",
+        "eroski", "alcampo", "esselunga", "conad", "carniceria", "casa italia",
     )),
     ("Ristorazione", (
         "restaurant", "restaurante", "ristorante", "cafeteria", "mcdonald",
         "burger king", "kfc", "telepizza", "domino", "pizza", "kebab", "sushi",
         "starbucks", "glovo", "uber eats", "ubereats", "just eat", "justeat",
         "deliveroo", "braseria", "taberna", "tapas", "cerveceria", "vermuteria",
+        "brunch",
     )),
     ("Trasporti", (
         "renfe", "rodalies", "tmb", "metro", "fgc", "autobus", "cercanias",
         "trenitalia", "italo", "uber", "bolt", "cabify", "free now", "taxi",
-        "bicing", "parking", "aparcamiento", "gasolinera", "repsol", "cepsa",
-        "galp", "peaje", "autopista", "aena", "vueling", "ryanair", "easyjet",
-        "iberia", "flixbus",
+        "bicing", "parking", "parquing", "aparcamiento", "gasolinera", "repsol",
+        "cepsa", "galp", "peaje", "autopista", "aena", "vueling", "ryanair",
+        "easyjet", "iberia", "flixbus", "itv ", "autolavado",
     )),
     ("Salute", (
         "farmacia", "parafarmacia", "pharmacy", "clinica", "hospital", "dentista",
         "dentist", "psicolog", "psiquiatr", "optica", "fisioterapia", "laboratorio",
-        "dendros", "cristina moro", "moro cristina", "giovanni oriolo", "oriolo giovanni",
+        "endocrinolog", "dendros", "cristina moro", "moro cristina",
+        "giovanni oriolo", "oriolo giovanni",
     )),
     ("Tech", (
         "amazon", "aliexpress", "pccomponentes", "mediamarkt", "media markt",
-        "fnac", "apple store", "el corte ingles", "worten", "k-tuin", "ktuin",
-        "keychron", "logitech", "anker",
+        "fnac", "apple store", "apple.com", "el corte ingles", "worten",
+        "k-tuin", "ktuin", "keychron", "logitech", "anker",
     )),
     ("Shopping", (
         "zara", "h&m", "uniqlo", "pull&bear", "bershka", "stradivarius", "mango",
         "primark", "decathlon", "nike", "adidas", "asos", "shein", "springfield",
-        "massimo dutti", "douglas", "sephora", "muji",
+        "massimo dutti", "douglas", "sephora", "muji", "lush", "vinted",
     )),
     ("Svago", (
         "cinema", "cinesa", "yelmo", "teatro", "concierto", "concert", "steam",
@@ -122,6 +124,7 @@ KEYWORD_RULES: list[tuple[str, tuple[str, ...]]] = [
 _BNPL_PROVIDERS = (
     "klarna", "scalapay", "sequra", "clearpay", "afterpay", "cofidis",
     "findomestic", "younited", "oney", "floa", "agos", "compass",
+    "wandoo", "quebueno",
 )
 # Installment / loan markers. Combined with PayPal (or seen on their own) they
 # mean a rata/prestito rather than a normal purchase.
@@ -169,36 +172,36 @@ def categorize(
     """Best-guess budget category for a transaction.
 
     All income is grouped as "Entrate" and always counts (pocket transfers,
-    parents, sales, top-ups). For expenses: outgoing transfers/giroconti map to
-    "Trasferimenti" (excluded from the Uscite total) — detected from the bank's
-    own type (TRANSFER) with a description fallback. Then a match against the
-    user's subscriptions wins (keeps "Abbonamenti" aligned with its page), then
-    MCC, then keyword rules, then financing, else "Altro".
+    parents, sales, top-ups). For expenses the order is: subscriptions →
+    keyword rules (named payees like 420, rent→Casa, merchants) → MCC → outgoing
+    transfers (giroconti → "Trasferimenti", excluded from Uscite) → financing
+    (Rate) → "Varie". Keyword rules run BEFORE the transfer check so a meaningful
+    P2P payment (rent, 420) wins over the generic giroconto exclusion.
     """
     if is_income:
         return "Entrate"
 
     haystack = f"{merchant or ''} {description or ''}".lower()
 
-    # Outgoing internal movement → not spending.
-    if (bank_category or "").upper() == "TRANSFER" or any(kw in haystack for kw in _TRANSFER_MARKERS):
-        return TRANSFER_CATEGORY
-
     if sub_keywords and any(kw in haystack for kw in sub_keywords):
         return "Abbonamenti"
+
+    for category, keywords in KEYWORD_RULES:
+        if any(kw in haystack for kw in keywords):
+            return category
 
     if mcc:
         hit = MCC_CATEGORY_MAP.get(mcc.strip())
         if hit:
             return hit
 
-    for category, keywords in KEYWORD_RULES:
-        if any(kw in haystack for kw in keywords):
-            return category
+    # Outgoing internal movement (giroconto / transfer to own pockets) → not
+    # spending. After the keyword rules so named payees keep their category.
+    if (bank_category or "").upper() == "TRANSFER" or any(kw in haystack for kw in _TRANSFER_MARKERS):
+        return TRANSFER_CATEGORY
 
-    # Financing: BNPL providers, explicit installment/loan markers, or a PayPal
-    # charge with no identifiable merchant (Giuseppe's PayPal flow is rate/loans).
-    # Checked last so a recognised merchant paid via PayPal still wins.
+    # Financing: BNPL/loan providers, installment markers, or a PayPal charge with
+    # no identifiable merchant (Giuseppe's PayPal flow is rate/loans).
     if (
         any(p in haystack for p in _BNPL_PROVIDERS)
         or any(m in haystack for m in _INSTALLMENT_MARKERS)
@@ -206,4 +209,4 @@ def categorize(
     ):
         return "Rate"
 
-    return "Altro"
+    return "Varie"

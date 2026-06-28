@@ -45,7 +45,7 @@ const CAT_COLORS: Record<string, string> = {
   Shopping: '249 115 22', Svago: '148 163 184', Viaggi: '6 182 212',
   Rate: '217 70 239', '420': '132 204 22', Prelievi: '120 113 108',
   Commissioni: '113 113 122', Trasferimenti: '100 116 139',
-  Entrate: '34 197 94', Altro: '100 116 139',
+  Varie: '161 161 170', Entrate: '34 197 94', Altro: '100 116 139',
 };
 function colorFor(cat: string, i = 0): string {
   if (CAT_COLORS[cat]) return CAT_COLORS[cat];

@@ -569,7 +569,7 @@ input[type='checkbox'], input[type='radio'] {
 .sd-main-inner { max-width: 1140px; margin: 0 auto; }
 .sd-grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
 .sd-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-.sd-twocol { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 18px; }
+.sd-twocol { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); gap: 18px; }
 .sd-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 @media (max-width: 760px) { .sd-grid3 { grid-template-columns: 1fr !important; } }
 .sd-focus { display: grid; grid-template-columns: 0.82fr 1.18fr; gap: 0; }
