@@ -171,17 +171,22 @@ def categorize(
 ) -> str:
     """Best-guess budget category for a transaction.
 
-    All income is grouped as "Entrate" and always counts (pocket transfers,
-    parents, sales, top-ups). For expenses the order is: subscriptions →
-    keyword rules (named payees like 420, rent→Casa, merchants) → MCC → outgoing
-    transfers (giroconti → "Trasferimenti", excluded from Uscite) → financing
-    (Rate) → "Varie". Keyword rules run BEFORE the transfer check so a meaningful
-    P2P payment (rent, 420) wins over the generic giroconto exclusion.
-    """
-    if is_income:
-        return "Entrate"
+    Income counts as "Entrate" — EXCEPT pocket/exchange moves into the balance
+    ("To EUR"), which are internal and map to "Trasferimenti" (excluded). Real
+    income (From <person>, sales, loans, top-ups) stays Entrate.
 
+    For expenses the order is: subscriptions → keyword rules (named payees like
+    420, rent→Casa, merchants) → MCC → outgoing transfers (giroconti →
+    "Trasferimenti", excluded from Uscite) → financing (Rate) → "Varie". Keyword
+    rules run BEFORE the transfer check so a meaningful P2P payment (rent, 420)
+    wins over the generic giroconto exclusion.
+    """
     haystack = f"{merchant or ''} {description or ''}".lower()
+    # Internal pocket/exchange move (e.g. "To EUR") — applies in both directions.
+    internal_move = any(kw in haystack for kw in _TRANSFER_MARKERS)
+
+    if is_income:
+        return TRANSFER_CATEGORY if internal_move else "Entrate"
 
     if sub_keywords and any(kw in haystack for kw in sub_keywords):
         return "Abbonamenti"
@@ -197,7 +202,7 @@ def categorize(
 
     # Outgoing internal movement (giroconto / transfer to own pockets) → not
     # spending. After the keyword rules so named payees keep their category.
-    if (bank_category or "").upper() == "TRANSFER" or any(kw in haystack for kw in _TRANSFER_MARKERS):
+    if (bank_category or "").upper() == "TRANSFER" or internal_move:
         return TRANSFER_CATEGORY
 
     # Financing: BNPL/loan providers, installment markers, or a PayPal charge with

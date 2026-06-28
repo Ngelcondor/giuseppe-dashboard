@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Trash2, FileUp, Landmark, RefreshCw, Tags, Tag } from 'lucide-react';
+import { Trash2, FileUp, Landmark, RefreshCw, Tags, Tag, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Sheet, Field, FieldRow } from '@/components/sd/FormSheet';
 import {
@@ -204,6 +204,11 @@ export default function BudgetPage() {
     label: t.description || t.category,
   }));
 
+  // Expense line items grouped by category, for the per-category cascade.
+  const expenseByCat: Record<string, TxView[]> = {};
+  txView.filter((t) => t.amount < 0).forEach((t) => { (expenseByCat[t.cat] ||= []).push(t); });
+  Object.values(expenseByCat).forEach((arr) => arr.sort((a, b) => a.amount - b.amount));
+
   // cash-flow breakdowns (Flusso). Internal movements aren't real income.
   const incomeMap = new Map<string, number>();
   txs.filter((t) => t.transaction_type === 'income' && t.category !== 'Trasferimenti').forEach((t) => {
@@ -341,7 +346,7 @@ export default function BudgetPage() {
               <>
                 <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 20px' }}><CompositionDonut cats={cats} total={catTotal} /></div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {cats.map((c) => <CatRow key={c.name} cat={c} spent={catTotal} />)}
+                  {cats.map((c) => <CatRow key={c.name} cat={c} spent={catTotal} items={expenseByCat[c.name] || []} />)}
                 </div>
               </>
             )}
@@ -477,22 +482,44 @@ function CompositionDonut({ cats, total }: { cats: Cat[]; total: number }) {
   );
 }
 
-function CatRow({ cat, spent }: { cat: Cat; spent: number }) {
+function CatRow({ cat, spent, items }: { cat: Cat; spent: number; items: TxView[] }) {
+  const [open, setOpen] = useState(false);
   const frac = spent ? cat.amount / spent : 0;
   const pct = Math.round(frac * 100);
+  const canOpen = items.length > 0;
   return (
     <div className="sd-fin-legend">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 7 }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: 'rgb(var(--color-heading))', background: 'rgb(var(--color-card-inner))', border: '1px solid rgb(var(--color-border))', borderRadius: 999, padding: '3px 10px' }}>
-          <span style={{ width: 7, height: 7, borderRadius: 9, background: `rgb(${cat.color})` }} />{cat.name}
-        </span>
-        <span style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontFamily: mono, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{eur(cat.amount, true)}</span> · {pct}%
-        </span>
+      <div
+        onClick={canOpen ? () => setOpen((o) => !o) : undefined}
+        role={canOpen ? 'button' : undefined}
+        aria-expanded={canOpen ? open : undefined}
+        style={{ cursor: canOpen ? 'pointer' : 'default' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 7 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: 'rgb(var(--color-heading))', background: 'rgb(var(--color-card-inner))', border: '1px solid rgb(var(--color-border))', borderRadius: 999, padding: '3px 10px' }}>
+            <span style={{ width: 7, height: 7, borderRadius: 9, background: `rgb(${cat.color})` }} />{cat.name}
+            {canOpen && <span style={{ fontFamily: mono, fontWeight: 600, color: 'rgb(var(--color-muted))' }}>{items.length}</span>}
+          </span>
+          <span style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontFamily: mono, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{eur(cat.amount, true)}</span> · {pct}%
+            {canOpen && <ChevronDown size={13} style={{ color: 'rgb(var(--color-muted))', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />}
+          </span>
+        </div>
+        <div style={{ height: 8, borderRadius: 8, background: 'rgb(var(--color-card-inner))', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${(frac * 100).toFixed(0)}%`, borderRadius: 8, background: `rgb(${cat.color})` }} />
+        </div>
       </div>
-      <div style={{ height: 8, borderRadius: 8, background: 'rgb(var(--color-card-inner))', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${(frac * 100).toFixed(0)}%`, borderRadius: 8, background: `rgb(${cat.color})` }} />
-      </div>
+      {open && (
+        <div style={{ marginTop: 10, marginLeft: 3, paddingLeft: 11, borderLeft: `2px solid rgb(${cat.color} / 0.35)`, display: 'flex', flexDirection: 'column', gap: 9 }}>
+          {items.map((it) => (
+            <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ flex: 'none', width: 40, fontFamily: mono, fontSize: 11, color: 'rgb(var(--color-muted))' }}>{it.dateLabel}</span>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: 'rgb(var(--color-body))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.name}</span>
+              <span style={{ flex: 'none', fontFamily: mono, fontSize: 12, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{eur(Math.abs(it.amount), true)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
