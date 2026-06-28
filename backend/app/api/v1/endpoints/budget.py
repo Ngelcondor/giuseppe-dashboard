@@ -338,6 +338,7 @@ async def sync_bank_transactions(
                     is_income=(txn_type == TransactionType.INCOME),
                     sub_keywords=sub_kws,
                     bank_category=tx.bank_transaction_code,
+                    amount=abs(tx.amount),
                 )
 
                 new_tx = Transaction(
@@ -629,6 +630,7 @@ async def recategorize_transactions(
             is_income=(txn.transaction_type == TransactionType.INCOME),
             sub_keywords=sub_kws,
             bank_category=txn.bank_category,
+            amount=txn.amount,
         )
         if new_cat != txn.category:
             txn.category = new_cat

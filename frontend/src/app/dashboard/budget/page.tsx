@@ -43,7 +43,7 @@ const CAT_COLORS: Record<string, string> = {
   Bollette: '234 179 8', Ristorazione: '236 72 153', Abbonamenti: '139 92 246',
   Studio: '168 85 247', Salute: '244 63 94', Tech: '14 165 233',
   Shopping: '249 115 22', Svago: '148 163 184', Viaggi: '6 182 212',
-  Rate: '217 70 239', '420': '132 204 22', Prelievi: '120 113 108',
+  Gaming: '45 212 191', Rate: '217 70 239', '420': '132 204 22', Prelievi: '120 113 108',
   Commissioni: '113 113 122', Trasferimenti: '100 116 139',
   Varie: '161 161 170', Entrate: '34 197 94', Altro: '100 116 139',
 };
