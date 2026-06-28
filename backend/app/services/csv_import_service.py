@@ -95,6 +95,7 @@ def parse_revolut_csv(
                 merchant=description,
                 is_income=(txn_type == TransactionType.INCOME),
                 sub_keywords=sub_keywords,
+                amount=abs(amount),
             )
 
             # Currency

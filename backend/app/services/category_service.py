@@ -52,7 +52,7 @@ KEYWORD_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("420", ("giulio de angelis", "de angelis giulio", "giulio d")),
     ("Abbonamenti", (
         "spotify", "netflix", "disney", "hbo", "prime video", "amazon prime",
-        "youtube premium", "youtube music", "apple.com/bill", "apple music",
+        "youtube premium", "youtube music", "apple music",
         "icloud", "google one", "google storage", "openai", "chatgpt",
         "anthropic", "claude.ai", "claude", "cursor", "github", "notion",
         "adobe", "dropbox", "1password", "proton", "nordvpn", "expressvpn",
@@ -110,10 +110,14 @@ KEYWORD_RULES: list[tuple[str, tuple[str, ...]]] = [
         "primark", "decathlon", "nike", "adidas", "asos", "shein", "springfield",
         "massimo dutti", "douglas", "sephora", "muji", "lush", "vinted",
     )),
+    ("Gaming", (
+        "last war", "warsurvival", "supercell", "steam", "playstation",
+        "nintendo", "xbox", "epic games", "riot games", "roblox", "twitch",
+    )),
     ("Svago", (
-        "cinema", "cinesa", "yelmo", "teatro", "concierto", "concert", "steam",
-        "playstation", "nintendo", "xbox", "epic games", "gimnasio", "basic fit",
-        "basic-fit", "metropolitan", "padel", "museo", "museu",
+        "cinema", "cinesa", "yelmo", "teatro", "concierto", "concert",
+        "gimnasio", "basic fit", "basic-fit", "metropolitan", "padel",
+        "museo", "museu",
     )),
     ("Prelievi", ("atm", "cajero", "withdrawal", "prelievo", "bancomat")),
     ("Commissioni", ("fee", "comision", "commissione", "comissio")),
@@ -133,6 +137,11 @@ _INSTALLMENT_MARKERS = (
     "pago en 3", "pago en 4", "en 3 plazos", "en 4 plazos", "installment",
     "prestito", "prestamo", "finanziamento", "financiacion", "credito al consumo",
 )
+
+# Apple in-app charges all show as "apple.com/bill" at the bank. These recurring
+# monthly amounts are Giuseppe's real Apple subscriptions; every other
+# apple.com/bill amount is an in-app (Last War) purchase → Gaming.
+_APPLE_SUB_AMOUNTS = {9.99, 14.99}
 
 # Brand prefixes that sell far more than subscriptions — for these, only the full
 # subscription title (e.g. "amazon prime") is matched, never the bare brand, so a
@@ -168,6 +177,7 @@ def categorize(
     is_income: bool = False,
     sub_keywords: set[str] | None = None,
     bank_category: str | None = None,
+    amount: float | None = None,
 ) -> str:
     """Best-guess budget category for a transaction.
 
@@ -187,6 +197,11 @@ def categorize(
 
     if is_income:
         return TRANSFER_CATEGORY if internal_move else "Entrate"
+
+    # Apple in-app: bank shows everything as "apple.com/bill". Recurring monthly
+    # amounts are real Apple subscriptions; the rest are in-app (game) purchases.
+    if "apple.com/bill" in haystack:
+        return "Abbonamenti" if round(amount or 0.0, 2) in _APPLE_SUB_AMOUNTS else "Gaming"
 
     if sub_keywords and any(kw in haystack for kw in sub_keywords):
         return "Abbonamenti"
