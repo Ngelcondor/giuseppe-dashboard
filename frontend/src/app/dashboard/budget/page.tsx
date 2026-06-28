@@ -44,7 +44,8 @@ const CAT_COLORS: Record<string, string> = {
   Studio: '168 85 247', Salute: '244 63 94', Tech: '14 165 233',
   Shopping: '249 115 22', Svago: '148 163 184', Viaggi: '6 182 212',
   Rate: '217 70 239', '420': '132 204 22', Prelievi: '120 113 108',
-  Commissioni: '113 113 122', Entrate: '34 197 94', Altro: '100 116 139',
+  Commissioni: '113 113 122', Trasferimenti: '100 116 139',
+  Entrate: '34 197 94', Altro: '100 116 139',
 };
 function colorFor(cat: string, i = 0): string {
   if (CAT_COLORS[cat]) return CAT_COLORS[cat];
@@ -203,9 +204,9 @@ export default function BudgetPage() {
     label: t.description || t.category,
   }));
 
-  // cash-flow breakdowns (Flusso)
+  // cash-flow breakdowns (Flusso). Internal movements aren't real income.
   const incomeMap = new Map<string, number>();
-  txs.filter((t) => t.transaction_type === 'income').forEach((t) => {
+  txs.filter((t) => t.transaction_type === 'income' && t.category !== 'Trasferimenti').forEach((t) => {
     const k = t.description || t.merchant_name || t.category || 'Entrata';
     incomeMap.set(k, (incomeMap.get(k) || 0) + t.amount);
   });
@@ -625,7 +626,7 @@ function CategoryEditForm({ current, categoryNames, onSubmit, onCancel }: { curr
   const [value, setValue] = useState(current);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const quick = Object.keys(CAT_COLORS).filter((c) => c !== 'Altro' && c !== 'Entrate');
+  const quick = Object.keys(CAT_COLORS).filter((c) => !['Altro', 'Entrate', 'Trasferimenti'].includes(c));
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const v = value.trim();
