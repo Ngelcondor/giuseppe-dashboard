@@ -89,10 +89,13 @@ async def create_token(
     await db.commit()
     await db.refresh(api_token)
 
-    # Return response with the full token (only time it's visible)
-    response = APITokenCreated.model_validate(api_token)
-    response.token = raw_token
-    return response
+    # Return response with the full token (only time it's visible).
+    # NB: build from the ORM-derived fields + the raw token; model_validate(api_token)
+    # alone fails because `token` is required and absent on the ORM object.
+    return APITokenCreated(
+        **APITokenResponse.model_validate(api_token).model_dump(),
+        token=raw_token,
+    )
 
 
 # ── Revoke (delete) a token ──────────────────────────────────────────────────
