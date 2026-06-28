@@ -12,19 +12,19 @@ classifies identically.
 """
 from __future__ import annotations
 
-# Category for internal money movements (top-ups, currency exchange, transfers
-# between own accounts). NOT real income or spending — the dashboard excludes it
-# from income/expense/net totals, but the rows still show in the ledger.
+# Category for OUTGOING internal movements — giroconti / transfers to own
+# pockets. Per Giuseppe: these are NOT spending, so the dashboard excludes them
+# from the Uscite total (rows still show in the ledger). Incoming transfers
+# (money from his pockets, parents, sales, top-ups) DO count as Entrate, so the
+# is_income short-circuit runs before this check.
 TRANSFER_CATEGORY = "Trasferimenti"
 
-# Revolut internal-movement markers, matched as substrings on merchant +
-# description. The trailing currency codes carry a leading space so "to eur"
+# Description fallback for outgoing transfers when bank_category is absent (e.g.
+# CSV import). The trailing currency codes carry a leading space so "to eur"
 # never matches inside an unrelated word.
 _TRANSFER_MARKERS = (
-    "top-up", "top up", "topup",
     "to eur", "to usd", "to gbp", "to chf", "to pln", "to ron",
-    "from usd", "from gbp", "from chf",
-    "exchanged to", "to revolut", "from revolut", "savings vault",
+    "exchanged to", "to revolut", "savings vault",
 )
 
 # Merchant-category-code → category. High confidence, checked before keywords.
@@ -164,23 +164,25 @@ def categorize(
     *,
     is_income: bool = False,
     sub_keywords: set[str] | None = None,
+    bank_category: str | None = None,
 ) -> str:
     """Best-guess budget category for a transaction.
 
-    Income is always grouped as "Entrate" (the spending breakdown only counts
-    expenses, so income categories are never split). For expenses: a match
-    against the user's own subscriptions wins first (keeps "Abbonamenti" aligned
-    with the dedicated page), then MCC, then keyword rules, else "Altro".
+    All income is grouped as "Entrate" and always counts (pocket transfers,
+    parents, sales, top-ups). For expenses: outgoing transfers/giroconti map to
+    "Trasferimenti" (excluded from the Uscite total) — detected from the bank's
+    own type (TRANSFER) with a description fallback. Then a match against the
+    user's subscriptions wins (keeps "Abbonamenti" aligned with its page), then
+    MCC, then keyword rules, then financing, else "Altro".
     """
-    haystack = f"{merchant or ''} {description or ''}".lower()
-
-    # Internal movements first — applies to both directions (a top-up is a
-    # positive entry, an exchange-out is negative), so check before is_income.
-    if any(kw in haystack for kw in _TRANSFER_MARKERS):
-        return TRANSFER_CATEGORY
-
     if is_income:
         return "Entrate"
+
+    haystack = f"{merchant or ''} {description or ''}".lower()
+
+    # Outgoing internal movement → not spending.
+    if (bank_category or "").upper() == "TRANSFER" or any(kw in haystack for kw in _TRANSFER_MARKERS):
+        return TRANSFER_CATEGORY
 
     if sub_keywords and any(kw in haystack for kw in sub_keywords):
         return "Abbonamenti"
