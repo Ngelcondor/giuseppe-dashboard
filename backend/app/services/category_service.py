@@ -12,6 +12,21 @@ classifies identically.
 """
 from __future__ import annotations
 
+# Category for internal money movements (top-ups, currency exchange, transfers
+# between own accounts). NOT real income or spending — the dashboard excludes it
+# from income/expense/net totals, but the rows still show in the ledger.
+TRANSFER_CATEGORY = "Trasferimenti"
+
+# Revolut internal-movement markers, matched as substrings on merchant +
+# description. The trailing currency codes carry a leading space so "to eur"
+# never matches inside an unrelated word.
+_TRANSFER_MARKERS = (
+    "top-up", "top up", "topup",
+    "to eur", "to usd", "to gbp", "to chf", "to pln", "to ron",
+    "from usd", "from gbp", "from chf",
+    "exchanged to", "to revolut", "from revolut", "savings vault",
+)
+
 # Merchant-category-code → category. High confidence, checked before keywords.
 MCC_CATEGORY_MAP: dict[str, str] = {
     "5411": "Alimentari", "5412": "Alimentari", "5422": "Alimentari",
@@ -157,10 +172,15 @@ def categorize(
     against the user's own subscriptions wins first (keeps "Abbonamenti" aligned
     with the dedicated page), then MCC, then keyword rules, else "Altro".
     """
+    haystack = f"{merchant or ''} {description or ''}".lower()
+
+    # Internal movements first — applies to both directions (a top-up is a
+    # positive entry, an exchange-out is negative), so check before is_income.
+    if any(kw in haystack for kw in _TRANSFER_MARKERS):
+        return TRANSFER_CATEGORY
+
     if is_income:
         return "Entrate"
-
-    haystack = f"{merchant or ''} {description or ''}".lower()
 
     if sub_keywords and any(kw in haystack for kw in sub_keywords):
         return "Abbonamenti"

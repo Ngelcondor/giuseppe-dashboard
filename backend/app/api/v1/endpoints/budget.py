@@ -41,7 +41,7 @@ from app.schemas.budget import (
     CSVImportResponse,
 )
 from app.services.bank_factory import get_bank_provider
-from app.services.category_service import categorize, subscription_keywords
+from app.services.category_service import categorize, subscription_keywords, TRANSFER_CATEGORY
 from app.services.csv_import_service import parse_revolut_csv
 
 logger = logging.getLogger(__name__)
@@ -718,8 +718,11 @@ async def get_budget_dashboard(
     )
     transactions = result.scalars().all()
 
-    income = sum(t.amount for t in transactions if t.transaction_type == TransactionType.INCOME)
-    expenses = sum(t.amount for t in transactions if t.transaction_type == TransactionType.EXPENSE)
+    # Internal movements (top-ups, currency exchange, own-account transfers) are
+    # not income/spending — keep them out of the totals.
+    real = [t for t in transactions if t.category != TRANSFER_CATEGORY]
+    income = sum(t.amount for t in real if t.transaction_type == TransactionType.INCOME)
+    expenses = sum(t.amount for t in real if t.transaction_type == TransactionType.EXPENSE)
 
     dashboard.total_income = round(income, 2)
     dashboard.total_expenses = round(expenses, 2)
@@ -732,7 +735,7 @@ async def get_budget_dashboard(
 
     # ── 3. Category spending vs goals ─────────────────────────────────────────
     by_category: dict[str, float] = {}
-    for txn in transactions:
+    for txn in real:
         if txn.transaction_type == TransactionType.EXPENSE:
             by_category[txn.category] = by_category.get(txn.category, 0) + txn.amount
 
