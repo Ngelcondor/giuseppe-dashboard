@@ -300,7 +300,13 @@ class EnableBankingProvider(BankProvider):
         date_from: Optional[date] = None,
         date_to: Optional[date] = None,
     ) -> BankTransactionList:
-        """GET /accounts/{account_uid}/transactions?date_from=&date_to=."""
+        """GET /accounts/{account_uid}/transactions?date_from=&date_to=.
+
+        Enable Banking returns transactions newest-first in pages and signals
+        more via `continuation_key`. We MUST follow it — reading only the first
+        page silently drops older transactions in the requested window (e.g. a
+        90-day sync that returns just the last two weeks).
+        """
         headers = self._auth_headers()
         params = {}
         if date_from:
@@ -308,34 +314,48 @@ class EnableBankingProvider(BankProvider):
         if date_to:
             params["date_to"] = date_to.isoformat()
 
-        async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.get(
-                f"{EB_BASE}/accounts/{account_id}/transactions",
-                headers=headers,
-                params=params,
-            )
-            try:
-                resp.raise_for_status()
-            except httpx.HTTPStatusError:
-                logger.error(
-                    "EB get_transactions HTTP %s: %s", resp.status_code, resp.text
-                )
-                raise
-            data = resp.json() if resp.content else {}
-
         result = BankTransactionList()
-        if not isinstance(data, dict):
-            logger.error("EB get_transactions unexpected payload: %s", resp.text)
-            return result
+        url = f"{EB_BASE}/accounts/{account_id}/transactions"
+        MAX_PAGES = 100  # safety cap (~ tens of thousands of tx) against loops
 
-        for tx in data.get("transactions", []) or []:
-            if not isinstance(tx, dict):
-                continue
-            try:
-                result.booked.append(self._parse_transaction(tx))
-            except Exception as e:  # never let one bad tx kill the sync
-                logger.warning("EB transaction parse failed: %s | raw=%s", e, tx)
+        async with httpx.AsyncClient(timeout=30) as client:
+            continuation_key: Optional[str] = None
+            for page in range(MAX_PAGES):
+                q = dict(params)
+                if continuation_key:
+                    q["continuation_key"] = continuation_key
+                resp = await client.get(url, headers=headers, params=q)
+                try:
+                    resp.raise_for_status()
+                except httpx.HTTPStatusError:
+                    logger.error(
+                        "EB get_transactions HTTP %s (page %s): %s",
+                        resp.status_code, page, resp.text,
+                    )
+                    raise
+                data = resp.json() if resp.content else {}
+                if not isinstance(data, dict):
+                    logger.error("EB get_transactions unexpected payload: %s", resp.text)
+                    break
 
+                for tx in data.get("transactions", []) or []:
+                    if not isinstance(tx, dict):
+                        continue
+                    try:
+                        result.booked.append(self._parse_transaction(tx))
+                    except Exception as e:  # never let one bad tx kill the sync
+                        logger.warning("EB transaction parse failed: %s | raw=%s", e, tx)
+
+                continuation_key = data.get("continuation_key")
+                if not continuation_key:
+                    break
+            else:
+                logger.warning(
+                    "EB get_transactions hit MAX_PAGES=%s; older transactions may be truncated",
+                    MAX_PAGES,
+                )
+
+        logger.info("EB get_transactions: fetched %s booked transactions", len(result.booked))
         return result
 
     @staticmethod
