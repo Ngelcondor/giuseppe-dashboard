@@ -93,7 +93,7 @@ export function DeadlineForm({ initial, defaultType, onSubmit, onCancel }: { ini
       body.installments_total = null;
       body.installments_paid = null;
       body.recurrence_interval = null;
-      body.amount = null;
+      body.amount = amount ? parseFloat(amount) : null;
     }
 
     setSubmitting(true); setError('');
@@ -138,11 +138,12 @@ export function DeadlineForm({ initial, defaultType, onSubmit, onCancel }: { ini
           </select>
         </Field>
       )}
-      {recType !== 'none' && (
-        <Field label={recType === 'installments' ? 'Importo per rata (€)' : 'Importo per periodo (€)'} hint={recType === 'installments' ? 'La prima rata cade alla data indicata; le successive a distanza di un mese.' : 'La data indicata è il primo addebito.'}>
-          <input className="sd-input" type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="49.90" />
-        </Field>
-      )}
+      <Field
+        label={recType === 'installments' ? 'Importo per rata (€)' : recType === 'subscription' ? 'Importo per periodo (€)' : 'Importo (€)'}
+        hint={recType === 'installments' ? 'La prima rata cade alla data indicata; le successive a distanza di un mese.' : recType === 'subscription' ? 'La data indicata è il primo addebito.' : undefined}
+      >
+        <input className="sd-input" type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="49.90" />
+      </Field>
 
       <Field label="Descrizione"><textarea className="sd-textarea" value={descrizione} onChange={(e) => setDescrizione(e.target.value)} placeholder="Dettagli, note…" /></Field>
       {error && <p style={errStyle}>{error}</p>}
