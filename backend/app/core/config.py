@@ -1,7 +1,10 @@
 """Configuration settings for the application."""
 from pydantic_settings import BaseSettings
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from typing import Optional, Union
+
+# Placeholder shipped in .env.example — must never survive in production.
+_INSECURE_SECRET_KEY = "your-secret-key-change-in-production"
 
 
 class Settings(BaseSettings):
@@ -11,7 +14,12 @@ class Settings(BaseSettings):
     APP_NAME: str = "Giuseppe Dashboard API"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
-    ENV: str = "development"
+    ENVIRONMENT: str = "development"  # "production" on the prod host
+    DISABLE_DOCS: bool = False  # docs are always off in production regardless
+
+    @property
+    def is_production(self) -> bool:
+        return self.ENVIRONMENT.lower() == "production"
 
     # Database Configuration
     DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/giuseppe_dashboard"
@@ -22,7 +30,7 @@ class Settings(BaseSettings):
     REDIS_CACHE_EXPIRY: int = 3600
 
     # Security Configuration
-    SECRET_KEY: str = "your-secret-key-change-in-production"
+    SECRET_KEY: str = _INSECURE_SECRET_KEY
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -97,9 +105,12 @@ class Settings(BaseSettings):
     AWS_S3_BUCKET: str = "giuseppe-dashboard"
     AWS_S3_REGION: str = "us-east-1"
 
-    # Single-user credentials (used to auto-seed on first startup)
-    ADMIN_EMAIL: str = "giuseppe.diansr@hotmail.it"
+    # Single-user credentials (used to auto-seed on first startup).
+    # No personal defaults in code: both come from the environment; the seed
+    # is skipped (with a warning) when either is missing.
+    ADMIN_EMAIL: str = ""
     ADMIN_PASSWORD: str = ""  # plain password, read at startup to seed DB
+    ALLOW_ADMIN_INIT: bool = False  # gate for POST /auth/init (see README §Security)
 
     # Open Banking — Provider-agnostic (configure one of the two)
     # Option 1: Enable Banking (recommended — free for personal use)
@@ -107,7 +118,7 @@ class Settings(BaseSettings):
     # App ID is an identifier (not secret); the private RSA key goes in
     # ENABLE_BANKING_APP_SECRET via env only (never commit it). Redirect URL must
     # match exactly a value registered in the EB app (EB rejects query strings).
-    ENABLE_BANKING_APP_ID: str = "ce2e676c-fd45-4df0-9055-cc4fbe0c2447"
+    ENABLE_BANKING_APP_ID: str = ""  # from env only — no personal defaults in code
     ENABLE_BANKING_APP_SECRET: str = ""
     ENABLE_BANKING_REDIRECT_URL: str = "http://localhost:3000/dashboard/budget"
 
@@ -121,6 +132,17 @@ class Settings(BaseSettings):
     # Feature Flags
     ENABLE_NOTIFICATIONS: bool = True
     ENABLE_FEED: bool = True
+
+    @model_validator(mode="after")
+    def _fail_fast_in_production(self) -> "Settings":
+        """Refuse to boot production with an insecure or missing SECRET_KEY."""
+        if self.is_production and (not self.SECRET_KEY or self.SECRET_KEY == _INSECURE_SECRET_KEY):
+            raise RuntimeError(
+                "SECRET_KEY non impostata (o lasciata al placeholder) con "
+                "ENVIRONMENT=production. Genera una chiave forte, es.: "
+                "python -c 'import secrets; print(secrets.token_urlsafe(64))'"
+            )
+        return self
 
     class Config:
         """Pydantic config."""

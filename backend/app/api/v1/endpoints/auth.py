@@ -1,6 +1,5 @@
 """Authentication endpoints — single-user, no registration."""
 import logging
-import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +7,7 @@ from sqlalchemy.future import select
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.ratelimit import client_ip, init_limiter, login_limiter
 from app.core.security import (
     hash_password,
     verify_password,
@@ -42,10 +42,11 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/init", status_code=201)
 async def init_admin(request: Request, db: AsyncSession = Depends(get_db)):
     """Create admin user — only if no admin exists and ALLOW_ADMIN_INIT is enabled."""
-    client_host = request.client.host if request.client else "unknown"
+    client_host = client_ip(request)
     logger.warning(f"Admin init attempted from {client_host}")
+    init_limiter.check(client_host)
 
-    if os.getenv("ALLOW_ADMIN_INIT", "").lower() != "true":
+    if not settings.ALLOW_ADMIN_INIT:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin init disabled, use CLI",
@@ -78,9 +79,10 @@ async def init_admin(request: Request, db: AsyncSession = Depends(get_db)):
 
 @router.post("/login", response_model=UserAuthResponse)
 async def login(
-    credentials: UserLoginRequest, db: AsyncSession = Depends(get_db)
+    credentials: UserLoginRequest, request: Request, db: AsyncSession = Depends(get_db)
 ) -> UserAuthResponse:
     """Login user."""
+    login_limiter.check(client_ip(request))
     result = await db.execute(select(User).where(User.email == credentials.email))
     user = result.scalars().first()
 
