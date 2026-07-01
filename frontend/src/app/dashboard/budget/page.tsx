@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Trash2, FileUp, Landmark, RefreshCw, Tags, Tag, ChevronDown } from 'lucide-react';
+import { Trash2, FileUp, Landmark, RefreshCw, Tags, Tag, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Sheet, Field, FieldRow } from '@/components/sd/FormSheet';
 import {
@@ -23,15 +23,14 @@ import { Abbonamenti } from '@/components/sd/Abbonamenti';
    and the scadenze list. No budgeting/targets — just what actually happened. */
 
 const mono = "'JetBrains Mono',monospace";
-const MONTH = 6;
-const YEAR = 2026;
-const FIRST_DAY_ISO = '2026-06-01';
-const TODAY_ISO = '2026-06-21';
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const isoOf = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const monthFirstISO = (year: number, month: number) => `${year}-${pad2(month)}-01`;
 const errStyle: React.CSSProperties = { margin: '2px 0 0', fontSize: 12.5, color: 'rgb(239 68 68)' };
 
 const FALLBACK: BudgetDashboard = {
   bank_connected: false, bank_balance: null, bank_currency: 'EUR', bank_last_sync: null,
-  month: FIRST_DAY_ISO, total_income: 0, total_expenses: 0, net_balance: 0,
+  month: monthFirstISO(new Date().getFullYear(), new Date().getMonth() + 1), total_income: 0, total_expenses: 0, net_balance: 0,
   categories: [], upcoming_scadenze: [], overdue_scadenze: [],
   scadenze_total: 0, scadenze_paid: 0, scadenze_remaining: 0, recent_transactions: [],
 };
@@ -87,6 +86,8 @@ export default function BudgetPage() {
   const [txs, setTxs] = useState<Transaction[]>([]);
 
   const [view, setView] = useState<'a' | 'b' | 'c' | 'd'>('a');
+  // Selected month for Panoramica/Flusso (+ header stats). Defaults to the current month.
+  const [period, setPeriod] = useState(() => { const n = new Date(); return { month: n.getMonth() + 1, year: n.getFullYear() }; });
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [importErr, setImportErr] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
@@ -108,12 +109,12 @@ export default function BudgetPage() {
   const load = useCallback(async () => {
     try {
       const [dash, tx] = await Promise.all([
-        getBudgetDashboard(MONTH, YEAR),
-        listTransactions({ month: MONTH, year: YEAR, limit: 1000 }),
+        getBudgetDashboard(period.month, period.year),
+        listTransactions({ month: period.month, year: period.year, limit: 1000 }),
       ]);
       setData(dash); setTxs(tx);
     } catch {/* keep current */}
-  }, []);
+  }, [period]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { getCurrentUserRole().then((u) => setIsGuest(u?.role === 'guest')).catch(() => {}); }, []);
 
@@ -138,6 +139,20 @@ export default function BudgetPage() {
     } catch {/* ignore */}
   }, []);
   const setViewP = (v: 'a' | 'b' | 'c' | 'd') => { setView(v); try { localStorage.setItem('sd-fin-view', v); } catch {/**/} };
+
+  // ── Month navigation (Panoramica + Flusso + header stats are per-month) ──
+  const now = new Date();
+  const curKey = now.getFullYear() * 12 + now.getMonth();
+  const selKey = period.year * 12 + (period.month - 1);
+  const canNext = selKey < curKey;                  // don't step into future months (no data)
+  const periodISO = monthFirstISO(period.year, period.month);
+  const shiftMonth = (delta: number) => setPeriod((p) => {
+    const d = new Date(p.year, p.month - 1 + delta, 1);
+    return { month: d.getMonth() + 1, year: d.getFullYear() };
+  });
+  // New expense defaults to today when viewing the current month, otherwise to
+  // the 1st of the viewed month so the added transaction shows up in this view.
+  const txDefaultDate = selKey === curKey ? isoOf(now) : periodISO;
 
   // Manual bank sync (pull transactions for an already-connected account).
   const doSync = async () => {
@@ -255,7 +270,17 @@ export default function BudgetPage() {
       {/* ═══ HEADER ═══ */}
       <header className="sd-reveal" style={{ ['--i' as string]: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap', marginBottom: 24 }}>
         <div>
-          <div style={{ fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgb(16 185 129)', fontFamily: mono, marginBottom: 10, fontWeight: 600 }}>Banca · {fmtMonthLabel(data.month)}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 10 }}>
+            <button type="button" className="sd-press" onClick={() => shiftMonth(-1)} aria-label="Mese precedente"
+              style={{ display: 'inline-flex', alignItems: 'center', border: 'none', background: 'transparent', color: 'rgb(16 185 129)', cursor: 'pointer', padding: 2 }}>
+              <ChevronLeft size={16} />
+            </button>
+            <span style={{ fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgb(16 185 129)', fontFamily: mono, fontWeight: 600, minWidth: 132, textAlign: 'center' }}>Banca · {fmtMonthLabel(periodISO)}</span>
+            <button type="button" className="sd-press" onClick={() => canNext && shiftMonth(1)} disabled={!canNext} aria-label="Mese successivo"
+              style={{ display: 'inline-flex', alignItems: 'center', border: 'none', background: 'transparent', color: 'rgb(16 185 129)', cursor: canNext ? 'pointer' : 'default', opacity: canNext ? 1 : 0.3, padding: 2 }}>
+              <ChevronRight size={16} />
+            </button>
+          </div>
           <h1 style={{ margin: 0, fontSize: 32, lineHeight: 1.05, letterSpacing: '.02em', color: 'rgb(var(--color-heading))', fontWeight: 700 }}>Gestione finanziaria</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -339,7 +364,7 @@ export default function BudgetPage() {
                     <Tags size={13} />{recatting ? 'Ricategorizzo…' : 'Ricategorizza'}
                   </button>
                 )}
-                <span style={{ fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{fmtMonthLabel(data.month).split(' ')[0]}</span>
+                <span style={{ fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{fmtMonthLabel(periodISO).split(' ')[0]}</span>
               </div>
             </div>
             {cats.length === 0 ? <Empty>Nessuna spesa registrata.</Empty> : (
@@ -368,8 +393,8 @@ export default function BudgetPage() {
       {view === 'b' && (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 18 }} className="sd-grid3">
-            <SurfaceStat i={3} label={`Entrate · ${fmtMonthLabel(data.month).split(' ')[0]}`} value={eur(income, true)} color="rgb(16 185 129)" />
-            <SurfaceStat i={4} label={`Uscite · ${fmtMonthLabel(data.month).split(' ')[0]}`} value={eur(spent, true)} color="rgb(239 68 68)" />
+            <SurfaceStat i={3} label={`Entrate · ${fmtMonthLabel(periodISO).split(' ')[0]}`} value={eur(income, true)} color="rgb(16 185 129)" />
+            <SurfaceStat i={4} label={`Uscite · ${fmtMonthLabel(periodISO).split(' ')[0]}`} value={eur(spent, true)} color="rgb(239 68 68)" />
             <SurfaceStat i={5} label="Netto" value={(net >= 0 ? '+' : '−') + eur(Math.abs(net), true).replace('−', '')} accent />
           </div>
           <div className="sd-twocol">
@@ -404,7 +429,7 @@ export default function BudgetPage() {
 
       {/* ═══ SHEETS ═══ */}
       <Sheet open={txOpen} onClose={() => setTxOpen(false)} title="Nuova spesa" subtitle="Movimento del mese">
-        <TransactionForm key={txOpen ? 't' : 'c'} categoryNames={categoryNames} onSubmit={submitTx} onCancel={() => setTxOpen(false)} />
+        <TransactionForm key={txOpen ? 't' : 'c'} categoryNames={categoryNames} defaultDate={txDefaultDate} onSubmit={submitTx} onCancel={() => setTxOpen(false)} />
       </Sheet>
       <Sheet open={!!editTx} onClose={() => setEditTx(null)} title="Cambia categoria" subtitle={editTx?.name} maxWidth={420}>
         <CategoryEditForm key={editTx?.id ?? 'none'} current={editTx?.cat ?? ''} categoryNames={categoryNames} onSubmit={saveCategory} onCancel={() => setEditTx(null)} />
@@ -617,10 +642,10 @@ function FormActions({ onCancel, submitting }: { onCancel: () => void; submittin
     </div>
   );
 }
-function TransactionForm({ categoryNames, onSubmit, onCancel }: { categoryNames: string[]; onSubmit: (b: { amount: number; category: string; description: string; date: string }) => Promise<void>; onCancel: () => void }) {
+function TransactionForm({ categoryNames, defaultDate, onSubmit, onCancel }: { categoryNames: string[]; defaultDate: string; onSubmit: (b: { amount: number; category: string; description: string; date: string }) => Promise<void>; onCancel: () => void }) {
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
-  const [date, setDate] = useState(TODAY_ISO);
+  const [date, setDate] = useState(defaultDate);
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
