@@ -11,6 +11,8 @@ import { getScadenze, type ScadenzaItem } from '@/services/scadenzeService';
 import { getStudyOverview, type StudyOverview } from '@/services/studyService';
 import { getUpcomingEvents, type CalendarEventDTO } from '@/services/calendarService';
 import { getFamilyWeather, weatherIcon, weatherDescription, type FamilyWeather } from '@/services/weatherService';
+import { toAmount, fmtEur } from '@/components/sd/DeadlineForm';
+import type { UniEvento } from '@/services/universitaService';
 
 /* ── Home redesign · "Study Desk" ─────────────────────────────────────────────
    Terminal-style header with a live clock, three horizontal scrollable lanes
@@ -160,13 +162,27 @@ export default function HomePage() {
   const { profilo, prossimo_esame } = uni;
   const esameDays = prossimo_esame ? Math.max(0, daysTo(prossimo_esame.data)) : null;
 
-  // ── Lane 1 · Studio di oggi (real study overview) ───────────────────────────
+  // ── Lane 1 · Studio di oggi (Università + CPTS) ─────────────────────────────
   const today = study?.today ?? null;
   const overall = study?.overall ?? { done: 0, total: 0, pct: 0 };
   const tasks = today && !today.isRest ? today.tasks : [];
   const doneCount = today?.done ?? 0;
   const totalCount = today?.total ?? 0;
   const activeIdx = tasks.findIndex((t) => !t.completed);
+
+  // Impegni UOC imminenti (consegne aperte + prossimo esame, entro 14 giorni):
+  // la corsia studio racconta la giornata reale, non solo il piano CPTS.
+  const uniItems: UniEvento[] = [
+    ...uni.consegne.filter((c) => c.stato !== 'fatto'),
+    ...(prossimo_esame ? [prossimo_esame] : []),
+  ]
+    .filter((e, i, arr) => arr.findIndex((x) => x.id === e.id) === i)
+    .filter((e) => {
+      const d = daysTo(e.data);
+      return d >= 0 && d <= 14;
+    })
+    .sort((a, b) => a.data.localeCompare(b.data))
+    .slice(0, 6);
 
   // ── Lane 2 · Appuntamenti (real calendar) ───────────────────────────────────
   const appointments = appts.slice(0, 10);
@@ -215,14 +231,17 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* ════ CORSIA 1 · STUDIO DI OGGI ════ */}
+      {/* ════ CORSIA 1 · STUDIO DI OGGI (Università + CPTS) ════ */}
       <section className="sd-reveal" style={{ ['--i' as string]: 1, marginBottom: 22 }}>
         <LanePrompt
           cmd="studio"
-          flags={[{ text: '--oggi', color: `rgb(${INDIGO})` }, { text: '--now', color: `rgb(${PINK})` }]}
-          comment={!today || today.isRest ? '# riposo' : `# ${totalCount} blocchi · ${doneCount} fatti`}
+          flags={[{ text: '--uni', color: `rgb(${INDIGO})` }, { text: '--cpts', color: `rgb(${PINK})` }]}
+          comment={[
+            uniItems.length ? `uni ${uniItems.length}` : null,
+            !today || today.isRest ? 'cpts riposo' : `cpts ${doneCount}/${totalCount}`,
+          ].filter(Boolean).map((s, i) => (i === 0 ? `# ${s}` : s)).join(' · ')}
         />
-        {tasks.length > 0 ? (
+        {tasks.length > 0 || uniItems.length > 0 ? (
           <LaneScroll railColor={`rgb(${EMERALD}/0.3)`}>
             {tasks.map((t, i) => {
               if (t.completed) {
@@ -258,9 +277,36 @@ export default function HomePage() {
                 </LaneNode>
               );
             })}
+            {uniItems.map((e, i) => {
+              const d = Math.max(0, daysTo(e.data));
+              const urgent = d <= 2;
+              const isEsame = e.tipo === 'esame';
+              const sub = [e.corso, isEsame && e.ora ? e.ora : '', isEsame && e.aula ? e.aula : '']
+                .filter(Boolean).join(' · ');
+              const when = d === 0 ? 'oggi' : d === 1 ? 'domani' : `tra ${d}g`;
+              return (
+                <LaneNode
+                  key={e.id} j={tasks.length + i}
+                  time={fmtDay(e.data)}
+                  timeColor={urgent ? `rgb(${INDIGO})` : undefined}
+                  timeWeight={urgent ? 600 : undefined}
+                  dot={urgent
+                    ? <Dot kind="urgent" color={`rgb(${INDIGO})`} />
+                    : <Dot kind="future" color={`rgb(${INDIGO})`} />}
+                  cardStyle={urgent ? { border: `1px solid rgb(${INDIGO}/0.4)` } : undefined}
+                >
+                  <div style={nodeTitle}>{e.titolo}</div>
+                  {sub && <div style={nodeSub}>{sub}</div>}
+                  <div style={{ marginTop: 10, display: 'flex', gap: 6 }}>
+                    <Badge variant={isEsame ? 'primary' : 'info'} size="sm">{isEsame ? 'Esame' : 'Consegna'}</Badge>
+                    <Badge variant={urgent ? 'warning' : 'secondary'} size="sm">{when}</Badge>
+                  </div>
+                </LaneNode>
+              );
+            })}
           </LaneScroll>
         ) : (
-          <LaneEmpty text={today?.isRest ? 'Oggi è riposo — goditi la pausa.' : 'Nessun blocco di studio per oggi.'} />
+          <LaneEmpty text={today?.isRest ? 'Oggi è riposo — nessuna consegna UOC imminente.' : 'Nessun blocco di studio o impegno UOC per oggi.'} />
         )}
       </section>
 
@@ -323,6 +369,8 @@ export default function HomePage() {
                 ? <Dot kind="urgent" color={`rgb(${AMBER})`} />
                 : <Dot kind="future" color={soon ? `rgb(${INDIGO})` : 'rgb(var(--color-muted))'} />;
               const badge: BadgeVariant = urgent ? 'warning' : d <= 7 ? 'primary' : soon ? 'info' : 'secondary';
+              // Importo (solo scadenze finanziarie; le accademiche non ne hanno).
+              const amt = toAmount(s.raw?.amount);
               return (
                 <LaneNode
                   key={s.id} j={i} time={fmtDay(s.data)} timeColor={dateColor} timeWeight={urgent ? 600 : undefined}
@@ -330,7 +378,15 @@ export default function HomePage() {
                 >
                   <div style={nodeTitle}>{s.titolo}</div>
                   {s.sottotitolo && <div style={nodeSub}>{s.sottotitolo}</div>}
-                  <div style={{ marginTop: 10 }}><Badge variant={badge} size="sm">{d} giorni</Badge></div>
+                  <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <Badge variant={badge} size="sm">{d} giorni</Badge>
+                    {amt !== null && (
+                      <span style={{ fontFamily: mono, fontSize: 13.5, fontWeight: 600, color: 'rgb(var(--color-heading))', whiteSpace: 'nowrap' }}>
+                        {fmtEur(Math.abs(amt))}
+                        {s.occIndex && s.occTotal ? <span style={{ fontSize: 10.5, color: 'rgb(var(--color-muted))', fontWeight: 400 }}> · {s.occIndex}/{s.occTotal}</span> : null}
+                      </span>
+                    )}
+                  </div>
                 </LaneNode>
               );
             })}
