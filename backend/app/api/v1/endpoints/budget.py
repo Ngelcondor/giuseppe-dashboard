@@ -83,6 +83,30 @@ async def get_bank_status(
     }
 
 
+async def _active_connection(db: AsyncSession, user_id) -> Optional[BankConnection]:
+    """Latest ACTIVE connection for the user, honestly expiring stale consents.
+
+    Il consenso PSD2 dura ~90 giorni (expires_at): se è passato, la connessione
+    viene marcata EXPIRED qui — così l'API non finge un conto collegato che il
+    provider rifiuterebbe, e il frontend torna a proporre il collegamento.
+    """
+    result = await db.execute(
+        select(BankConnection).where(
+            (BankConnection.user_id == user_id)
+            & (BankConnection.status == BankConnectionStatus.ACTIVE)
+        ).order_by(BankConnection.created_at.desc())
+    )
+    connection = result.scalars().first()
+    if connection and connection.expires_at and connection.expires_at < datetime.utcnow():
+        connection.status = BankConnectionStatus.EXPIRED
+        connection.last_sync_error = "Consenso PSD2 scaduto — ricollega il conto"
+        db.add(connection)
+        await db.commit()
+        logger.info("Bank connection %s expired (consent past expires_at)", connection.id)
+        return None
+    return connection
+
+
 @router.get("/bank/institutions", response_model=List[InstitutionResponse])
 async def list_bank_institutions(
     country: str = Query("FR"),
@@ -226,13 +250,7 @@ async def get_bank_connection(
     db: AsyncSession = Depends(get_db),
 ):
     """Get the current active bank connection."""
-    result = await db.execute(
-        select(BankConnection).where(
-            (BankConnection.user_id == current_user["sub"])
-            & (BankConnection.status == BankConnectionStatus.ACTIVE)
-        ).order_by(BankConnection.created_at.desc())
-    )
-    connection = result.scalars().first()
+    connection = await _active_connection(db, current_user["sub"])
     if not connection:
         return None
     return BankConnectionResponse.from_orm(connection)
@@ -244,13 +262,7 @@ async def get_bank_balance(
     db: AsyncSession = Depends(get_db),
 ) -> List[BankBalanceResponse]:
     """Get current bank account balance."""
-    result = await db.execute(
-        select(BankConnection).where(
-            (BankConnection.user_id == current_user["sub"])
-            & (BankConnection.status == BankConnectionStatus.ACTIVE)
-        ).order_by(BankConnection.created_at.desc())
-    )
-    connection = result.scalars().first()
+    connection = await _active_connection(db, current_user["sub"])
     if not connection or not connection.account_id:
         raise HTTPException(status_code=404, detail="Nessun conto bancario collegato")
 
@@ -280,16 +292,10 @@ async def sync_bank_transactions(
     db: AsyncSession = Depends(get_db),
 ) -> CSVImportResponse:
     """
-    Sync transactions from bank via GoCardless.
-    Deduplicates by external_id.
+    Sync transactions from the configured bank provider.
+    Deduplicates by external_id (per user).
     """
-    result = await db.execute(
-        select(BankConnection).where(
-            (BankConnection.user_id == current_user["sub"])
-            & (BankConnection.status == BankConnectionStatus.ACTIVE)
-        ).order_by(BankConnection.created_at.desc())
-    )
-    connection = result.scalars().first()
+    connection = await _active_connection(db, current_user["sub"])
     if not connection or not connection.account_id:
         raise HTTPException(status_code=404, detail="Nessun conto collegato")
 
@@ -319,9 +325,12 @@ async def sync_bank_transactions(
                     skipped += 1
                     continue
 
-                # Check dedup
+                # Check dedup (user-scoped: multi-account safe)
                 existing = await db.execute(
-                    select(Transaction).where(Transaction.external_id == ext_id)
+                    select(Transaction).where(
+                        (Transaction.external_id == ext_id)
+                        & (Transaction.user_id == current_user["sub"])
+                    )
                 )
                 if existing.scalars().first():
                     skipped += 1
