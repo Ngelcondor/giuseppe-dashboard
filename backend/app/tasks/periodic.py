@@ -12,6 +12,7 @@ from sqlalchemy.future import select
 import logging
 
 from app.core.config import settings
+from app.core.crypto import decrypt_or_plain, encrypt_str, is_encrypted
 from app.models.user import User
 from app.models.deadline import Deadline
 from app.models.routine import Routine
@@ -253,12 +254,19 @@ def sync_all_calendars(self):
                         except (json.JSONDecodeError, TypeError):
                             pass
 
+                    # Upgrade opportunistico: righe legacy in chiaro → cifrate.
+                    if not is_encrypted(connection.app_password):
+                        connection.app_password = encrypt_str(connection.app_password)
+                        db.add(connection)
+                        await db.commit()
+                        logger.info("CalDAV password re-encrypted at rest for %s", connection.display_name)
+
                     sync_result = await sync_calendar_events(
                         user_id=str(connection.user_id),
                         connection_id=str(connection.id),
                         caldav_url=connection.caldav_url,
                         username=connection.username,
-                        password=connection.app_password,
+                        password=decrypt_or_plain(connection.app_password),
                         calendar_ids=calendar_ids,
                         days_back=settings.CALDAV_SYNC_DAYS_BACK,
                         days_forward=settings.CALDAV_SYNC_DAYS_FORWARD,
@@ -416,7 +424,7 @@ def sync_single_calendar(connection_id: str):
                 connection_id=str(connection.id),
                 caldav_url=connection.caldav_url,
                 username=connection.username,
-                password=connection.app_password,
+                password=decrypt_or_plain(connection.app_password),
                 calendar_ids=calendar_ids,
                 days_back=settings.CALDAV_SYNC_DAYS_BACK,
                 days_forward=settings.CALDAV_SYNC_DAYS_FORWARD,

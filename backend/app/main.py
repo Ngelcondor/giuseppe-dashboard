@@ -1,5 +1,4 @@
 """FastAPI main application."""
-import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,8 +29,8 @@ async def seed_admin_user() -> None:
     from app.models.user import User
     from app.core.security import hash_password
 
-    if not settings.ADMIN_PASSWORD:
-        logger.warning("ADMIN_PASSWORD not set — skipping admin seed.")
+    if not settings.ADMIN_EMAIL or not settings.ADMIN_PASSWORD:
+        logger.warning("ADMIN_EMAIL/ADMIN_PASSWORD not set — skipping admin seed.")
         return
 
     async with AsyncSessionLocal() as db:
@@ -78,10 +77,7 @@ async def lifespan(app: FastAPI):
 
 
 # Disable OpenAPI docs in production to avoid information disclosure.
-_docs_disabled = (
-    os.getenv("DISABLE_DOCS", "").lower() == "true"
-    or os.getenv("ENVIRONMENT", "").lower() == "production"
-)
+_docs_disabled = settings.DISABLE_DOCS or settings.is_production
 _docs_kwargs = (
     {"docs_url": None, "redoc_url": None, "openapi_url": None}
     if _docs_disabled
@@ -131,9 +127,11 @@ async def general_exception_handler(request: Request, exc: Exception):
     """Handle all unhandled exceptions with CORS headers."""
     logger.error(f"Unhandled error: {exc}")
     logger.error(traceback.format_exc())
+    # Never leak exception internals to clients in production.
+    detail = "Internal server error" if settings.is_production else f"Internal server error: {exc}"
     return JSONResponse(
         status_code=500,
-        content={"detail": f"Internal server error: {str(exc)}"},
+        content={"detail": detail},
         headers=cors_headers(),
     )
 

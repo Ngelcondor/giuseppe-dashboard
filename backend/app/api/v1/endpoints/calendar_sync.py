@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import delete as sa_delete
 
+from app.core.crypto import decrypt_or_plain, encrypt_str
 from app.core.database import get_db
 from app.core.security import get_current_user, require_editor
 from app.models.calendar_connection import CalendarConnection
@@ -81,7 +82,7 @@ async def create_connection(
         display_name=data.display_name,
         caldav_url=caldav_url,
         username=data.username,
-        app_password=data.app_password,  # TODO: encrypt at rest
+        app_password=encrypt_str(data.app_password),
         is_active=True,
         sync_interval_minutes=data.sync_interval_minutes,
     )
@@ -132,6 +133,8 @@ async def update_connection(
     update_data = data.dict(exclude_unset=True)
     for field, value in update_data.items():
         if value is not None:
+            if field == "app_password":
+                value = encrypt_str(value)
             setattr(connection, field, value)
 
     db.add(connection)
@@ -177,7 +180,7 @@ async def test_connection(
     service = CalDAVService(
         url=connection.caldav_url,
         username=connection.username,
-        password=connection.app_password,
+        password=decrypt_or_plain(connection.app_password),
     )
     result = service.test_connection()
 
@@ -211,7 +214,7 @@ async def list_remote_calendars(
     service = CalDAVService(
         url=connection.caldav_url,
         username=connection.username,
-        password=connection.app_password,
+        password=decrypt_or_plain(connection.app_password),
     )
 
     try:
@@ -278,7 +281,7 @@ async def trigger_sync(
         connection_id=str(connection.id),
         caldav_url=connection.caldav_url,
         username=connection.username,
-        password=connection.app_password,
+        password=decrypt_or_plain(connection.app_password),
         calendar_ids=calendar_ids,
         days_back=days_back,
         days_forward=days_forward,

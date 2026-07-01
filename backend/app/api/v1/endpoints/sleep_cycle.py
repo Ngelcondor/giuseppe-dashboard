@@ -3,20 +3,21 @@
 Sleep Cycle scrive i dati sonno in Apple HealthKit. Uno Shortcut iOS li legge
 e li POSTa a questo endpoint, che li salva come SleepSession con source='sleep_cycle'.
 
-Autenticazione: stesso Bearer token di APPLE_HEALTH_WEBHOOK_SECRET.
+Autenticazione: token API per-utente (Bearer ``gd_...``, creato via /api-tokens).
+Il secret globale APPLE_HEALTH_WEBHOOK_SECRET è ancora accettato ma deprecato.
 """
 import json
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select as sa_select, and_
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from app.core.config import settings
 from app.core.database import get_db
+from app.core.webhook_auth import get_webhook_user, get_webhook_user_allow_query
 from app.models.health import SleepSession, SleepPhaseEntry, SleepPhase
+from app.models.user import User
 from app.schemas.health import (
     SleepCycleWebhookPayload,
     SleepCycleSyncResponse,
@@ -26,8 +27,6 @@ from app.schemas.health import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/health/sleep/sync", tags=["sleep-cycle"])
-
-_bearer_scheme = HTTPBearer(auto_error=False)
 
 # ── Priorità fonti: valore più alto = più affidabile ──
 _SOURCE_PRIORITY = {
@@ -56,24 +55,6 @@ async def _find_same_night_session(
         ).order_by(SleepSession.created_at.desc()).limit(1)
     )
     return result.scalar_one_or_none()
-
-
-async def _verify_webhook_token(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
-) -> None:
-    """Verifica il Bearer token — riusa lo stesso secret del webhook Apple Health."""
-    secret = settings.APPLE_HEALTH_WEBHOOK_SECRET
-    if not secret:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Webhook non configurato: imposta APPLE_HEALTH_WEBHOOK_SECRET nel .env.",
-        )
-    if not credentials or credentials.credentials != secret:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token non valido.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
 
 
 _IT_MONTHS = {
@@ -163,8 +144,11 @@ def _map_phase(phase_str: str) -> SleepPhase:
     return mapping.get(phase_str.lower().replace(" ", ""), SleepPhase.LIGHT)
 
 
-@router.post("/sleep-cycle/debug", dependencies=[Depends(_verify_webhook_token)])
-async def sleep_cycle_debug(request: Request) -> dict:
+@router.post("/sleep-cycle/debug")
+async def sleep_cycle_debug(
+    request: Request,
+    webhook_user: User = Depends(get_webhook_user),
+) -> dict:
     """Debug endpoint: logga headers e body grezzi per capire cosa manda iOS."""
     body_bytes = await request.body()
     body_str = body_bytes.decode("utf-8", errors="replace")
@@ -183,10 +167,10 @@ async def sleep_cycle_debug(request: Request) -> dict:
 @router.post(
     "/sleep-cycle",
     response_model=SleepCycleSyncResponse,
-    dependencies=[Depends(_verify_webhook_token)],
 )
 async def sleep_cycle_webhook(
     request: Request,
+    webhook_user: User = Depends(get_webhook_user),
     db: AsyncSession = Depends(get_db),
 ) -> SleepCycleSyncResponse:
     """Ricevi dati sonno da Sleep Cycle tramite iOS Shortcut.
@@ -197,8 +181,6 @@ async def sleep_cycle_webhook(
     Deduplicazione: se esiste già una sessione con sleep_start entro ±5 min,
     aggiorna i campi SC-specifici invece di crearne una nuova.
     """
-    from app.models.user import User
-
     # Leggi e parsa il body manualmente per gestire qualsiasi formato iOS
     body_bytes = await request.body()
     body_str = body_bytes.decode("utf-8", errors="replace")
@@ -217,16 +199,8 @@ async def sleep_cycle_webhook(
         logger.error("Payload non valido: %s | raw: %s", e, raw)
         raise HTTPException(status_code=422, detail=f"Payload non valido: {e}")
 
-    # Resolve single admin user
-    result = await db.execute(sa_select(User).limit(1))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Nessun utente trovato.",
-        )
-
-    user_id = user.id
+    # User authenticated via webhook token
+    user_id = webhook_user.id
     sleep_start = _parse_date(payload.sleep_start)
     sleep_end = _parse_date(payload.sleep_end)
     # Auto-swap se lo Shortcut manda i timestamp invertiti
@@ -396,10 +370,10 @@ async def sleep_cycle_webhook(
 @router.post(
     "/health-auto-export",
     response_model=SleepCycleSyncResponse,
-    dependencies=[Depends(_verify_webhook_token)],
 )
 async def health_auto_export_webhook(
     request: Request,
+    webhook_user: User = Depends(get_webhook_user),
     db: AsyncSession = Depends(get_db),
 ) -> SleepCycleSyncResponse:
     """Ricevi dati sonno da Health Auto Export iOS app.
@@ -417,8 +391,6 @@ async def health_auto_export_webhook(
     Oppure il formato flat (singolo record):
     { "sleepStart": ..., "sleepEnd": ..., "deep": N, ... }
     """
-    from app.models.user import User
-
     body_bytes = await request.body()
     body_str = body_bytes.decode("utf-8", errors="replace")
     logger.info("Health Auto Export raw body: %s", body_str[:2000])
@@ -555,13 +527,8 @@ async def health_auto_export_webhook(
         chosen_source, sleep_start, sleep_end, duration, time_in_bed, deep_min, rem_min, light_min, awake_min,
     )
 
-    # Resolve user
-    result = await db.execute(sa_select(User).limit(1))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=503, detail="Nessun utente trovato.")
-
-    user_id = user.id
+    # User authenticated via webhook token
+    user_id = webhook_user.id
 
     # Deduplication: same-night (±4h)
     existing = await _find_same_night_session(db, user_id, sleep_start)
@@ -669,42 +636,21 @@ async def health_auto_export_webhook(
 
 ## ── Nuovo endpoint: ricezione campioni granulari da Apple Shortcut ──────────
 
-async def _verify_webhook_token_or_query(
-    request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
-) -> None:
-    """Verifica token via header Authorization OPPURE query param ?token=..."""
-    secret = settings.APPLE_HEALTH_WEBHOOK_SECRET
-    if not secret:
-        raise HTTPException(status_code=503, detail="Webhook non configurato.")
-
-    # Prima prova header
-    if credentials and credentials.credentials == secret:
-        return
-
-    # Poi prova query param
-    token = request.query_params.get("token")
-    if token and token == secret:
-        return
-
-    raise HTTPException(status_code=401, detail="Token non valido.")
-
-
 @router.get(
     "/shortcut",
     response_model=SleepCycleSyncResponse,
-    dependencies=[Depends(_verify_webhook_token_or_query)],
 )
 async def shortcut_sleep_get(
     request: Request,
     token: str = "",
     data: str = "",
+    webhook_user: User = Depends(get_webhook_user_allow_query),
     db: AsyncSession = Depends(get_db),
 ) -> SleepCycleSyncResponse:
     """Endpoint GET per iOS Shortcuts — riceve dati base64 nel query param.
 
     iOS Shortcuts manda header HTTP/2 invalidi nei POST, causando 400.
-    Questo endpoint GET accetta i dati come ?data=<base64>&token=<secret>.
+    Questo endpoint GET accetta i dati come ?data=<base64>&token=<API token gd_...>.
     Il base64 decodificato deve essere testo pipe-delimited (start|end|value|source per riga).
     """
     import base64
@@ -722,16 +668,16 @@ async def shortcut_sleep_get(
 
     # Redirige al handler POST con il body decodificato
     request._body = body_str.encode("utf-8")
-    return await shortcut_sleep_webhook(request, db)
+    return await shortcut_sleep_webhook(request, webhook_user, db)
 
 
 @router.post(
     "/shortcut",
     response_model=SleepCycleSyncResponse,
-    dependencies=[Depends(_verify_webhook_token_or_query)],
 )
 async def shortcut_sleep_webhook(
     request: Request,
+    webhook_user: User = Depends(get_webhook_user_allow_query),
     db: AsyncSession = Depends(get_db),
 ) -> SleepCycleSyncResponse:
     """Ricevi campioni di sonno granulari da Apple Shortcut.
@@ -751,8 +697,6 @@ async def shortcut_sleep_webhook(
     Valori possibili per "value":
       InBed, Asleep, Awake, AsleepCore (=light), AsleepDeep, AsleepREM
     """
-    from app.models.user import User
-
     body = await request.body()
     body_str = body.decode("utf-8", errors="replace").strip()
     logger.info("Shortcut webhook: raw payload (%d bytes): %s", len(body), body_str[:500])
@@ -950,12 +894,8 @@ async def shortcut_sleep_webhook(
     if not night_blocks:
         raise HTTPException(status_code=422, detail="Nessun blocco di sonno significativo trovato")
 
-    # ── 3-5. Resolve user (una volta sola) ──
-    result = await db.execute(sa_select(User).limit(1))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=503, detail="Nessun utente trovato.")
-    user_id = user.id
+    # ── 3-5. User authenticated via webhook token ──
+    user_id = webhook_user.id
 
     # ── Processa ogni notte ──
     saved_ids: list[str] = []
@@ -1078,21 +1018,15 @@ async def shortcut_sleep_webhook(
     )
 
 
-@router.get(
-    "/sleep-cycle/status",
-    dependencies=[Depends(_verify_webhook_token)],
-)
+@router.get("/sleep-cycle/status")
 async def sleep_cycle_status(
+    webhook_user: User = Depends(get_webhook_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Stato della sync con Sleep Cycle — quante sessioni, ultima sync, ecc."""
     from sqlalchemy import func
 
-    from app.models.user import User
-    result = await db.execute(sa_select(User).limit(1))
-    user = result.scalar_one_or_none()
-    if not user:
-        return {"connected": False, "total_sessions": 0}
+    user = webhook_user
 
     result = await db.execute(
         sa_select(

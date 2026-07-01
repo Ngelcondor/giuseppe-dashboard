@@ -3,7 +3,6 @@ import logging
 import xml.etree.ElementTree as ET
 from io import StringIO
 from fastapi import APIRouter, Depends, HTTPException, Request, status, UploadFile, File
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select as sa_select, and_, func
 from datetime import datetime, timedelta, timezone
@@ -12,10 +11,11 @@ from pydantic import BaseModel
 
 from zoneinfo import ZoneInfo
 
-from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user, require_editor
+from app.core.webhook_auth import get_webhook_user, get_webhook_user_allow_query
 from app.models.health import HealthMetric, MetricType, Medication, MedicationLog
+from app.models.user import User
 from app.schemas.health import (
     AppleHealthImportResponse,
     HealthMetricCreate,
@@ -64,48 +64,19 @@ SHORTCUT_TYPE_MAP: dict[str, tuple[MetricType, str]] = {
     "temperature":    (MetricType.TEMPERATURE, "°C"),
 }
 
-_bearer_scheme = HTTPBearer(auto_error=False)
-
-
-async def _verify_webhook_token(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
-) -> None:
-    """Raise 401 if the Bearer token does not match APPLE_HEALTH_WEBHOOK_SECRET."""
-    secret = settings.APPLE_HEALTH_WEBHOOK_SECRET
-    if not secret:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Webhook non configurato: imposta APPLE_HEALTH_WEBHOOK_SECRET nel .env del server.",
-        )
-    if not credentials or credentials.credentials != secret:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token non valido.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-
-@router.post("/webhook", dependencies=[Depends(_verify_webhook_token)])
+@router.post("/webhook")
 async def apple_health_webhook(
     payload: AppleHealthWebhookPayload,
+    webhook_user: User = Depends(get_webhook_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Receive real-time health data from an iOS Shortcut.
 
     The Shortcut runs hourly and POSTs the latest metrics.
-    This endpoint is authenticated with a static Bearer token
-    (APPLE_HEALTH_WEBHOOK_SECRET) and does NOT require a user JWT —
-    the dashboard is single-user so we look up the admin user automatically.
+    This endpoint is authenticated with a per-user API token (Bearer) and
+    does NOT require a user JWT — the data is attributed to the token's owner.
     """
-    from app.models.user import User
-
-    # Resolve the single admin user
-    result = await db.execute(sa_select(User).limit(1))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Nessun utente trovato.")
-
-    user_id = user.id
+    user_id = webhook_user.id
     imported = 0
     skipped = 0
     errors: List[str] = []
@@ -423,9 +394,10 @@ AUTO_EXPORT_NAME_MAP: dict[str, tuple[MetricType, str]] = {
 }
 
 
-@router.post("/auto-export", dependencies=[Depends(_verify_webhook_token)])
+@router.post("/auto-export")
 async def health_auto_export(
     request: Request,
+    webhook_user: User = Depends(get_webhook_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Receive data from the Health Auto Export iOS app.
@@ -454,21 +426,13 @@ async def health_auto_export(
       }
     }
     """
-    from app.models.user import User
-
     # Parse raw JSON
     try:
         body = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON body")
 
-    # Resolve admin user
-    result = await db.execute(sa_select(User).limit(1))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=503, detail="Nessun utente trovato.")
-
-    user_id = user.id
+    user_id = webhook_user.id
     data = body.get("data", body)  # Support both {"data": {...}} and flat format
     metrics_list = data.get("metrics", [])
 
@@ -570,9 +534,10 @@ class HAEMedicationPayload(BaseModel):
     medications: List[HAEMedicationEntry] = []
 
 
-@router.post("/medications/sync", dependencies=[Depends(_verify_webhook_token)])
+@router.post("/medications/sync")
 async def sync_medications_from_hae(
     request: Request,
+    webhook_user: User = Depends(get_webhook_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Receive medication dose events from Health Auto Export.
@@ -596,21 +561,13 @@ async def sync_medications_from_hae(
     This endpoint matches each entry to an existing Medication by name
     (using displayText or nickname) and creates a MedicationLog entry.
     """
-    from app.models.user import User
-
     # Parse raw JSON
     try:
         body = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON body")
 
-    # Resolve admin user
-    result = await db.execute(sa_select(User).limit(1))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=503, detail="Nessun utente trovato.")
-
-    user_id = user.id
+    user_id = webhook_user.id
 
     # Extract medications array (support both nested and flat)
     data = body.get("data", body)
@@ -793,11 +750,12 @@ _UNIFIED_TYPE_MAP: dict[str, tuple[MetricType, str]] = {
 async def unified_shortcut_webhook(
     request: Request,
     token: str = "",
+    webhook_user: User = Depends(get_webhook_user_allow_query),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     """Endpoint unificato per iOS Shortcut — riceve tutte le metriche health.
 
-    Autenticazione via query param: ?token=<APPLE_HEALTH_WEBHOOK_SECRET>
+    Autenticazione via query param: ?token=<API token gd_...> (o Bearer header).
     Niente header custom → compatibile con iOS Shortcuts.
 
     Formati accettati:
@@ -811,11 +769,6 @@ async def unified_shortcut_webhook(
          {"metrics": [{"type": "steps", "value": 8432, "unit": "passi", "date": "..."}]}
     """
     import json as _json
-
-    # ── Auth ──
-    secret = settings.APPLE_HEALTH_WEBHOOK_SECRET
-    if not secret or token != secret:
-        raise HTTPException(status_code=401, detail="Token non valido.")
 
     # ── Parse body ──
     body = await request.body()
@@ -856,13 +809,8 @@ async def unified_shortcut_webhook(
     if not metrics_raw:
         raise HTTPException(status_code=422, detail="Nessuna metrica trovata nel payload")
 
-    # ── Resolve user ──
-    from app.models.user import User
-    result = await db.execute(sa_select(User).limit(1))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=503, detail="Nessun utente trovato.")
-    user_id = user.id
+    # ── User: authenticated via webhook token ──
+    user_id = webhook_user.id
 
     # ── Process metrics ──
     imported = 0
