@@ -1,5 +1,5 @@
 """Deadline and task tracking model."""
-from sqlalchemy import Column, String, Date, DateTime, Boolean, Integer, Numeric, Enum as SQLEnum, ForeignKey
+from sqlalchemy import Column, String, Date, DateTime, Boolean, Integer, Numeric, JSON, Enum as SQLEnum, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from datetime import datetime
@@ -80,6 +80,11 @@ class Deadline(Base):
     recurrence_interval = Column(SQLEnum(RecurrenceInterval), nullable=True)
     # amount per rata / per period (numeric, currency-agnostic)
     amount = Column(Numeric(12, 2), nullable=True)
+    # Per-occurrence paid ledger: ISO date strings (YYYY-MM-DD) of the individual
+    # rate / subscription charges the user has ticked as paid. Independent of
+    # installments_paid (which is the pre-app baseline), so each occurrence can be
+    # checked/unchecked reversibly. Nullable so _sync_missing_columns can ALTER it in.
+    paid_occurrences = Column(JSON, nullable=True)
 
     # Additional info
     notes = Column(String(2000), nullable=True)

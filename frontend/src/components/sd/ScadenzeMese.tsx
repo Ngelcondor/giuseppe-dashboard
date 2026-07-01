@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/sd/FormSheet';
 import { DeadlineForm, INTERVAL_LABEL, toAmount, fmtEur } from '@/components/sd/DeadlineForm';
 import {
-  getScadenze, createDeadline, updateDeadline, deleteDeadline, payInstallment, getCurrentUserRole,
+  getScadenze, createDeadline, updateDeadline, deleteDeadline, setOccurrencePaid, getCurrentUserRole,
   type ScadenzaItem, type Deadline, type DeadlineInput,
 } from '@/services/scadenzeService';
 
@@ -99,10 +99,9 @@ export function ScadenzeMese() {
   };
   const patchItem = (id: string, raw: Deadline) =>
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, raw } : it)));
+  const patchOccPaid = (id: string, occPaid: boolean) =>
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, occPaid } : it)));
 
-  // Binary, fully reversible: the checkbox just toggles `is_completed` for any
-  // deadline (single, subscription or installment). Rata counts stay editable
-  // in the form; the checkbox never silently advances or loses progress.
   // Single deadlines: the checkbox flips the whole (one-row) deadline's paid flag.
   const onCheck = async (it: ScadenzaItem) => {
     const rt = it.raw?.recurrence_type;
@@ -115,14 +114,16 @@ export function ScadenzeMese() {
     finally { setSavingId(null); }
   };
 
-  // Installments: checking the next-due rata records one payment (installments_paid++
-  // via the pay-installment endpoint), then reloads so that rata drops off and the
-  // following one becomes next. Never flips the whole plan at once.
-  const onPayRata = async (it: ScadenzaItem) => {
+  // Recurring rows (single rata / single subscription charge): tick THIS occurrence
+  // paid/unpaid by its date. Reversible and per-date — independent of the plan's
+  // baseline count, so it never advances or loses the rest of the plan.
+  const onToggleOcc = async (it: ScadenzaItem) => {
     if (it.source !== 'deadline' || isGuest || !it.raw) return;
+    const next = !it.occPaid;
     setSavingId(it.id);
-    try { await payInstallment(it.raw.id); await load(); }
-    catch {/* keep current on failure */}
+    patchOccPaid(it.id, next); // optimistic
+    try { await setOccurrencePaid(it.raw.id, it.data, next); }
+    catch { await load(); }
     finally { setSavingId(null); }
   };
 
@@ -185,61 +186,49 @@ export function ScadenzeMese() {
           <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: gi + 1, ...card, padding: '6px 22px' }}>
             {g.list.map((it, idx) => {
               const d = it.raw;
-              const paid = it.source === 'deadline' && !!d?.is_completed;
+              const isDeadline = it.source === 'deadline';
               const recType = d?.recurrence_type;
-              const isSingle = it.source === 'deadline' && (recType == null || recType === 'none');
-              // The next unpaid rata is the first remaining occurrence (#paid+1); only it is payable.
-              const nextRata = recType === 'installments' && it.occIndex != null && it.occIndex === (d?.installments_paid ?? 0) + 1;
+              const isSingle = isDeadline && (recType == null || recType === 'none');
+              // Paid state: single deadlines use is_completed; recurring rows (rate /
+              // subscription charges) use the per-occurrence tick (occPaid).
+              const rowPaid = isDeadline && (isSingle ? !!d?.is_completed : !!it.occPaid);
               const secondary = amountLine(d) || it.sottotitolo;
               return (
                 <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderTop: idx === 0 ? undefined : '1px solid rgb(var(--color-border))' }}>
-                  {/* Paid checkbox — single deadlines (toggle) and the next-due rata of an
-                      installment plan (records one payment). Academic, subscription and
-                      not-yet-due rate keep the slot empty for alignment. */}
+                  {/* Paid checkbox on every deadline row — single flips is_completed,
+                      each rata / subscription charge ticks its own occurrence.
+                      Academic rows keep the slot empty for alignment. */}
                   <div style={{ width: 22, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {isSingle && (
+                    {isDeadline && (
                       <button
                         type="button"
-                        onClick={() => onCheck(it)}
+                        onClick={() => (isSingle ? onCheck(it) : onToggleOcc(it))}
                         disabled={isGuest || savingId === it.id}
                         className={!isGuest ? 'sd-press' : undefined}
-                        aria-label={paid ? 'Segna come non pagata' : 'Segna come pagata'}
-                        title={paid ? 'Pagata · clic per annullare' : 'Segna come pagata'}
-                        style={{ border: 'none', background: 'transparent', padding: 0, display: 'flex', cursor: isGuest ? 'default' : 'pointer', color: paid ? 'rgb(16 185 129)' : 'rgb(var(--color-muted))', opacity: savingId === it.id ? 0.5 : 1 }}
+                        aria-label={rowPaid ? 'Segna come non pagata' : 'Segna come pagata'}
+                        title={rowPaid ? 'Pagata · clic per annullare' : 'Segna come pagata'}
+                        style={{ border: 'none', background: 'transparent', padding: 0, display: 'flex', cursor: isGuest ? 'default' : 'pointer', color: rowPaid ? 'rgb(16 185 129)' : 'rgb(var(--color-muted))', opacity: savingId === it.id ? 0.5 : 1 }}
                       >
-                        {paid ? <CheckCircle2 size={18} /> : <Circle size={18} />}
-                      </button>
-                    )}
-                    {nextRata && !isGuest && (
-                      <button
-                        type="button"
-                        onClick={() => onPayRata(it)}
-                        disabled={savingId === it.id}
-                        className="sd-press"
-                        aria-label="Segna questa rata come pagata"
-                        title="Segna questa rata come pagata"
-                        style={{ border: 'none', background: 'transparent', padding: 0, display: 'flex', cursor: 'pointer', color: 'rgb(var(--color-muted))', opacity: savingId === it.id ? 0.5 : 1 }}
-                      >
-                        <Circle size={18} />
+                        {rowPaid ? <CheckCircle2 size={18} /> : <Circle size={18} />}
                       </button>
                     )}
                   </div>
-                  <div style={{ width: 46, flex: 'none', textAlign: 'center', opacity: paid ? 0.55 : 1 }}>
+                  <div style={{ width: 46, flex: 'none', textAlign: 'center', opacity: rowPaid ? 0.55 : 1 }}>
                     <div style={{ fontFamily: mono, fontSize: 20, fontWeight: 700, color: dayColor(it), lineHeight: 1 }}>{dayNum(it.data)}</div>
                     <div style={{ fontSize: 10, letterSpacing: '.1em', color: 'rgb(var(--color-tertiary))', textTransform: 'uppercase' }}>{monthAbbr(it.data)}</div>
                   </div>
-                  <div style={{ flex: 1, minWidth: 0, opacity: paid ? 0.6 : 1 }}>
+                  <div style={{ flex: 1, minWidth: 0, opacity: rowPaid ? 0.6 : 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 14.5, fontWeight: 500, color: paid ? 'rgb(var(--color-tertiary))' : 'rgb(var(--color-heading))', textDecoration: paid ? 'line-through' : 'none' }}>{it.titolo}</span>
+                      <span style={{ fontSize: 14.5, fontWeight: 500, color: rowPaid ? 'rgb(var(--color-tertiary))' : 'rgb(var(--color-heading))', textDecoration: rowPaid ? 'line-through' : 'none' }}>{it.titolo}</span>
                       {it.source === 'academic' && <span style={{ fontSize: 9.5, letterSpacing: '.1em', fontWeight: 600, color: 'rgb(var(--color-muted))', fontFamily: mono, background: 'rgb(128 128 128 / 0.12)', padding: '2px 6px', borderRadius: 5 }}>UOC</span>}
-                      {paid
+                      {rowPaid
                         ? <span style={{ flex: 'none', width: 'max-content', fontSize: 10.5, fontWeight: 600, color: 'rgb(16 185 129)', background: 'rgb(16 185 129 / 0.12)', border: '1px solid rgb(16 185 129 / 0.3)', borderRadius: 6, padding: '1px 7px' }}>Pagata</span>
                         : recurrenceBadge(it)}
                     </div>
                     {secondary && <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{secondary}</div>}
                   </div>
                   {itemAmount(it) != null
-                    ? <span style={{ flex: 'none', fontFamily: mono, fontSize: 13.5, fontWeight: 600, color: paid ? 'rgb(var(--color-muted))' : 'rgb(var(--color-heading))', textDecoration: paid ? 'line-through' : 'none' }}>{fmtEur(itemAmount(it)!)}</span>
+                    ? <span style={{ flex: 'none', fontFamily: mono, fontSize: 13.5, fontWeight: 600, color: rowPaid ? 'rgb(var(--color-muted))' : 'rgb(var(--color-heading))', textDecoration: rowPaid ? 'line-through' : 'none' }}>{fmtEur(itemAmount(it)!)}</span>
                     : daysBadge(it)}
                   {it.source === 'deadline' && !isGuest && (
                     <div style={{ display: 'flex', gap: 2, flex: 'none' }}>

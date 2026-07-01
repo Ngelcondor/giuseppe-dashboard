@@ -19,6 +19,8 @@ export interface Deadline {
   installments_paid: number | null;
   recurrence_interval: RecurrenceInterval | null;
   amount: number | string | null; // numeric serialized; coerce before formatting
+  // ISO dates (YYYY-MM-DD) of individually-paid rate / subscription charges.
+  paid_occurrences: string[] | null;
 }
 
 // Unified item rendered by the Scadenze page (academic + certifications).
@@ -37,6 +39,9 @@ export interface ScadenzaItem {
   // the plan total, so a rate plan reads "rata 2/4" per row instead of per plan.
   occIndex?: number;
   occTotal?: number;
+  // Whether THIS occurrence (this date) has been individually ticked as paid.
+  // Only meaningful for recurring rows; single deadlines use raw.is_completed.
+  occPaid?: boolean;
 }
 
 // A computed (non-persisted) occurrence of a recurring deadline.
@@ -127,6 +132,7 @@ const addMonths = (iso: string, n: number): string => {
 // A completed deadline collapses back to a single (struck-through) row.
 function expandDeadline(d: Deadline): ScadenzaItem[] {
   const base = deadlineBase(d);
+  const paidSet = new Set(d.paid_occurrences ?? []);
   const single: ScadenzaItem = { ...base, id: d.id, data: d.due_date };
   if (d.is_completed) return [single];
 
@@ -137,7 +143,8 @@ function expandDeadline(d: Deadline): ScadenzaItem[] {
     const out: ScadenzaItem[] = [];
     for (let i = 0; i < total - paid; i++) {
       const index = paid + 1 + i;
-      out.push({ ...base, id: `${d.id}#${index}`, data: addMonths(d.due_date, i), occIndex: index, occTotal: total });
+      const data = addMonths(d.due_date, i);
+      out.push({ ...base, id: `${d.id}#${index}`, data, occIndex: index, occTotal: total, occPaid: paidSet.has(data) });
     }
     return out.length ? out : [single];
   }
@@ -151,7 +158,7 @@ function expandDeadline(d: Deadline): ScadenzaItem[] {
     let guard = 0;
     while (when < today && guard < 1200) { when = addMonths(when, step); guard += 1; }
     while (when <= horizon && guard < 1200) {
-      out.push({ ...base, id: `${d.id}@${when}`, data: when });
+      out.push({ ...base, id: `${d.id}@${when}`, data: when, occPaid: paidSet.has(when) });
       when = addMonths(when, step);
       guard += 1;
     }
@@ -213,6 +220,13 @@ export async function deleteDeadline(id: string): Promise<void> {
 // Mark the next rata of an installment plan as paid (increments installments_paid).
 export async function payInstallment(id: string): Promise<Deadline> {
   const { data } = await api.patch(`/deadlines/${id}/pay-installment`);
+  return data;
+}
+
+// Tick/untick a single occurrence (one rata or one subscription charge) as paid,
+// by its ISO date. Reversible and per-date; returns the updated deadline.
+export async function setOccurrencePaid(id: string, date: string, paid: boolean): Promise<Deadline> {
+  const { data } = await api.patch(`/deadlines/${id}/occurrence`, { date, paid });
   return data;
 }
 
