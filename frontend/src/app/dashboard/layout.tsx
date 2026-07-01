@@ -12,7 +12,7 @@ import { usePathname } from 'next/navigation';
    Requires the dark-glass CSS block appended to globals.css — see
    handoff/globals-additions.css. */
 
-type NavItem = { label: string; href: string; dot: string };
+type NavItem = { label: string; href: string; dot: string; wip?: boolean };
 
 const NAV: NavItem[] = [
   { label: 'Home', href: '/dashboard', dot: 'rgb(99 102 241)' },
@@ -21,6 +21,10 @@ const NAV: NavItem[] = [
   { label: 'Calendario', href: '/dashboard/calendar', dot: 'rgb(99 102 241)' },
   { label: 'Finanze', href: '/dashboard/budget', dot: 'rgb(16 185 129)' },
   { label: 'Smart Home', href: '/dashboard/smart-home', dot: 'rgb(245 158 11)' },
+  { label: 'Cyber Feed', href: '/dashboard/feed', dot: 'rgb(129 140 248)' },
+  { label: 'Salute', href: '/dashboard/salute', dot: 'rgb(244 63 94)', wip: true },
+  { label: 'Sonno', href: '/dashboard/sonno', dot: 'rgb(139 92 246)', wip: true },
+  { label: 'Farmaci', href: '/dashboard/farmaci', dot: 'rgb(20 184 166)', wip: true },
   { label: 'Impostazioni', href: '/dashboard/impostazioni', dot: 'rgb(100 116 139)' },
 ];
 
@@ -134,7 +138,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     {on && <span style={{ position: 'absolute', inset: 0, borderRadius: 11, background: 'rgb(99 102 241 / 0.09)' }} />}
                     {on && <span style={{ position: 'absolute', left: 0, top: 10, bottom: 10, width: 3, borderRadius: 3, background: 'rgb(99 102 241)' }} />}
                     <span style={{ position: 'relative', width: 7, height: 7, borderRadius: 2, background: item.dot }} />
-                    <span style={{ position: 'relative' }}>{item.label}</span>
+                    <span style={{ position: 'relative', minWidth: 0, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
+                    {item.wip && (
+                      <span
+                        title="In lavorazione"
+                        style={{ position: 'relative', flex: 'none', fontFamily: "'JetBrains Mono',monospace", fontSize: 9, fontWeight: 700, letterSpacing: '.1em', padding: '2.5px 6px', borderRadius: 6, color: 'rgb(245 158 11)', background: 'rgb(245 158 11 / 0.13)', border: '1px solid rgb(245 158 11 / 0.35)' }}
+                      >
+                        WIP
+                      </span>
+                    )}
                   </Link>
                 );
               })}
