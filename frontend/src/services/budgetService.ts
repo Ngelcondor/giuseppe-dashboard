@@ -150,7 +150,11 @@ export async function completeBankAuth(code: string, state?: string): Promise<Ba
 }
 
 export async function syncBankTransactions(daysBack = 30): Promise<ImportResult> {
-  const { data } = await api.post(`/budget/bank/sync?days_back=${daysBack}`);
+  // Il sync pagina Enable Banking (~1s a pagina) e può superare i 10s del
+  // timeout axios di default: qui serve un timeout dedicato, non quello globale.
+  const { data } = await api.post(`/budget/bank/sync?days_back=${daysBack}`, undefined, {
+    timeout: 60_000,
+  });
   return data;
 }
 

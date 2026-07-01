@@ -114,6 +114,14 @@ services:
       postgres:
         condition: service_healthy
     command: celery -A app.tasks.celery_app worker --loglevel=warning --pool=solo
+    # Override dell'healthcheck HTTP ereditato dall'immagine backend: qui non
+    # gira uvicorn, quindi risultava sempre "unhealthy".
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.tasks.celery_app inspect ping --timeout 10 | grep -q pong"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
     networks:
       - gd-network
     restart: always
@@ -139,6 +147,10 @@ services:
       postgres:
         condition: service_healthy
     command: celery -A app.tasks.celery_app beat --loglevel=warning
+    # Beat non è un worker né un server HTTP: l'healthcheck ereditato non ha
+    # niente di sensato da misurare — disabilitato invece di fingere.
+    healthcheck:
+      disable: true
     networks:
       - gd-network
     restart: always
