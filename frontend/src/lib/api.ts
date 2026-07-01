@@ -73,13 +73,16 @@ api.interceptors.response.use(
           throw new Error('No refresh token');
         }
 
+        // Backend contract: POST /auth/refresh-token with { refresh_token },
+        // responds { access_token }. (Previously called /auth/refresh with the
+        // wrong body/field → 404, so the session dropped instead of refreshing.)
         const response = await axios.post(
-          `${API_BASE_URL}/auth/refresh`,
-          { refreshToken },
+          `${API_BASE_URL}/auth/refresh-token`,
+          { refresh_token: refreshToken },
           { withCredentials: true }
         );
 
-        const { token } = response.data;
+        const token = response.data.access_token;
         localStorage.setItem('token', token);
 
         api.defaults.headers.common.Authorization = `Bearer ${token}`;
