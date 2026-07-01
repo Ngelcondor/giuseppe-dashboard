@@ -33,6 +33,10 @@ export interface ScadenzaItem {
   source: 'academic' | 'deadline';
   // Original deadline, carried so an edit form can prefill its fields.
   raw?: Deadline;
+  // For an expanded installment occurrence: which rata this row is (1-based) and
+  // the plan total, so a rate plan reads "rata 2/4" per row instead of per plan.
+  occIndex?: number;
+  occTotal?: number;
 }
 
 // A computed (non-persisted) occurrence of a recurring deadline.
@@ -86,9 +90,8 @@ const academicToItem = (e: UniEvento): ScadenzaItem => ({
   source: 'academic',
 });
 
-const deadlineToItem = (d: Deadline): ScadenzaItem => ({
-  id: d.id,
-  data: d.due_date,
+// Fields shared by every row of one deadline, before occurrence expansion.
+const deadlineBase = (d: Deadline): Omit<ScadenzaItem, 'id' | 'data'> => ({
   titolo: d.title,
   sottotitolo: d.description ?? '',
   kind: d.category === 'certification' ? 'certification' : d.category === 'ctf' ? 'ctf' : 'altro',
@@ -96,11 +99,74 @@ const deadlineToItem = (d: Deadline): ScadenzaItem => ({
   raw: d,
 });
 
+// ── Recurrence expansion (mirrors backend _expand_occurrences) ──
+const INTERVAL_STEP: Record<RecurrenceInterval, number> = { monthly: 1, quarterly: 3, yearly: 12 };
+// How far ahead open-ended subscriptions are projected into the month list.
+const SUBSCRIPTION_HORIZON_MONTHS = 12;
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const isoOf = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+// Add `n` months to an ISO date, clamping the day to the target month length (so
+// e.g. Jan 31 + 1 month → Feb 28/29 — same rule as dateutil.relativedelta).
+const addMonths = (iso: string, n: number): string => {
+  const d = new Date(iso + 'T00:00:00');
+  const day = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + n);
+  d.setDate(Math.min(day, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()));
+  return isoOf(d);
+};
+
+// Expand one deadline into the rows shown in the month-grouped Scadenze view:
+//   - none: the deadline itself, once.
+//   - installments: one row per REMAINING unpaid rata (#paid+1 … #total), spaced
+//     one month apart from due_date — so a rate plan spans future months instead
+//     of collapsing onto its next due date (the bug: list stopped at that month).
+//   - subscription: one row per charge from the next one forward, up to the
+//     projection horizon.
+// A completed deadline collapses back to a single (struck-through) row.
+function expandDeadline(d: Deadline): ScadenzaItem[] {
+  const base = deadlineBase(d);
+  const single: ScadenzaItem = { ...base, id: d.id, data: d.due_date };
+  if (d.is_completed) return [single];
+
+  if (d.recurrence_type === 'installments') {
+    const total = d.installments_total ?? 0;
+    const paid = Math.max(0, d.installments_paid ?? 0);
+    if (total <= 0) return [single];
+    const out: ScadenzaItem[] = [];
+    for (let i = 0; i < total - paid; i++) {
+      const index = paid + 1 + i;
+      out.push({ ...base, id: `${d.id}#${index}`, data: addMonths(d.due_date, i), occIndex: index, occTotal: total });
+    }
+    return out.length ? out : [single];
+  }
+
+  if (d.recurrence_type === 'subscription') {
+    const step = INTERVAL_STEP[d.recurrence_interval ?? 'monthly'];
+    const today = isoOf(new Date());
+    const horizon = addMonths(today, SUBSCRIPTION_HORIZON_MONTHS);
+    const out: ScadenzaItem[] = [];
+    let when = d.due_date;
+    let guard = 0;
+    while (when < today && guard < 1200) { when = addMonths(when, step); guard += 1; }
+    while (when <= horizon && guard < 1200) {
+      out.push({ ...base, id: `${d.id}@${when}`, data: when });
+      when = addMonths(when, step);
+      guard += 1;
+    }
+    return out.length ? out : [single];
+  }
+
+  return [single];
+}
+
 // Aggregates academic scadenze (from /university) with certification / CTF
-// deadlines (from /deadlines), merged and sorted ascending by date.
+// deadlines (from /deadlines) — the latter expanded into their recurring
+// occurrences — merged and sorted ascending by date.
 export async function getScadenze(): Promise<ScadenzaItem[]> {
   const [academic, deadlines] = await Promise.all([getScadenzeAccademiche(), getDeadlines()]);
-  return [...academic.map(academicToItem), ...deadlines.map(deadlineToItem)].sort(
+  return [...academic.map(academicToItem), ...deadlines.flatMap(expandDeadline)].sort(
     (a, b) => a.data.localeCompare(b.data),
   );
 }

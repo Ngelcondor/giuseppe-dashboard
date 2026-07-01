@@ -23,8 +23,9 @@ const INDIGO = 'rgb(99 102 241)';
 const AMBER = 'rgb(245 158 11)';
 const MUTED = 'rgb(var(--color-muted))';
 
-const TODAY = '2026-06-22';
-const daysTo = (iso: string) => Math.round((new Date(iso + 'T00:00:00').getTime() - new Date(TODAY + 'T00:00:00').getTime()) / 86_400_000);
+// Local (not UTC) start-of-today, so "X giorni" counts are correct near midnight in CET.
+const startOfToday = (() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime(); })();
+const daysTo = (iso: string) => Math.round((new Date(iso + 'T00:00:00').getTime() - startOfToday) / 86_400_000);
 const dayNum = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { day: '2-digit' });
 const monthAbbr = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { month: 'short' }).replace('.', '');
 const monthKey = (iso: string) => iso.slice(0, 7); // YYYY-MM
@@ -49,11 +50,18 @@ const amountLine = (d?: Deadline): string => {
   return fmtEur(amt);
 };
 
-const recurrenceBadge = (d?: Deadline): React.ReactNode => {
+// A recurring deadline (rate / abbonamento) has more than one dated row in the
+// list; the plain paid checkbox (which flips the whole plan) doesn't map onto a
+// single occurrence, so it's shown only on single deadlines.
+const isRecurring = (it: ScadenzaItem): boolean =>
+  it.raw?.recurrence_type === 'installments' || it.raw?.recurrence_type === 'subscription';
+
+const recurrenceBadge = (it: ScadenzaItem): React.ReactNode => {
+  const d = it.raw;
   if (!d) return null;
   if (d.recurrence_type === 'installments') {
-    const total = d.installments_total ?? 0;
-    const next = Math.min((d.installments_paid ?? 0) + 1, total);
+    const total = it.occTotal ?? d.installments_total ?? 0;
+    const next = it.occIndex ?? Math.min((d.installments_paid ?? 0) + 1, total);
     return <Badge variant="warning" size="sm" style={{ flex: 'none', width: 'max-content' }}>rata {next}/{total}</Badge>;
   }
   if (d.recurrence_type === 'subscription') {
@@ -102,11 +110,11 @@ export function ScadenzeMese() {
   // deadline (single, subscription or installment). Rata counts stay editable
   // in the form; the checkbox never silently advances or loses progress.
   const onCheck = async (it: ScadenzaItem) => {
-    if (it.source !== 'deadline' || isGuest || !it.raw) return;
+    if (it.source !== 'deadline' || isRecurring(it) || isGuest || !it.raw) return;
     const next = !it.raw.is_completed;
     setSavingId(it.id);
     patchItem(it.id, { ...it.raw, is_completed: next }); // optimistic
-    try { patchItem(it.id, await updateDeadline(it.id, { is_completed: next })); }
+    try { patchItem(it.id, await updateDeadline(it.raw.id, { is_completed: next })); }
     catch { await load(); }
     finally { setSavingId(null); }
   };
@@ -171,13 +179,14 @@ export function ScadenzeMese() {
             {g.list.map((it, idx) => {
               const d = it.raw;
               const paid = it.source === 'deadline' && !!d?.is_completed;
-              const interactive = it.source === 'deadline' && !isGuest;
+              const recurring = isRecurring(it);
+              const interactive = it.source === 'deadline' && !recurring && !isGuest;
               const secondary = amountLine(d) || it.sottotitolo;
               return (
                 <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderTop: idx === 0 ? undefined : '1px solid rgb(var(--color-border))' }}>
-                  {/* Paid checkbox — deadlines only; academic rows keep the slot empty for alignment */}
+                  {/* Paid checkbox — single deadlines only; academic and recurring (rate/abbonamenti) rows keep the slot empty for alignment */}
                   <div style={{ width: 22, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {it.source === 'deadline' && (
+                    {it.source === 'deadline' && !recurring && (
                       <button
                         type="button"
                         onClick={() => onCheck(it)}
@@ -201,7 +210,7 @@ export function ScadenzeMese() {
                       {it.source === 'academic' && <span style={{ fontSize: 9.5, letterSpacing: '.1em', fontWeight: 600, color: 'rgb(var(--color-muted))', fontFamily: mono, background: 'rgb(128 128 128 / 0.12)', padding: '2px 6px', borderRadius: 5 }}>UOC</span>}
                       {paid
                         ? <span style={{ flex: 'none', width: 'max-content', fontSize: 10.5, fontWeight: 600, color: 'rgb(16 185 129)', background: 'rgb(16 185 129 / 0.12)', border: '1px solid rgb(16 185 129 / 0.3)', borderRadius: 6, padding: '1px 7px' }}>Pagata</span>
-                        : recurrenceBadge(d)}
+                        : recurrenceBadge(it)}
                     </div>
                     {secondary && <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{secondary}</div>}
                   </div>
@@ -211,7 +220,7 @@ export function ScadenzeMese() {
                   {it.source === 'deadline' && !isGuest && (
                     <div style={{ display: 'flex', gap: 2, flex: 'none' }}>
                       <button className="sd-iconbtn" aria-label="Modifica" onClick={() => setEd({ open: true, editing: it.raw ?? null })}><Pencil size={14} /></button>
-                      <button className="sd-iconbtn" aria-label="Elimina" onClick={() => setDel({ id: it.id, label: it.titolo })}><Trash2 size={14} /></button>
+                      <button className="sd-iconbtn" aria-label="Elimina" onClick={() => setDel({ id: it.raw?.id ?? it.id, label: it.titolo })}><Trash2 size={14} /></button>
                     </div>
                   )}
                 </div>
