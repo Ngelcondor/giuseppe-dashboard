@@ -10,6 +10,7 @@ import { getBudgetDashboard, type BudgetDashboard } from '@/services/budgetServi
 import { getScadenze, type ScadenzaItem } from '@/services/scadenzeService';
 import { getStudyOverview, type StudyOverview } from '@/services/studyService';
 import { getUpcomingEvents, type CalendarEventDTO } from '@/services/calendarService';
+import { getFamilyWeather, weatherIcon, weatherDescription, type FamilyWeather } from '@/services/weatherService';
 
 /* ── Home redesign · "Study Desk" ─────────────────────────────────────────────
    Terminal-style header with a live clock, three horizontal scrollable lanes
@@ -132,6 +133,8 @@ export default function HomePage() {
   const [scadenze, setScadenze] = useState<ScadenzaItem[]>([]);
   const [study, setStudy] = useState<StudyOverview | null>(null);
   const [appts, setAppts] = useState<CalendarEventDTO[]>([]);
+  // Meteo famiglia: [] finché non configurato nelle Impostazioni → corsia nascosta.
+  const [family, setFamily] = useState<FamilyWeather[]>([]);
 
   // Stable "today" for date math (local, not UTC — correct near midnight in CET).
   const now = new Date();
@@ -149,6 +152,7 @@ export default function HomePage() {
     getScadenze().then((d) => { if (alive) setScadenze(d); }).catch(() => {/* keep empty */});
     getStudyOverview().then((d) => { if (alive) setStudy(d); }).catch(() => {/* keep empty */});
     getUpcomingEvents().then((d) => { if (alive) setAppts(d); }).catch(() => {/* keep empty */});
+    getFamilyWeather().then((d) => { if (alive) setFamily(d); }).catch(() => {/* keep empty */});
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -335,6 +339,30 @@ export default function HomePage() {
           <LaneEmpty text="Nessuna scadenza imminente." />
         )}
       </section>
+
+      {/* ════ CORSIA 4 · METEO FAMIGLIA (solo se configurato in Impostazioni) ════ */}
+      {family.length > 0 && (
+        <section className="sd-reveal" style={{ ['--i' as string]: 4, marginBottom: 30 }}>
+          <LanePrompt cmd="meteo" flags={[{ text: '--famiglia', color: `rgb(${PINK})` }]} comment={`# ${family.length} città`} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12 }}>
+            {family.map((m) => (
+              <div key={`${m.label}-${m.city}`} style={{ background: 'rgb(var(--color-card))', border: '1px solid rgb(var(--color-border))', borderRadius: 10, padding: '15px 17px', boxShadow: '0 1px 2px rgba(17,17,26,.04)', display: 'flex', alignItems: 'center', gap: 13 }}>
+                <span style={{ fontSize: 30, lineHeight: 1, flex: 'none' }} title={weatherDescription(m.code)}>{weatherIcon(m.code)}</span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'rgb(var(--color-heading))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.label}</div>
+                  <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.city} · {weatherDescription(m.code)}</div>
+                </div>
+                <div style={{ textAlign: 'right', flex: 'none' }}>
+                  <div style={{ fontFamily: mono, fontSize: 19, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{m.temp !== null ? `${m.temp}°` : '—'}</div>
+                  <div style={{ fontFamily: mono, fontSize: 11, color: 'rgb(var(--color-muted))', whiteSpace: 'nowrap' }}>
+                    {m.min !== null && m.max !== null ? `${m.min}° / ${m.max}°` : ''}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ════ STATS · riepilogo ════ */}
       <div className="sd-reveal" style={{ ['--i' as string]: 4, display: 'flex', alignItems: 'center', gap: 14, margin: '6px 0 14px' }}>

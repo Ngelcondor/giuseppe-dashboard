@@ -98,6 +98,11 @@ export default function ImpostazioniPage() {
         <CalendarConnectionsCard editor={isEditor} />
       </Section>
 
+      {/* Famiglia (meteo in Home) */}
+      <Section i={7} title="Famiglia" hint="Membri e città per il meteo in Home. Le coordinate arrivano dal geocoding Open-Meteo — niente posizioni inventate.">
+        <FamilyCard value={settings['family']} editor={isEditor} onSaved={loadSettings} />
+      </Section>
+
       {/* Style */}
       <Section i={7} title="Aspetto">
         <StyleCard value={settings['style']} editor={isEditor} onSaved={loadSettings} />
@@ -613,5 +618,88 @@ function GuestForm({ onSubmit, onCancel }: { onSubmit: (b: { email: string; pass
         <Button type="submit" variant="primary" isLoading={submitting}>Crea account</Button>
       </div>
     </form>
+  );
+}
+
+/* ── Famiglia (membri + città per il meteo in Home) ── */
+
+type FamilyMember = { name: string; city: string; lat: number; lon: number };
+
+function FamilyCard({ value, editor, onSaved }: {
+  value?: Record<string, unknown>; editor: boolean; onSaved: () => Promise<void>;
+}) {
+  const members: FamilyMember[] = Array.isArray(value?.members)
+    ? (value!.members as FamilyMember[]).filter((m) => m && m.lat != null && m.lon != null)
+    : [];
+  const [name, setName] = useState('');
+  const [city, setCity] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const save = async (next: FamilyMember[]) => {
+    await updateSetting('family', { members: next });
+    await onSaved();
+  };
+
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !city.trim()) { setError('Inserisci nome e città.'); return; }
+    setBusy(true); setError('');
+    try {
+      const { geocodeCity } = await import('@/services/weatherService');
+      const geo = await geocodeCity(city.trim());
+      if (!geo) { setError(`Città "${city.trim()}" non trovata.`); setBusy(false); return; }
+      await save([...members, { name: name.trim(), city: geo.name, lat: geo.lat, lon: geo.lon }]);
+      setName(''); setCity('');
+    } catch {
+      setError('Salvataggio non riuscito. Riprova.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (idx: number) => {
+    setBusy(true); setError('');
+    try { await save(members.filter((_, i) => i !== idx)); }
+    catch { setError('Rimozione non riuscita. Riprova.'); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="sd-reveal sd-shadow" style={{ ...card, padding: '20px 22px' }}>
+      {members.length === 0 && (
+        <p style={{ margin: '0 0 14px', fontSize: 13.5, color: 'rgb(var(--color-tertiary))' }}>
+          Nessun membro configurato — la corsia meteo in Home resta nascosta finché non ne aggiungi almeno uno.
+        </p>
+      )}
+      {members.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: editor ? 16 : 0 }}>
+          {members.map((m, idx) => (
+            <div key={`${m.name}-${idx}`} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, background: 'rgb(var(--color-card-inner))', border: '1px solid rgb(var(--color-border))' }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{m.name}</span>
+                <span style={{ fontSize: 13, color: 'rgb(var(--color-tertiary))' }}> · {m.city}</span>
+              </div>
+              <span style={{ fontFamily: mono, fontSize: 11, color: 'rgb(var(--color-muted))', whiteSpace: 'nowrap' }}>
+                {m.lat.toFixed(2)}, {m.lon.toFixed(2)}
+              </span>
+              {editor && (
+                <button className="sd-iconbtn sd-press" aria-label={`Rimuovi ${m.name}`} title="Rimuovi" onClick={() => remove(idx)} disabled={busy}>
+                  <Trash2 size={15} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {editor && (
+        <form onSubmit={add} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <input className="sd-input" style={{ flex: '1 1 130px' }} value={name} placeholder="Nome (es. mamma)" onChange={(e) => setName(e.target.value)} />
+          <input className="sd-input" style={{ flex: '1 1 150px' }} value={city} placeholder="Città (es. Bergamo)" onChange={(e) => setCity(e.target.value)} />
+          <Button type="submit" variant="primary" size="sm" isLoading={busy}><Plus size={15} />Aggiungi</Button>
+          {error && <p style={{ ...errStyle, flexBasis: '100%' }}>{error}</p>}
+        </form>
+      )}
+    </div>
   );
 }
