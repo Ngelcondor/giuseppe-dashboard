@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/sd/FormSheet';
 import { DeadlineForm, INTERVAL_LABEL, toAmount, fmtEur } from '@/components/sd/DeadlineForm';
 import {
-  getScadenze, createDeadline, updateDeadline, deleteDeadline, getCurrentUserRole,
+  getScadenze, createDeadline, updateDeadline, deleteDeadline, payInstallment, getCurrentUserRole,
   type ScadenzaItem, type Deadline, type DeadlineInput,
 } from '@/services/scadenzeService';
 
@@ -49,12 +49,6 @@ const amountLine = (d?: Deadline): string => {
   if (d.recurrence_type === 'installments') return `${fmtEur(amt)} a rata · ${d.installments_total ?? 0} rate`;
   return fmtEur(amt);
 };
-
-// A recurring deadline (rate / abbonamento) has more than one dated row in the
-// list; the plain paid checkbox (which flips the whole plan) doesn't map onto a
-// single occurrence, so it's shown only on single deadlines.
-const isRecurring = (it: ScadenzaItem): boolean =>
-  it.raw?.recurrence_type === 'installments' || it.raw?.recurrence_type === 'subscription';
 
 const recurrenceBadge = (it: ScadenzaItem): React.ReactNode => {
   const d = it.raw;
@@ -109,13 +103,26 @@ export function ScadenzeMese() {
   // Binary, fully reversible: the checkbox just toggles `is_completed` for any
   // deadline (single, subscription or installment). Rata counts stay editable
   // in the form; the checkbox never silently advances or loses progress.
+  // Single deadlines: the checkbox flips the whole (one-row) deadline's paid flag.
   const onCheck = async (it: ScadenzaItem) => {
-    if (it.source !== 'deadline' || isRecurring(it) || isGuest || !it.raw) return;
+    const rt = it.raw?.recurrence_type;
+    if (it.source !== 'deadline' || isGuest || !it.raw || (rt && rt !== 'none')) return;
     const next = !it.raw.is_completed;
     setSavingId(it.id);
     patchItem(it.id, { ...it.raw, is_completed: next }); // optimistic
     try { patchItem(it.id, await updateDeadline(it.raw.id, { is_completed: next })); }
     catch { await load(); }
+    finally { setSavingId(null); }
+  };
+
+  // Installments: checking the next-due rata records one payment (installments_paid++
+  // via the pay-installment endpoint), then reloads so that rata drops off and the
+  // following one becomes next. Never flips the whole plan at once.
+  const onPayRata = async (it: ScadenzaItem) => {
+    if (it.source !== 'deadline' || isGuest || !it.raw) return;
+    setSavingId(it.id);
+    try { await payInstallment(it.raw.id); await load(); }
+    catch {/* keep current on failure */}
     finally { setSavingId(null); }
   };
 
@@ -179,24 +186,41 @@ export function ScadenzeMese() {
             {g.list.map((it, idx) => {
               const d = it.raw;
               const paid = it.source === 'deadline' && !!d?.is_completed;
-              const recurring = isRecurring(it);
-              const interactive = it.source === 'deadline' && !recurring && !isGuest;
+              const recType = d?.recurrence_type;
+              const isSingle = it.source === 'deadline' && (recType == null || recType === 'none');
+              // The next unpaid rata is the first remaining occurrence (#paid+1); only it is payable.
+              const nextRata = recType === 'installments' && it.occIndex != null && it.occIndex === (d?.installments_paid ?? 0) + 1;
               const secondary = amountLine(d) || it.sottotitolo;
               return (
                 <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderTop: idx === 0 ? undefined : '1px solid rgb(var(--color-border))' }}>
-                  {/* Paid checkbox — single deadlines only; academic and recurring (rate/abbonamenti) rows keep the slot empty for alignment */}
+                  {/* Paid checkbox — single deadlines (toggle) and the next-due rata of an
+                      installment plan (records one payment). Academic, subscription and
+                      not-yet-due rate keep the slot empty for alignment. */}
                   <div style={{ width: 22, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {it.source === 'deadline' && !recurring && (
+                    {isSingle && (
                       <button
                         type="button"
                         onClick={() => onCheck(it)}
-                        disabled={!interactive || savingId === it.id}
-                        className={interactive ? 'sd-press' : undefined}
+                        disabled={isGuest || savingId === it.id}
+                        className={!isGuest ? 'sd-press' : undefined}
                         aria-label={paid ? 'Segna come non pagata' : 'Segna come pagata'}
                         title={paid ? 'Pagata · clic per annullare' : 'Segna come pagata'}
-                        style={{ border: 'none', background: 'transparent', padding: 0, display: 'flex', cursor: interactive ? 'pointer' : 'default', color: paid ? 'rgb(16 185 129)' : 'rgb(var(--color-muted))', opacity: savingId === it.id ? 0.5 : 1 }}
+                        style={{ border: 'none', background: 'transparent', padding: 0, display: 'flex', cursor: isGuest ? 'default' : 'pointer', color: paid ? 'rgb(16 185 129)' : 'rgb(var(--color-muted))', opacity: savingId === it.id ? 0.5 : 1 }}
                       >
                         {paid ? <CheckCircle2 size={18} /> : <Circle size={18} />}
+                      </button>
+                    )}
+                    {nextRata && !isGuest && (
+                      <button
+                        type="button"
+                        onClick={() => onPayRata(it)}
+                        disabled={savingId === it.id}
+                        className="sd-press"
+                        aria-label="Segna questa rata come pagata"
+                        title="Segna questa rata come pagata"
+                        style={{ border: 'none', background: 'transparent', padding: 0, display: 'flex', cursor: 'pointer', color: 'rgb(var(--color-muted))', opacity: savingId === it.id ? 0.5 : 1 }}
+                      >
+                        <Circle size={18} />
                       </button>
                     )}
                   </div>
