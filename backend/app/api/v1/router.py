@@ -28,7 +28,6 @@ from app.api.v1.endpoints import (
     accounts,
     smarthome,
     family_weather,
-    banking,
     calendar_integration,
 )
 from app.api.v1.endpoints import settings as settings_endpoint
@@ -69,4 +68,3 @@ router.include_router(accounts.router)
 router.include_router(smarthome.router)
 router.include_router(family_weather.router)
 router.include_router(calendar_integration.router)
-router.include_router(banking.router)
