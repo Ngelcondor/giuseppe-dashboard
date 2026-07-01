@@ -1,6 +1,7 @@
 """Family weather endpoint — meteo reale (Open-Meteo, no API key) per le città
 della famiglia. Legge le location dal settings store (chiave 'family' o
-'weather'); se non configurate usa i default Bergamo / Siracusa / Barcellona.
+'weather'); se non configurate ritorna lista vuota (il frontend mostra lo stato
+"non configurato", mai membri o città inventati).
 
 NB onestà: la posizione live dei familiari (Find My) NON ha API pubbliche, quindi
 qui mostriamo SOLO la città configurata per ogni membro + il meteo reale di quella
@@ -22,14 +23,6 @@ router = APIRouter(prefix="/family-weather", tags=["family-weather"])
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 
-# Default famiglia — usato quando il settings store non ha location configurate.
-# Coordinate dei capoluoghi/centri città.
-DEFAULT_MEMBERS: List[Dict[str, Any]] = [
-    {"label": "mamma", "city": "Bergamo", "lat": 45.6983, "lon": 9.6773},
-    {"label": "papà", "city": "Siracusa", "lat": 37.0755, "lon": 15.2866},
-    {"label": "Aurora", "city": "Barcellona", "lat": 41.3874, "lon": 2.1686},
-]
-
 
 def _resolve_members(family_cfg: Optional[dict], weather_cfg: Optional[dict]) -> List[Dict[str, Any]]:
     """Estrae la lista di location da configurare.
@@ -39,7 +32,7 @@ def _resolve_members(family_cfg: Optional[dict], weather_cfg: Optional[dict]) ->
       weather -> { locations: [{label, lat, lon}], ... }
 
     Ritorna sempre una lista normalizzata { label, city, lat, lon }.
-    Se nulla è configurato (o incompleto) torna ai default famiglia.
+    Se nulla è configurato (o incompleto) ritorna lista vuota — nessun default.
     """
     members: List[Dict[str, Any]] = []
 
@@ -64,7 +57,7 @@ def _resolve_members(family_cfg: Optional[dict], weather_cfg: Optional[dict]) ->
             label = loc.get("label") or ""
             members.append({"label": label, "city": label, "lat": lat, "lon": lon})
 
-    return members or DEFAULT_MEMBERS
+    return members
 
 
 async def _get_setting(db: AsyncSession, user_id: Optional[str], key: str) -> Optional[dict]:
@@ -136,7 +129,7 @@ async def get_family_weather(
     """Meteo reale (Open-Meteo) per le città dei familiari.
 
     Ritorna un array { label, city, temp, code, min, max } — una entry per
-    membro/location configurata (o per i 3 default famiglia).
+    membro/location configurata nel settings store; vuoto se non configurato.
     """
     user_id = current_user.get("sub")
     family_cfg = await _get_setting(db, user_id, "family")

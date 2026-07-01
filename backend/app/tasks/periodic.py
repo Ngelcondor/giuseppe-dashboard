@@ -23,7 +23,6 @@ from app.services.notification_service import (
 )
 from app.services.focus_calculator import calculate_daily_focus_score
 from app.services.feed_service import fetch_cybersecurity_feed
-from app.services.weather_service import get_weather
 from app.services.caldav_service import sync_calendar_events
 from app.services.smarthome_service import shelly_devices
 from app.models.app_settings import AppSetting

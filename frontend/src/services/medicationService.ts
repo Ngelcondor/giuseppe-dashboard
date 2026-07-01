@@ -170,12 +170,6 @@ const medicationService = {
     const { data } = await api.get('/health/medications/stats', { params });
     return data;
   },
-
-  /** Seed dei farmaci di Giuseppe */
-  async seed(): Promise<MedicationResponse[]> {
-    const { data } = await api.post('/health/medications/seed');
-    return data;
-  },
 };
 
 export default medicationService;
