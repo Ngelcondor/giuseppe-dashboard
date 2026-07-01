@@ -12,10 +12,32 @@ export interface FamilyWeather {
   max: number | null;   // massima di oggi °C
 }
 
-// Meteo reale per le città dei familiari (default: Bergamo, Siracusa, Barcellona).
+// Meteo reale per le città dei familiari configurate nelle Impostazioni.
+// Ritorna [] finché la sezione Famiglia non è configurata (stato onesto).
 export async function getFamilyWeather(): Promise<FamilyWeather[]> {
   const { data } = await api.get<FamilyWeather[]>('/family-weather');
   return data;
+}
+
+// ── Geocoding Open-Meteo (no API key) ────────────────────────────────────────
+// Risolve una città in coordinate al salvataggio del membro famiglia, così il
+// backend non deve mai inventare posizioni.
+export interface GeocodedCity {
+  name: string;
+  lat: number;
+  lon: number;
+  country?: string;
+  admin1?: string; // regione/provincia
+}
+
+export async function geocodeCity(query: string): Promise<GeocodedCity | null> {
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=it&format=json`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = await res.json();
+  const r = data?.results?.[0];
+  if (!r) return null;
+  return { name: r.name, lat: r.latitude, lon: r.longitude, country: r.country, admin1: r.admin1 };
 }
 
 // ── WMO weather code → descrizione IT + icona ─────────────────────────────────
