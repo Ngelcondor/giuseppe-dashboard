@@ -315,6 +315,19 @@ async def sync_bank_transactions(
         skipped = 0
         errors = 0
 
+        # Dedup in una query sola: con centinaia di transazioni, un SELECT per
+        # riga teneva il sync oltre il timeout del client.
+        ext_ids = [tx.transaction_id for tx in tx_data.booked if tx.transaction_id]
+        seen_ids: set[str] = set()
+        if ext_ids:
+            existing = await db.execute(
+                select(Transaction.external_id).where(
+                    (Transaction.user_id == current_user["sub"])
+                    & (Transaction.external_id.in_(ext_ids))
+                )
+            )
+            seen_ids = {row[0] for row in existing.all()}
+
         for tx in tx_data.booked:
             try:
                 ext_id = tx.transaction_id
@@ -325,16 +338,10 @@ async def sync_bank_transactions(
                     skipped += 1
                     continue
 
-                # Check dedup (user-scoped: multi-account safe)
-                existing = await db.execute(
-                    select(Transaction).where(
-                        (Transaction.external_id == ext_id)
-                        & (Transaction.user_id == current_user["sub"])
-                    )
-                )
-                if existing.scalars().first():
+                if ext_id in seen_ids:
                     skipped += 1
                     continue
+                seen_ids.add(ext_id)  # dedup anche i duplicati intra-batch
 
                 txn_type = TransactionType.INCOME if tx.amount > 0 else TransactionType.EXPENSE
 

@@ -158,7 +158,9 @@ export default function BudgetPage() {
   const doSync = async () => {
     setSyncing(true); setImportErr(null); setImportMsg(null);
     try {
-      const r = await syncBankTransactions(90);
+      // Refresh di routine: 30 giorni bastano (lo storico è già in DB) e
+      // dimezzano le pagine Enable Banking → sync ben sotto il timeout.
+      const r = await syncBankTransactions(30);
       setImportMsg(`${r.imported} transazioni sincronizzate${r.skipped ? ` · ${r.skipped} già presenti` : ''}`);
       await load();
     } catch { setImportErr('Sincronizzazione non riuscita. Riprova.'); }
