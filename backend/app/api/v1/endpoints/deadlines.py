@@ -22,6 +22,7 @@ from app.schemas.deadline import (
     DeadlineCompleteRequest,
     DeadlineOccurrence,
     DeadlineOccurrencesResponse,
+    DeadlineOccurrencePaidRequest,
 )
 
 router = APIRouter(prefix="/deadlines", tags=["deadlines"])
@@ -290,6 +291,45 @@ async def get_upcoming_occurrences(
         horizon_end=horizon_end,
         occurrences=occurrences,
     )
+
+
+@router.patch("/{deadline_id}/occurrence", response_model=DeadlineResponse)
+async def set_occurrence_paid(
+    deadline_id: str,
+    request: DeadlineOccurrencePaidRequest,
+    current_user: dict = Depends(require_editor),
+    db: AsyncSession = Depends(get_db),
+) -> DeadlineResponse:
+    """Mark one occurrence (a single rata or subscription charge) paid/unpaid.
+
+    Toggles the occurrence's ISO date in `paid_occurrences`. This is per-date and
+    reversible, independent of `installments_paid` (the pre-app baseline), so any
+    rate/charge shown in the Scadenze view can be checked off when paid.
+    """
+    result = await db.execute(
+        select(Deadline).where(
+            (Deadline.id == deadline_id)
+            & (Deadline.user_id == current_user["sub"])
+        )
+    )
+    deadline = result.scalars().first()
+    if not deadline:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deadline not found")
+
+    iso = request.date.isoformat()
+    dates = list(deadline.paid_occurrences or [])
+    if request.paid:
+        if iso not in dates:
+            dates.append(iso)
+    else:
+        dates = [d for d in dates if d != iso]
+    # Reassign (not in-place) so SQLAlchemy detects the JSON column change.
+    deadline.paid_occurrences = sorted(dates)
+
+    db.add(deadline)
+    await db.commit()
+    await db.refresh(deadline)
+    return DeadlineResponse.from_orm(deadline)
 
 
 @router.patch("/{deadline_id}/pay-installment", response_model=DeadlineResponse)

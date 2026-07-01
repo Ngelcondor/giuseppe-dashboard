@@ -29,6 +29,8 @@ class DeadlineBase(BaseModel):
     installments_paid: Optional[int] = 0
     recurrence_interval: Optional[RecurrenceInterval] = None
     amount: Optional[Decimal] = None
+    # ISO dates (YYYY-MM-DD) of individually-paid occurrences (rate / charges).
+    paid_occurrences: Optional[List[str]] = None
 
 
 class DeadlineCreate(DeadlineBase):
@@ -77,6 +79,13 @@ class DeadlineCompleteRequest(BaseModel):
     """Request to mark deadline as complete."""
 
     completion_notes: Optional[str] = None
+
+
+class DeadlineOccurrencePaidRequest(BaseModel):
+    """Mark a single occurrence (one rata / one subscription charge) paid or not."""
+
+    date: date
+    paid: bool
 
 
 class DeadlineUpcomingResponse(BaseModel):
