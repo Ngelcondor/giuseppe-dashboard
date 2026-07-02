@@ -14,9 +14,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.core.database import get_db
+from app.core.sections import SECTION_KEYS
 from app.core.security import get_current_user, hash_password
 from app.models.user import User
-from app.schemas.app_settings import MeResponse, UserSummary, GuestCreate
+from app.schemas.app_settings import MeResponse, UserSummary, GuestCreate, UserSectionsUpdate
 
 # /auth/me — sits under the auth prefix
 me_router = APIRouter(prefix="/auth", tags=["auth"])
@@ -26,6 +27,24 @@ router = APIRouter(prefix="/users", tags=["accounts"])
 
 def _role(user: User) -> str:
     return user.role or "admin"
+
+
+def _sections(user: User):
+    """Sezioni per le response: None = tutte (admin, o guest storico)."""
+    if _role(user) == "admin":
+        return None
+    return user.allowed_sections
+
+
+def _validate_sections(sections: list[str]) -> list[str]:
+    bad = [s for s in sections if s not in SECTION_KEYS]
+    if bad:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Sezioni sconosciute: {', '.join(bad)}",
+        )
+    # dedup preservando l'ordine canonico
+    return [s for s in SECTION_KEYS if s in sections]
 
 
 async def _load_user(db: AsyncSession, user_id) -> User:
@@ -52,7 +71,10 @@ async def get_me(
 ) -> MeResponse:
     """Identity + role of the authenticated user."""
     user = await _load_user(db, current_user.get("sub"))
-    return MeResponse(email=user.email, role=_role(user), full_name=user.username or "")
+    return MeResponse(
+        email=user.email, role=_role(user),
+        full_name=user.username or "", sections=_sections(user),
+    )
 
 
 @router.get("", response_model=list[UserSummary])
@@ -67,6 +89,7 @@ async def list_users(
         UserSummary(
             id=u.id, email=u.email, role=_role(u),
             full_name=u.username or "", is_active=bool(u.is_active),
+            sections=_sections(u),
         )
         for u in users
     ]
@@ -101,6 +124,7 @@ async def create_guest(
         hashed_password=hash_password(body.password),
         is_active=True,
         role="guest",
+        allowed_sections=_validate_sections(body.sections),
     )
     db.add(guest)
     await db.commit()
@@ -108,6 +132,33 @@ async def create_guest(
     return UserSummary(
         id=guest.id, email=guest.email, role=_role(guest),
         full_name=guest.username or "", is_active=bool(guest.is_active),
+        sections=_sections(guest),
+    )
+
+
+@router.patch("/{user_id}/sections", response_model=UserSummary)
+async def update_user_sections(
+    user_id: UUID,
+    body: UserSectionsUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserSummary:
+    """Update the sections granted to a guest account. Admin only."""
+    await _require_admin(db, current_user)
+    target = await _load_user(db, user_id)
+    if _role(target) != "guest":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le sezioni si applicano solo agli account ospite",
+        )
+    target.allowed_sections = _validate_sections(body.sections)
+    db.add(target)
+    await db.commit()
+    await db.refresh(target)
+    return UserSummary(
+        id=target.id, email=target.email, role=_role(target),
+        full_name=target.username or "", is_active=bool(target.is_active),
+        sections=_sections(target),
     )
 
 

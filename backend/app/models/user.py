@@ -30,6 +30,11 @@ class User(Base):
     # rows to 'admin' on dev startup; the seeded admin stays admin.
     role = Column(String(16), nullable=True, default="admin", server_default="admin")
 
+    # Sezioni concesse a un guest (lista di chiavi, vedi core/sections.py).
+    # NULL = tutte le sezioni (comportamento storico dei guest pre-esistenti);
+    # per gli admin il campo è ignorato.
+    allowed_sections = Column(JSON, nullable=True)
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

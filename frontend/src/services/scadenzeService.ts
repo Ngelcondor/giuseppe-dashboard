@@ -172,7 +172,12 @@ function expandDeadline(d: Deadline): ScadenzaItem[] {
 // deadlines (from /deadlines) — the latter expanded into their recurring
 // occurrences — merged and sorted ascending by date.
 export async function getScadenze(): Promise<ScadenzaItem[]> {
-  const [academic, deadlines] = await Promise.all([getScadenzeAccademiche(), getDeadlines()]);
+  // Tolleranza per fonte: un ospite può avere accesso solo a una delle due
+  // sezioni (universita/finanze) — il 403 dell'altra non deve azzerare tutto.
+  const [academic, deadlines] = await Promise.all([
+    getScadenzeAccademiche().catch(() => [] as UniEvento[]),
+    getDeadlines().catch(() => [] as Deadline[]),
+  ]);
   return [...academic.map(academicToItem), ...deadlines.flatMap(expandDeadline)].sort(
     (a, b) => a.data.localeCompare(b.data),
   );

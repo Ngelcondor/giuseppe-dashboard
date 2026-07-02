@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { getMe, canSee, type Me } from '@/services/settingsService';
 
 /* ── Study Desk shell ──────────────────────────────────────────────────────
    Dark-glass dashboard frame aligned to the Login: ambient 3D gyroscope +
@@ -12,19 +13,21 @@ import { usePathname } from 'next/navigation';
    Requires the dark-glass CSS block appended to globals.css — see
    handoff/globals-additions.css. */
 
-type NavItem = { label: string; href: string; dot: string; wip?: boolean };
+type NavItem = { label: string; href: string; dot: string; wip?: boolean; section?: string };
 
+// `section` = chiave di visibilità per gli ospiti (vedi settingsService.SECTIONS);
+// le voci senza section (Home, Impostazioni) sono sempre visibili.
 const NAV: NavItem[] = [
   { label: 'Home', href: '/dashboard', dot: 'rgb(99 102 241)' },
-  { label: 'Università', href: '/dashboard/universita', dot: 'rgb(99 102 241)' },
-  { label: 'Studio', href: '/dashboard/study', dot: 'rgb(99 102 241)' },
-  { label: 'Calendario', href: '/dashboard/calendar', dot: 'rgb(99 102 241)' },
-  { label: 'Finanze', href: '/dashboard/budget', dot: 'rgb(16 185 129)' },
-  { label: 'Smart Home', href: '/dashboard/smart-home', dot: 'rgb(245 158 11)' },
-  { label: 'Cyber Feed', href: '/dashboard/feed', dot: 'rgb(129 140 248)' },
-  { label: 'Salute', href: '/dashboard/salute', dot: 'rgb(244 63 94)', wip: true },
-  { label: 'Sonno', href: '/dashboard/sonno', dot: 'rgb(139 92 246)', wip: true },
-  { label: 'Farmaci', href: '/dashboard/farmaci', dot: 'rgb(20 184 166)', wip: true },
+  { label: 'Università', href: '/dashboard/universita', dot: 'rgb(99 102 241)', section: 'universita' },
+  { label: 'Studio', href: '/dashboard/study', dot: 'rgb(99 102 241)', section: 'studio' },
+  { label: 'Calendario', href: '/dashboard/calendar', dot: 'rgb(99 102 241)', section: 'calendario' },
+  { label: 'Finanze', href: '/dashboard/budget', dot: 'rgb(16 185 129)', section: 'finanze' },
+  { label: 'Smart Home', href: '/dashboard/smart-home', dot: 'rgb(245 158 11)', section: 'smart_home' },
+  { label: 'Cyber Feed', href: '/dashboard/feed', dot: 'rgb(129 140 248)', section: 'feed' },
+  { label: 'Salute', href: '/dashboard/salute', dot: 'rgb(244 63 94)', wip: true, section: 'salute' },
+  { label: 'Sonno', href: '/dashboard/sonno', dot: 'rgb(139 92 246)', wip: true, section: 'sonno' },
+  { label: 'Farmaci', href: '/dashboard/farmaci', dot: 'rgb(20 184 166)', wip: true, section: 'salute' },
   { label: 'Impostazioni', href: '/dashboard/impostazioni', dot: 'rgb(100 116 139)' },
 ];
 
@@ -37,6 +40,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname() || '/dashboard';
   const [lowStim, setLowStim] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  // Identità per filtrare la nav degli ospiti: finché non è nota mostriamo
+  // tutto (l'admin è il caso comune; le API restano comunque protette).
+  const [me, setMe] = useState<Me | null>(null);
   // 'idle' = no anim classes (content visible — the safe default, also SSR).
   // 'in' = hidden, 'lit' = revealing. JS drives in→lit→idle so content is
   // never stuck invisible if JS is slow or fails.
@@ -48,6 +54,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const t = localStorage.getItem('sd-theme');
     if (t === 'light' || t === 'dark') setTheme(t);
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    getMe().then((m) => { if (alive) setMe(m); }).catch(() => {/* non autenticato: gestito altrove */});
+    return () => { alive = false; };
+  }, []);
+
+  const visibleNav = NAV.filter((item) => !item.section || canSee(me, item.section));
   useEffect(() => { localStorage.setItem('sd-lowstim', lowStim ? '1' : '0'); }, [lowStim]);
   useEffect(() => { localStorage.setItem('sd-theme', theme); }, [theme]);
 
@@ -126,7 +140,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
 
             <nav className="sd-nav" style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 26 }}>
-              {NAV.map((item) => {
+              {visibleNav.map((item) => {
                 const on = isActive(pathname, item.href);
                 return (
                   <Link
