@@ -13,6 +13,7 @@ import { getUpcomingEvents, type CalendarEventDTO } from '@/services/calendarSer
 import { getFamilyWeather, weatherIcon, weatherDescription, type FamilyWeather } from '@/services/weatherService';
 import { toAmount, fmtEur } from '@/components/sd/DeadlineForm';
 import type { UniEvento } from '@/services/universitaService';
+import { getMe, canSee, type Me } from '@/services/settingsService';
 
 /* ── Home redesign · "Study Desk" ─────────────────────────────────────────────
    Terminal-style header with a live clock, three horizontal scrollable lanes
@@ -137,6 +138,8 @@ export default function HomePage() {
   const [appts, setAppts] = useState<CalendarEventDTO[]>([]);
   // Meteo famiglia: [] finché non configurato nelle Impostazioni → corsia nascosta.
   const [family, setFamily] = useState<FamilyWeather[]>([]);
+  // Sezioni visibili (ospiti): gate su fetch e rendering delle corsie.
+  const [me, setMe] = useState<Me | null>(null);
 
   // Stable "today" for date math (local, not UTC — correct near midnight in CET).
   const now = new Date();
@@ -149,15 +152,25 @@ export default function HomePage() {
     let alive = true;
     const m = now.getMonth() + 1;
     const y = now.getFullYear();
-    getUniversitaDashboard().then((d) => { if (alive) setUni(d); }).catch(() => {/* keep empty */});
-    getBudgetDashboard(m, y).then((d) => { if (alive) setBudget(d); }).catch(() => {/* keep empty */});
-    getScadenze().then((d) => { if (alive) setScadenze(d); }).catch(() => {/* keep empty */});
-    getStudyOverview().then((d) => { if (alive) setStudy(d); }).catch(() => {/* keep empty */});
-    getUpcomingEvents().then((d) => { if (alive) setAppts(d); }).catch(() => {/* keep empty */});
-    getFamilyWeather().then((d) => { if (alive) setFamily(d); }).catch(() => {/* keep empty */});
+    // Prima l'identità (per sapere quali sezioni servono), poi solo i fetch
+    // consentiti: niente 403 inutili per gli ospiti. Se /auth/me fallisce si
+    // procede come prima (fetch completo, errori gestiti singolarmente).
+    getMe().catch(() => null).then((meResp) => {
+      if (!alive) return;
+      setMe(meResp);
+      const ok = (s: string) => canSee(meResp, s);
+      if (ok('universita')) getUniversitaDashboard().then((d) => { if (alive) setUni(d); }).catch(() => {/* keep empty */});
+      if (ok('finanze')) getBudgetDashboard(m, y).then((d) => { if (alive) setBudget(d); }).catch(() => {/* keep empty */});
+      if (ok('finanze') || ok('universita')) getScadenze().then((d) => { if (alive) setScadenze(d); }).catch(() => {/* keep empty */});
+      if (ok('studio')) getStudyOverview().then((d) => { if (alive) setStudy(d); }).catch(() => {/* keep empty */});
+      if (ok('calendario')) getUpcomingEvents().then((d) => { if (alive) setAppts(d); }).catch(() => {/* keep empty */});
+      if (ok('famiglia')) getFamilyWeather().then((d) => { if (alive) setFamily(d); }).catch(() => {/* keep empty */});
+    });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const can = (s: string) => canSee(me, s);
 
   const { profilo, prossimo_esame } = uni;
   const esameDays = prossimo_esame ? Math.max(0, daysTo(prossimo_esame.data)) : null;
@@ -196,6 +209,8 @@ export default function HomePage() {
   const topCat = [...budget.categories].sort((a, b) => b.spent - a.spent)[0] ?? null;
   const studioHint = !today || today.isRest ? 'Riposo' : totalCount === 0 ? 'Nessun piano' : doneCount >= totalCount ? 'Tutto fatto ✓' : 'Continua così';
   const studioHintColor = !today || today.isRest || totalCount === 0 ? 'rgb(var(--color-tertiary))' : `rgb(${EMERALD})`;
+  // Celle della barra stats visibili: uni, cpts, speso, studio-oggi.
+  const statCount = [can('universita'), can('studio'), can('finanze'), can('studio')].filter(Boolean).length;
 
   return (
     <div>
@@ -232,6 +247,7 @@ export default function HomePage() {
       </header>
 
       {/* ════ CORSIA 1 · STUDIO DI OGGI (Università + CPTS) ════ */}
+      {(can('studio') || can('universita')) && (
       <section className="sd-reveal" style={{ ['--i' as string]: 1, marginBottom: 22 }}>
         <LanePrompt
           cmd="studio"
@@ -309,8 +325,10 @@ export default function HomePage() {
           <LaneEmpty text={today?.isRest ? 'Oggi è riposo — nessuna consegna UOC imminente.' : 'Nessun blocco di studio o impegno UOC per oggi.'} />
         )}
       </section>
+      )}
 
       {/* ════ CORSIA 2 · APPUNTAMENTI ════ */}
+      {can('calendario') && (
       <section className="sd-reveal" style={{ ['--i' as string]: 2, marginBottom: 22 }}>
         <LanePrompt cmd="appuntamenti" flags={[{ text: '--prossimi', color: `rgb(${INDIGO})` }]} comment={`# ${appointments.length} in calendario`} />
         {appointments.length > 0 ? (
@@ -351,8 +369,10 @@ export default function HomePage() {
           <LaneEmpty text="Nessun appuntamento in calendario." />
         )}
       </section>
+      )}
 
       {/* ════ CORSIA 3 · SCADENZE ════ */}
+      {(can('finanze') || can('universita')) && (
       <section className="sd-reveal" style={{ ['--i' as string]: 3, marginBottom: 30 }}>
         <LanePrompt
           cmd="scadenze" flags={[{ text: '--sort=data', color: `rgb(${INDIGO})` }]}
@@ -395,6 +415,7 @@ export default function HomePage() {
           <LaneEmpty text="Nessuna scadenza imminente." />
         )}
       </section>
+      )}
 
       {/* ════ CORSIA 4 · METEO FAMIGLIA (solo se configurato in Impostazioni) ════ */}
       {family.length > 0 && (
@@ -420,43 +441,55 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* ════ STATS · riepilogo ════ */}
-      <div className="sd-reveal" style={{ ['--i' as string]: 4, display: 'flex', alignItems: 'center', gap: 14, margin: '6px 0 14px' }}>
-        <span style={{ fontFamily: mono, fontSize: 12.5, whiteSpace: 'nowrap' }}>
-          <span style={{ color: TERM.green, fontWeight: 600 }}>$</span> <span style={{ color: 'rgb(var(--color-heading))' }}>stats</span> <span style={{ color: `rgb(${INDIGO})` }}>--overview</span>
-        </span>
-        <span style={{ flex: 1, height: 1, background: 'rgb(var(--color-border))' }} />
-      </div>
-      <div className="sd-reveal sd-statbar" style={{ ['--i' as string]: 5, display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', background: 'rgb(var(--color-card))', border: '1px solid rgb(var(--color-border))', borderRadius: 8, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px 22px' }}>
-          <CircularProgress value={cfuPct} size="md" variant="primary" />
-          <div style={{ minWidth: 0 }}>
-            <div style={statLabel}>CFU · UOC</div>
-            <div style={statValue}>{profilo.cfu_superati}<span style={statUnit}> / {profilo.cfu_totali}</span></div>
+      {/* ════ STATS · riepilogo (solo le celle delle sezioni visibili) ════ */}
+      {statCount > 0 && (
+        <>
+          <div className="sd-reveal" style={{ ['--i' as string]: 4, display: 'flex', alignItems: 'center', gap: 14, margin: '6px 0 14px' }}>
+            <span style={{ fontFamily: mono, fontSize: 12.5, whiteSpace: 'nowrap' }}>
+              <span style={{ color: TERM.green, fontWeight: 600 }}>$</span> <span style={{ color: 'rgb(var(--color-heading))' }}>stats</span> <span style={{ color: `rgb(${INDIGO})` }}>--overview</span>
+            </span>
+            <span style={{ flex: 1, height: 1, background: 'rgb(var(--color-border))' }} />
           </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px 22px' }}>
-          <CircularProgress value={overall.pct} size="md" variant="warning" />
-          <div style={{ minWidth: 0 }}>
-            <div style={statLabel}>CPTS · HTB</div>
-            <div style={statValue}>{overall.done}<span style={statUnit}> / {overall.total}</span></div>
+          <div className="sd-reveal sd-statbar" style={{ ['--i' as string]: 5, display: 'grid', gridTemplateColumns: `repeat(${statCount},minmax(0,1fr))`, background: 'rgb(var(--color-card))', border: '1px solid rgb(var(--color-border))', borderRadius: 8, overflow: 'hidden' }}>
+            {can('universita') && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px 22px' }}>
+                <CircularProgress value={cfuPct} size="md" variant="primary" />
+                <div style={{ minWidth: 0 }}>
+                  <div style={statLabel}>CFU · UOC</div>
+                  <div style={statValue}>{profilo.cfu_superati}<span style={statUnit}> / {profilo.cfu_totali}</span></div>
+                </div>
+              </div>
+            )}
+            {can('studio') && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px 22px' }}>
+                <CircularProgress value={overall.pct} size="md" variant="warning" />
+                <div style={{ minWidth: 0 }}>
+                  <div style={statLabel}>CPTS · HTB</div>
+                  <div style={statValue}>{overall.done}<span style={statUnit}> / {overall.total}</span></div>
+                </div>
+              </div>
+            )}
+            {can('finanze') && (
+              <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div style={{ ...statLabel, marginBottom: 7 }}>Speso · {budgetMonthLabel}</div>
+                <div style={statValue}>€{Math.round(budgetSpent)}</div>
+                <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))', marginTop: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {topCat ? `${topCat.category} · €${Math.round(topCat.spent)}` : 'Nessuna spesa'}
+                </div>
+              </div>
+            )}
+            {can('studio') && (
+              <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div style={{ ...statLabel, marginBottom: 7 }}>Studio oggi</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                  <span style={statValue}>{doneCount}<span style={statUnit}> / {totalCount}</span></span>
+                </div>
+                <div style={{ fontSize: 12, color: studioHintColor, marginTop: 6 }}>{studioHint}</div>
+              </div>
+            )}
           </div>
-        </div>
-        <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ ...statLabel, marginBottom: 7 }}>Speso · {budgetMonthLabel}</div>
-          <div style={statValue}>€{Math.round(budgetSpent)}</div>
-          <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))', marginTop: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {topCat ? `${topCat.category} · €${Math.round(topCat.spent)}` : 'Nessuna spesa'}
-          </div>
-        </div>
-        <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ ...statLabel, marginBottom: 7 }}>Studio oggi</div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={statValue}>{doneCount}<span style={statUnit}> / {totalCount}</span></span>
-          </div>
-          <div style={{ fontSize: 12, color: studioHintColor, marginTop: 6 }}>{studioHint}</div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Sheet, Field } from '@/components/sd/FormSheet';
 import {
   getMe, getSettings, updateSetting, listUsers, createGuest, deleteUser,
+  updateUserSections, SECTIONS,
   type Me, type SettingsMap, type UserSummary,
 } from '@/services/settingsService';
 import {
@@ -538,9 +539,19 @@ function StyleCard({ value, editor, onSaved }: { value?: Record<string, unknown>
 
 /* ── Accounts (editor only) ── */
 
+// Riepilogo compatto delle sezioni concesse, per la riga account.
+function sectionsSummary(u: UserSummary): string {
+  if (u.role === 'admin') return '';
+  if (u.sections === null) return 'Tutte le sezioni';
+  if (u.sections.length === 0) return 'Nessuna sezione';
+  const labels = SECTIONS.filter((s) => u.sections!.includes(s.key)).map((s) => s.label.split(' ')[0]);
+  return labels.join(' · ');
+}
+
 function AccountsCard({ i, users, onChange }: { i: number; users: UserSummary[]; onChange: () => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [del, setDel] = useState<UserSummary | null>(null);
+  const [edit, setEdit] = useState<UserSummary | null>(null);
   const [busy, setBusy] = useState(false);
 
   const confirmDelete = async () => {
@@ -565,18 +576,35 @@ function AccountsCard({ i, users, onChange }: { i: number; users: UserSummary[];
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, color: 'rgb(var(--color-heading))' }}>{u.full_name || u.email}</div>
                 <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))', fontFamily: mono }}>{u.email}</div>
+                {u.role !== 'admin' && (
+                  <div style={{ fontSize: 11.5, color: 'rgb(var(--color-muted))', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sectionsSummary(u)}</div>
+                )}
               </div>
               <span style={{ fontSize: 11, fontFamily: mono, fontWeight: 600, padding: '3px 9px', borderRadius: 20, flex: 'none', background: u.role === 'admin' ? 'rgb(99 102 241 / 0.12)' : 'rgb(0 0 0 / 0.05)', color: u.role === 'admin' ? 'rgb(99 102 241)' : 'rgb(var(--color-tertiary))' }}>{u.role}</span>
               {u.role !== 'admin' && (
-                <button className="sd-iconbtn" aria-label="Elimina account" onClick={() => setDel(u)} style={{ flex: 'none' }}><Trash2 size={15} /></button>
+                <>
+                  <button className="sd-iconbtn" aria-label="Modifica sezioni" title="Sezioni visibili" onClick={() => setEdit(u)} style={{ flex: 'none' }}><ListChecks size={15} /></button>
+                  <button className="sd-iconbtn" aria-label="Elimina account" onClick={() => setDel(u)} style={{ flex: 'none' }}><Trash2 size={15} /></button>
+                </>
               )}
             </div>
           ))}
         </div>
       )}
 
-      <Sheet open={open} onClose={() => setOpen(false)} title="Nuovo account ospite" subtitle="Accesso in sola lettura" maxWidth={440}>
+      <Sheet open={open} onClose={() => setOpen(false)} title="Nuovo account ospite" subtitle="Accesso in sola lettura" maxWidth={460}>
         <GuestForm key={open ? 'o' : 'c'} onCancel={() => setOpen(false)} onSubmit={async (b) => { await createGuest(b); setOpen(false); await onChange(); }} />
+      </Sheet>
+
+      <Sheet open={!!edit} onClose={() => setEdit(null)} title="Sezioni visibili" subtitle={edit?.email} maxWidth={460}>
+        {edit && (
+          <SectionsForm
+            key={edit.id}
+            initial={edit.sections ?? SECTIONS.map((s) => s.key)}
+            onCancel={() => setEdit(null)}
+            onSubmit={async (sections) => { await updateUserSections(edit.id, sections); setEdit(null); await onChange(); }}
+          />
+        )}
       </Sheet>
 
       <Sheet open={!!del} onClose={() => setDel(null)} title="Eliminare l'account?" subtitle={del?.email} maxWidth={400}>
@@ -590,10 +618,64 @@ function AccountsCard({ i, users, onChange }: { i: number; users: UserSummary[];
   );
 }
 
-function GuestForm({ onSubmit, onCancel }: { onSubmit: (b: { email: string; password: string; full_name: string }) => Promise<void>; onCancel: () => void }) {
+// Griglia di spunte per le sezioni concesse a un ospite.
+function SectionsPicker({ value, onChange }: { value: Set<string>; onChange: (next: Set<string>) => void }) {
+  const toggle = (key: string) => {
+    const next = new Set(value);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    onChange(next);
+  };
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
+      {SECTIONS.map((s) => (
+        <label key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13.5, color: 'rgb(var(--color-heading))', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={value.has(s.key)}
+            onChange={() => toggle(s.key)}
+            style={{ width: 16, height: 16, accentColor: 'rgb(99 102 241)', flex: 'none' }}
+          />
+          <span style={{ minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.label}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+// Modifica delle sezioni di un ospite esistente.
+function SectionsForm({ initial, onSubmit, onCancel }: {
+  initial: string[]; onSubmit: (sections: string[]) => Promise<void>; onCancel: () => void;
+}) {
+  const [sel, setSel] = useState<Set<string>>(() => new Set(initial));
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true); setError('');
+    try { await onSubmit(SECTIONS.map((s) => s.key).filter((k) => sel.has(k))); }
+    catch { setError('Salvataggio non riuscito. Riprova.'); setSubmitting(false); }
+  };
+
+  return (
+    <form onSubmit={submit}>
+      <Field label="Sezioni visibili" hint="L'ospite vede solo le sezioni spuntate (sempre in sola lettura).">
+        <SectionsPicker value={sel} onChange={setSel} />
+      </Field>
+      {error && <p style={errStyle}>{error}</p>}
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 14 }}>
+        <Button type="button" variant="secondary" onClick={onCancel} disabled={submitting}>Annulla</Button>
+        <Button type="submit" variant="primary" isLoading={submitting}>Salva</Button>
+      </div>
+    </form>
+  );
+}
+
+function GuestForm({ onSubmit, onCancel }: { onSubmit: (b: { email: string; password: string; full_name: string; sections: string[] }) => Promise<void>; onCancel: () => void }) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [sel, setSel] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -601,9 +683,13 @@ function GuestForm({ onSubmit, onCancel }: { onSubmit: (b: { email: string; pass
     e.preventDefault();
     if (!email.trim() || !password) { setError('Email e password sono obbligatori.'); return; }
     if (password.length < 8) { setError('La password deve avere almeno 8 caratteri.'); return; }
+    if (sel.size === 0) { setError('Spunta almeno una sezione da rendere visibile.'); return; }
     setSubmitting(true); setError('');
     try {
-      await onSubmit({ email: email.trim(), password, full_name: fullName.trim() });
+      await onSubmit({
+        email: email.trim(), password, full_name: fullName.trim(),
+        sections: SECTIONS.map((s) => s.key).filter((k) => sel.has(k)),
+      });
     } catch { setError('Creazione non riuscita. Email già in uso?'); setSubmitting(false); }
   };
 
@@ -612,6 +698,9 @@ function GuestForm({ onSubmit, onCancel }: { onSubmit: (b: { email: string; pass
       <Field label="Nome"><input className="sd-input" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Famiglia · ospite" autoFocus /></Field>
       <Field label="Email"><input className="sd-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="ospite@example.com" /></Field>
       <Field label="Password" hint="Almeno 8 caratteri."><input className="sd-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" /></Field>
+      <Field label="Sezioni visibili" hint="L'ospite vede solo le sezioni spuntate (sempre in sola lettura).">
+        <SectionsPicker value={sel} onChange={setSel} />
+      </Field>
       {error && <p style={errStyle}>{error}</p>}
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 6 }}>
         <Button type="button" variant="secondary" onClick={onCancel} disabled={submitting}>Annulla</Button>
