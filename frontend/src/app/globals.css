@@ -565,7 +565,8 @@ input[type='checkbox'], input[type='radio'] {
 
 .sd-root { font-family: 'Inter Tight', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 .sd-shell { display: grid; grid-template-columns: 252px minmax(0, 1fr); min-height: 100vh; }
-.sd-side { position: sticky; top: 0; height: 100vh; overflow: auto; }
+.sd-side { position: sticky; top: 0; height: 100vh; height: 100dvh; overflow: auto; }
+.sd-main { padding: 38px clamp(16px, 4.5vw, 44px) 64px; }
 .sd-main-inner { max-width: 1140px; margin: 0 auto; }
 .sd-grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
 .sd-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
@@ -575,24 +576,51 @@ input[type='checkbox'], input[type='radio'] {
 .sd-focus { display: grid; grid-template-columns: 0.82fr 1.18fr; gap: 0; }
 .sd-consumi-cols { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 16px; align-items: start; }
 .sd-consumi-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-@media (max-width: 880px) { .sd-consumi-cols { grid-template-columns: 1fr; } }
 @media (max-width: 520px) { .sd-consumi-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
+/* iPad landscape (sidebar visibile): colonna nav più stretta, contenuto più largo. */
+@media (max-width: 1180px) {
+  .sd-shell { grid-template-columns: 216px minmax(0, 1fr); }
+}
 @media (max-width: 1080px) {
   .sd-grid4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sd-twocol { grid-template-columns: 1fr; }
   .sd-focus { grid-template-columns: 1fr; }
+  /* con la sidebar visibile (921-1180px) la colonna destra scende sotto i 300px */
+  .sd-consumi-cols { grid-template-columns: minmax(0, 1fr); }
 }
+/* Mobile / tablet portrait: sidebar → topbar compatta (logo + pill bar nav
+   scrollabile). Tema e low-stim restano raggiungibili da Impostazioni → Aspetto. */
 @media (max-width: 920px) {
   .sd-shell { grid-template-columns: 1fr; }
-  .sd-side { position: static; height: auto; border-right: none !important; border-bottom: 1px solid rgb(var(--color-border)); }
-  .sd-sideflow { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
-  .sd-nav { flex-direction: row !important; flex-wrap: wrap; }
+  .sd-side {
+    position: static; height: auto;
+    border-right: none !important; border-bottom: 1px solid rgb(var(--color-border));
+    padding: calc(12px + env(safe-area-inset-top)) 14px 6px !important;
+  }
+  .sd-sideflow { display: flex; flex-direction: column; gap: 10px; }
+  .sd-nav {
+    flex-direction: row !important; margin: 0 -14px !important; padding: 0 10px;
+    flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; scroll-snap-type: x proximity;
+  }
+  .sd-nav::-webkit-scrollbar { display: none; }
+  .sd-nav .sd-nav-item { flex: none; white-space: nowrap; scroll-snap-align: start; }
+  .sd-nav-active-bar { display: none; }
   .sd-navsec { display: none; }
-  .sd-sidefoot { margin-top: 0 !important; border-top: none !important; }
+  .sd-sidefoot { display: none; }
+  .sd-main { padding-top: 22px; padding-bottom: 56px; }
 }
 @media (max-width: 560px) {
   .sd-grid4, .sd-grid2 { grid-template-columns: 1fr; }
+  /* Il nodo attivo delle lane Home (width inline 316px) non deve superare la vista. */
+  .sd-lane-scroll .sd-node { max-width: calc(100vw - 92px); }
+  /* Utility per le pagine: righe flex dense che devono adattarsi sotto i 560px. */
+  .sd-m-wrap { flex-wrap: wrap !important; }
+  .sd-m-hide { display: none !important; }
+  .sd-m-full { flex-basis: 100% !important; }
+  .sd-m-auto { margin-left: auto !important; }
+  .sd-m-noindent { border-left: none !important; padding-left: 0 !important; }
 }
 
 @keyframes sdFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
@@ -661,6 +689,21 @@ input[type='checkbox'], input[type='radio'] {
 }
 .sd-iconbtn { display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; cursor: pointer; color: rgb(var(--color-tertiary)); border-radius: 8px; padding: 6px; transition: background .15s ease, color .15s ease; }
 .sd-iconbtn:hover { background: rgb(0 0 0 / 0.06); color: rgb(var(--color-heading)); }
+
+/* Form a due colonne che collassa su schermi stretti (usata dagli sheet CRUD). */
+.sd-fieldrow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 480px) { .sd-fieldrow { grid-template-columns: 1fr; } }
+
+/* ── Ergonomia touch (iPhone/iPad) ──
+   - input ≥16px: sotto quella soglia iOS Safari zooma la pagina al focus
+   - hit area ~39px per gli icon button senza cambiare l'ingombro visivo
+   - .sd-checkbtn: da applicare ai bottoni-checkbox con padding:0 inline
+     (il margin negativo compensa, il layout resta identico) */
+@media (hover: none) and (pointer: coarse) {
+  .sd-input, .sd-select, .sd-textarea { font-size: 16px; }
+  .sd-iconbtn { padding: 12px; }
+  .sd-checkbtn { padding: 10px !important; margin: -10px !important; box-sizing: content-box; }
+}
 
 /* ════════════════════════════════════════════════════════════════════════
    Dark-glass dashboard theme — aligned to the Login.
@@ -747,6 +790,12 @@ input[type='checkbox'], input[type='radio'] {
 [data-stim='on'] .sd-bggrid { opacity: .5; }
 [data-stim='on'] .sd-lift, [data-stim='on'] .sd-accentcard { box-shadow: none !important; }
 @media (prefers-reduced-motion: reduce) { .sd-gyro { animation: none; } }
+/* Mobile / tablet portrait: spegne i layer costosi (compositing GPU continuo
+   = battery drain); restano grid e vignette, statici. */
+@media (max-width: 920px) {
+  .sd-gyro-wrap { display: none; }
+  .sd-bgglow.a, .sd-bgglow.b { animation: none; opacity: .35; }
+}
 
 /* ── light theme: background layers ── */
 .sd-root[data-theme='light'] .sd-bggrid { background-image: linear-gradient(rgb(30 32 70/0.05) 1px, transparent 1px), linear-gradient(90deg, rgb(30 32 70/0.05) 1px, transparent 1px); }
@@ -782,10 +831,14 @@ input[type='checkbox'], input[type='radio'] {
 /* Statbar dividers (vertical by default; horizontal when it wraps to 2 cols) */
 .sd-statbar > div { border-right: 1px solid rgb(var(--color-border)); }
 .sd-statbar > div:last-child { border-right: none; }
-@media (max-width: 760px) {
-  .sd-statbar { grid-template-columns: 1fr 1fr !important; }
+@media (max-width: 1080px) {
+  .sd-statbar { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
   .sd-statbar > div { border-right: none !important; border-top: 1px solid rgb(var(--color-border)); }
   .sd-statbar > div:nth-child(-n+2) { border-top: none; }
+}
+@media (max-width: 480px) {
+  .sd-statbar { grid-template-columns: minmax(0, 1fr) !important; }
+  .sd-statbar > div:nth-child(2) { border-top: 1px solid rgb(var(--color-border)); }
 }
 
 /* Motion: rail draws from the left, nodes cascade in from the right, dots pulse,
