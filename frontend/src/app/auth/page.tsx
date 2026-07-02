@@ -27,7 +27,7 @@ const LOGIN_CSS = `
   --color-tertiary:148 163 184;
   --color-muted:100 116 139;
   font-family:'Inter Tight',system-ui,sans-serif;-webkit-font-smoothing:antialiased;
-  position:relative;min-height:100vh;overflow:hidden;color:rgb(var(--color-body));
+  position:relative;min-height:100vh;min-height:100dvh;overflow-x:hidden;overflow-y:auto;color:rgb(var(--color-body));
   background:
     radial-gradient(1200px 700px at 22% -10%, rgb(var(--lg-accent)/0.18), transparent 60%),
     radial-gradient(1000px 800px at 110% 120%, rgb(236 72 153/0.12), transparent 55%),
@@ -74,6 +74,8 @@ const LOGIN_CSS = `
 .lg-input::placeholder{color:rgb(var(--color-muted))}
 .lg-input:focus{border-color:rgb(var(--lg-accent)/0.85);box-shadow:0 0 0 3px rgb(var(--lg-accent)/0.2);background:rgb(255 255 255/0.06)}
 .lg-inputwrap .lg-input{padding-right:44px}
+/* touch: 16px evita l'auto-zoom di iOS al focus */
+@media (hover:none) and (pointer:coarse){.lg-input{font-size:16px}}
 .lg-eye{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:rgb(var(--color-muted));padding:6px;display:flex;border-radius:8px;transition:color .15s}
 .lg-eye:hover{color:rgb(var(--color-body))}
 .lg-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:2px}

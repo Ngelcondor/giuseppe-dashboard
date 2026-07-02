@@ -168,7 +168,8 @@ function SubRow({ r, first, yearly, isGuest, onEdit, onDel }: {
   const perLabel = INTERVAL_LABEL[r.interval];
   const cadence = r.interval === 'monthly' ? 'Mensile' : r.interval === 'quarterly' ? 'Trimestrale' : 'Annuale';
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderTop: first ? undefined : '1px solid rgb(var(--color-border))' }}>
+    // ≤560px: wrappa in [dot+titolo] / [prezzo+azioni a destra]
+    <div className="sd-m-wrap" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderTop: first ? undefined : '1px solid rgb(var(--color-border))' }}>
       <span style={{ width: 10, height: 10, borderRadius: 3, flex: 'none', background: `rgb(${c})` }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -179,16 +180,19 @@ function SubRow({ r, first, yearly, isGuest, onEdit, onDel }: {
           Prossimo addebito · {fmtCharge(r.next, yearly)}{r.d.description ? ` · ${r.d.description}` : ''}
         </div>
       </div>
-      <div style={{ flex: 'none', textAlign: 'right' }}>
-        <div style={{ fontFamily: mono, fontSize: 14, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{fmtEur(r.amt)}<span style={{ fontSize: 11, color: 'rgb(var(--color-muted))', fontWeight: 400 }}>/{perLabel}</span></div>
-        {r.interval !== 'monthly' && <div style={{ fontSize: 10.5, color: 'rgb(var(--color-muted))', fontFamily: mono }}>≈ {fmtEur(round2(r.monthly))}/mese</div>}
-      </div>
-      {!isGuest && (
-        <div style={{ display: 'flex', gap: 2, flex: 'none' }}>
-          <button className="sd-iconbtn" aria-label="Modifica" onClick={() => onEdit(r.d)}><Pencil size={14} /></button>
-          <button className="sd-iconbtn" aria-label="Elimina" onClick={() => onDel(r.d)}><Trash2 size={14} /></button>
+      {/* cluster prezzo+azioni: gap 14 come il padre → desktop identico */}
+      <div className="sd-m-full" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 14, flex: 'none' }}>
+        <div style={{ flex: 'none', textAlign: 'right' }}>
+          <div style={{ fontFamily: mono, fontSize: 14, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{fmtEur(r.amt)}<span style={{ fontSize: 11, color: 'rgb(var(--color-muted))', fontWeight: 400 }}>/{perLabel}</span></div>
+          {r.interval !== 'monthly' && <div style={{ fontSize: 10.5, color: 'rgb(var(--color-muted))', fontFamily: mono }}>≈ {fmtEur(round2(r.monthly))}/mese</div>}
         </div>
-      )}
+        {!isGuest && (
+          <div style={{ display: 'flex', gap: 2, flex: 'none' }}>
+            <button className="sd-iconbtn" aria-label="Modifica" onClick={() => onEdit(r.d)}><Pencil size={14} /></button>
+            <button className="sd-iconbtn" aria-label="Elimina" onClick={() => onDel(r.d)}><Trash2 size={14} /></button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

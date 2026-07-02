@@ -30,7 +30,7 @@ function DayCell({ cell }: { cell: Cell }) {
     return <div style={{ minHeight: 52, borderRadius: 10, opacity: 0.4, border: '1px dashed rgb(var(--color-border))' }} />;
   }
   const base: React.CSSProperties = {
-    minHeight: 52, borderRadius: 10, padding: '7px 8px',
+    minHeight: 52, borderRadius: 10, padding: 'clamp(5px,1.3vw,7px) clamp(3px,1.5vw,8px)',
     border: '1px solid rgb(var(--color-border))', display: 'flex', flexDirection: 'column',
     ...(cell.today ? { border: '1px solid rgb(99 102 241 / 0.35)', background: 'rgb(99 102 241 / 0.10)' } : null),
   };
@@ -39,8 +39,8 @@ function DayCell({ cell }: { cell: Cell }) {
       <span style={{ fontSize: 12, fontWeight: cell.today ? 700 : 400, color: cell.today ? 'rgb(99 102 241)' : 'rgb(var(--color-body))', fontFamily: mono }}>{cell.n}</span>
       {cell.today && <span style={{ fontSize: 9, color: 'rgb(99 102 241)', marginTop: 'auto', fontWeight: 600 }}>Oggi</span>}
       {!cell.today && cell.dots && cell.dots.length > 0 && (
-        <span style={{ display: 'flex', gap: 3, marginTop: 'auto' }}>
-          {cell.dots.slice(0, 3).map((c, i) => <span key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: c }} />)}
+        <span style={{ display: 'flex', gap: 'clamp(2px,0.5vw,3px)', marginTop: 'auto' }}>
+          {cell.dots.slice(0, 3).map((c, i) => <span key={i} style={{ width: 'clamp(5px,1.3vw,6px)', height: 'clamp(5px,1.3vw,6px)', borderRadius: '50%', background: c }} />)}
         </span>
       )}
     </div>
@@ -61,7 +61,7 @@ function EventRow({ dot, title, sub, date, last }: { dot: string; title: string;
 }
 
 const navBtn: React.CSSProperties = {
-  width: 30, height: 30, borderRadius: 9, border: '1px solid rgb(var(--color-border))',
+  minWidth: 38, minHeight: 38, borderRadius: 9, border: '1px solid rgb(var(--color-border))',
   display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgb(var(--color-tertiary))',
   fontSize: 14, background: 'transparent', cursor: 'pointer',
 };
@@ -124,7 +124,7 @@ export default function CalendarPage() {
       <header className="sd-reveal" style={{ ['--i' as string]: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap', marginBottom: 22 }}>
         <div>
           <div style={{ fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgb(var(--color-tertiary))', fontFamily: mono, marginBottom: 12, fontWeight: 600 }}>{monthLabel} {cursor.y}</div>
-          <h1 style={{ margin: 0, fontSize: 38, lineHeight: 1.05, letterSpacing: '-.02em', color: 'rgb(var(--color-heading))', fontWeight: 600 }}>Calendario</h1>
+          <h1 style={{ margin: 0, fontSize: 'clamp(30px, 8vw, 38px)', lineHeight: 1.05, letterSpacing: '-.02em', color: 'rgb(var(--color-heading))', fontWeight: 600 }}>Calendario</h1>
         </div>
         <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'rgb(var(--color-tertiary))' }}><span style={{ width: 9, height: 9, borderRadius: '50%', background: 'rgb(99 102 241)' }} />Esami</span>
@@ -135,7 +135,7 @@ export default function CalendarPage() {
 
       <div className="sd-twocol">
         {/* Month grid */}
-        <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: 1, ...card, padding: '22px 24px' }}>
+        <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: 1, ...card, padding: 'clamp(12px,3vw,22px) clamp(12px,3vw,24px)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <div style={{ fontSize: 18, fontWeight: 600, color: 'rgb(var(--color-heading))', whiteSpace: 'nowrap' }}>{monthLabel} <span style={{ color: 'rgb(var(--color-muted))', fontWeight: 400, fontFamily: mono }}>{cursor.y}</span></div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -155,7 +155,7 @@ export default function CalendarPage() {
         </div>
 
         {/* Prossimi eventi */}
-        <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: 2, ...card, padding: '22px 24px' }}>
+        <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: 2, ...card, padding: 'clamp(12px,3vw,22px) clamp(12px,3vw,24px)' }}>
           <h3 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>Prossimi eventi</h3>
           {upcoming.length === 0 ? (
             <div style={{ padding: '16px 0 6px', fontSize: 13, color: 'rgb(var(--color-muted))' }}>Nessun evento in calendario. Collega un calendario dalle Impostazioni.</div>

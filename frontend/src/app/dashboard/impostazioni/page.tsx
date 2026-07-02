@@ -115,7 +115,7 @@ export default function ImpostazioniPage() {
           <span style={{ width: 42, height: 42, borderRadius: 12, background: 'rgb(99 102 241 / 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}><UserIcon size={20} color="rgb(99 102 241)" /></span>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{me?.full_name || '—'}</div>
-            <div style={{ fontSize: 13, color: 'rgb(var(--color-tertiary))', fontFamily: mono }}>{me?.email || '…'}</div>
+            <div style={{ fontSize: 13, color: 'rgb(var(--color-tertiary))', fontFamily: mono, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{me?.email || '…'}</div>
           </div>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 600, padding: '4px 11px', borderRadius: 20, fontFamily: mono, background: isEditor ? 'rgb(99 102 241 / 0.12)' : 'rgb(0 0 0 / 0.05)', color: isEditor ? 'rgb(99 102 241)' : 'rgb(var(--color-tertiary))' }}>
             <ShieldCheck size={13} />{me?.role ?? '—'}
@@ -371,7 +371,7 @@ function ConnectionForm({ onCreated, onCancel }: { onCreated: (c: CalendarConnec
 
   return (
     <form onSubmit={submit}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 8, marginBottom: 16 }}>
         {CAL_PROVIDERS.map((p) => {
           const on = provider === p.id;
           return (
@@ -574,8 +574,8 @@ function AccountsCard({ i, users, onChange }: { i: number; users: UserSummary[];
           {users.map((u, idx) => (
             <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: idx === users.length - 1 ? '13px 0 2px' : '13px 0', borderTop: '1px solid rgb(var(--color-border))' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: 'rgb(var(--color-heading))' }}>{u.full_name || u.email}</div>
-                <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))', fontFamily: mono }}>{u.email}</div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: 'rgb(var(--color-heading))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.full_name || u.email}</div>
+                <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))', fontFamily: mono, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email}</div>
                 {u.role !== 'admin' && (
                   <div style={{ fontSize: 11.5, color: 'rgb(var(--color-muted))', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sectionsSummary(u)}</div>
                 )}
@@ -626,9 +626,9 @@ function SectionsPicker({ value, onChange }: { value: Set<string>; onChange: (ne
     onChange(next);
   };
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '8px 14px' }}>
       {SECTIONS.map((s) => (
-        <label key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13.5, color: 'rgb(var(--color-heading))', cursor: 'pointer' }}>
+        <label key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 0', fontSize: 13.5, color: 'rgb(var(--color-heading))', cursor: 'pointer' }}>
           <input
             type="checkbox"
             checked={value.has(s.key)}

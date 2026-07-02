@@ -153,17 +153,20 @@ function LightCard({ i, light, canEdit, onToggle, onBri }: { i: number; light: H
 }
 
 function Toggle({ on, disabled, onClick }: { on: boolean; disabled?: boolean; onClick: () => void }) {
+  // Hit area estesa per touch: padding trasparente + margin negativo, il track visivo (span) resta 46×27.
   return (
     <button
       type="button" role="switch" aria-checked={on} aria-label={on ? 'Spegni' : 'Accendi'}
       disabled={disabled} onClick={onClick}
-      style={{
-        width: 46, height: 27, borderRadius: 99, border: 'none', flex: 'none', position: 'relative', cursor: disabled ? 'not-allowed' : 'pointer',
+      style={{ border: 'none', background: 'transparent', flex: 'none', padding: 8, margin: -8, cursor: disabled ? 'not-allowed' : 'pointer' }}
+    >
+      <span style={{
+        display: 'block', width: 46, height: 27, borderRadius: 99, position: 'relative',
         background: on ? 'rgb(16 185 129)' : 'rgb(var(--color-card-inner))', opacity: disabled ? 0.5 : 1,
         transition: 'background .18s ease',
-      }}
-    >
-      <span style={{ position: 'absolute', top: 3, left: on ? 22 : 3, width: 21, height: 21, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.25)', transition: 'left .18s ease' }} />
+      }}>
+        <span style={{ position: 'absolute', top: 3, left: on ? 22 : 3, width: 21, height: 21, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.25)', transition: 'left .18s ease' }} />
+      </span>
     </button>
   );
 }
@@ -239,7 +242,7 @@ function ShellySection() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {resp.devices.map((d) => (
                   <div key={d.device_id} style={{ opacity: d.online ? 1 : 0.5 }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 7, gap: 10 }}>
+                    <div className="sd-m-wrap" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 7, gap: 10 }}>
                       <span style={{ fontSize: 13.5, fontWeight: 500, color: 'rgb(var(--color-heading))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ width: 7, height: 7, borderRadius: '50%', flex: 'none', background: d.output ? 'rgb(16 185 129)' : 'rgb(var(--color-muted))' }} />
                         {d.name}{!d.online && <span style={{ fontSize: 11, color: 'rgb(var(--color-muted))' }}>· offline</span>}
@@ -292,7 +295,7 @@ function ConsumptionBlock() {
             <button
               key={p} onClick={() => setPeriod(p)}
               style={{
-                border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 500,
+                border: 'none', cursor: 'pointer', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 500,
                 background: period === p ? 'rgb(var(--color-card))' : 'transparent',
                 color: period === p ? 'rgb(var(--color-heading))' : 'rgb(var(--color-tertiary))',
                 boxShadow: period === p ? '0 1px 2px rgba(17,17,26,.08)' : 'none',

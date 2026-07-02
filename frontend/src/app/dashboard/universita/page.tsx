@@ -103,7 +103,7 @@ export default function UniversitaPage() {
       {/* Header */}
       <header className="sd-reveal" style={{ ['--i' as string]: 0, marginBottom: 28 }}>
         <div style={{ fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgb(99 102 241)', fontFamily: mono, marginBottom: 12, fontWeight: 600 }}>Università · UOC</div>
-        <h1 style={{ margin: 0, fontSize: 38, lineHeight: 1.05, letterSpacing: '-.02em', color: 'rgb(var(--color-heading))', fontWeight: 600 }}>
+        <h1 style={{ margin: 0, fontSize: 'clamp(28px, 7vw, 38px)', lineHeight: 1.05, letterSpacing: '-.02em', color: 'rgb(var(--color-heading))', fontWeight: 600 }}>
           {profilo.corso_laurea
             ? <>{profilo.corso_laurea.split(' ')[0]} <span style={{ fontFamily: "'Fraunces',serif", fontStyle: 'italic', fontWeight: 500 }}>{profilo.corso_laurea.split(' ').slice(1).join(' ')}</span></>
             : 'Università'}
@@ -113,7 +113,7 @@ export default function UniversitaPage() {
 
       {/* CFU + prossimo esame */}
       <div className="sd-twocol" style={{ marginBottom: 18 }}>
-        <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: 1, ...card, borderRadius: 18, padding: '26px 28px', display: 'flex', alignItems: 'center', gap: 28, flexWrap: 'wrap', position: 'relative' }}>
+        <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: 1, ...card, borderRadius: 18, padding: 'clamp(16px,4vw,26px) clamp(16px,4.5vw,28px)', display: 'flex', alignItems: 'center', gap: 28, flexWrap: 'wrap', position: 'relative' }}>
           <button className="sd-iconbtn" aria-label="Modifica profilo" onClick={() => setProfiloEd(true)} style={{ position: 'absolute', top: 14, right: 14 }}><Pencil size={15} /></button>
           <CircularProgress value={cfuPct} size="lg" variant="primary" />
           <div style={{ flex: 1, minWidth: 200 }}>
@@ -128,7 +128,7 @@ export default function UniversitaPage() {
         </div>
 
         {prossimo_esame ? (
-          <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: 2, background: 'rgb(99 102 241)', borderRadius: 18, padding: '26px 28px', color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative' }}>
+          <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: 2, background: 'rgb(99 102 241)', borderRadius: 18, padding: 'clamp(16px,4vw,26px) clamp(16px,4.5vw,28px)', color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative' }}>
             <div style={{ position: 'absolute', top: 14, right: 12, display: 'flex', gap: 2 }}>
               <button className="sd-iconbtn" aria-label="Modifica esame" onClick={() => setEventoEd({ open: true, editing: prossimo_esame, tipo: 'esame' })} style={{ color: 'rgba(255,255,255,.85)' }}><Pencil size={15} /></button>
               <button className="sd-iconbtn" aria-label="Elimina esame" onClick={() => setDel({ kind: 'evento', id: prossimo_esame.id, label: prossimo_esame.titolo })} style={{ color: 'rgba(255,255,255,.85)' }}><Trash2 size={15} /></button>
@@ -144,7 +144,7 @@ export default function UniversitaPage() {
             </div>
           </div>
         ) : (
-          <div className="sd-reveal" style={{ ['--i' as string]: 2, ...card, borderRadius: 18, padding: '26px 28px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 14 }}>
+          <div className="sd-reveal" style={{ ['--i' as string]: 2, ...card, borderRadius: 18, padding: 'clamp(16px,4vw,26px) clamp(16px,4.5vw,28px)', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: 14 }}>
             <div>
               <div style={{ fontSize: 10.5, letterSpacing: '.16em', textTransform: 'uppercase', color: 'rgb(var(--color-tertiary))', fontWeight: 600, marginBottom: 8 }}>Prossimo esame</div>
               <p style={{ margin: 0, fontSize: 14, color: 'rgb(var(--color-tertiary))' }}>Nessun esame in programma.</p>
@@ -163,7 +163,7 @@ export default function UniversitaPage() {
         </div>
       </div>
       {corsi.length === 0 ? (
-        <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: 4, ...card, padding: '22px 24px', marginBottom: 18 }}>
+        <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: 4, ...card, padding: 'clamp(16px,4vw,22px) clamp(16px,4.5vw,24px)', marginBottom: 18 }}>
           <p style={{ margin: 0, fontSize: 14, color: 'rgb(var(--color-tertiary))' }}>Nessun corso ancora. Aggiungi il primo con <strong style={{ fontWeight: 600 }}>+ Corso</strong>.</p>
         </div>
       ) : (
@@ -175,8 +175,8 @@ export default function UniversitaPage() {
       )}
 
       {/* Consegne */}
-      <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: 8, ...card, padding: '22px 24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 12 }}>
+      <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: 8, ...card, padding: 'clamp(16px,4vw,22px) clamp(16px,4.5vw,24px)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 12, flexWrap: 'wrap' }}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>Consegne in arrivo</h3>
           <Button size="sm" variant="secondary" onClick={() => setEventoEd({ open: true, editing: null, tipo: 'consegna' })}><Plus size={15} style={{ marginRight: 6 }} />Consegna</Button>
         </div>
@@ -237,14 +237,17 @@ function CourseCard({ i, corso, onEdit, onDelete }: { i: number; corso: UniCorso
 function DeliveryRow({ evento, onEdit, onDelete, last }: { evento: UniEvento; onEdit: () => void; onDelete: () => void; last?: boolean }) {
   const dot = daysTo(evento.data) <= 7 ? 'rgb(245 158 11)' : 'rgb(99 102 241)';
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: last ? '14px 0 4px' : '14px 0', borderTop: '1px solid rgb(var(--color-border))' }}>
+    <div className="sd-m-wrap" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: last ? '14px 0 4px' : '14px 0', borderTop: '1px solid rgb(var(--color-border))' }}>
       <span style={{ width: 9, height: 9, borderRadius: '50%', background: dot, flex: 'none' }} />
       <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 14, fontWeight: 500, color: 'rgb(var(--color-heading))' }}>{evento.titolo}</div><div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{evento.descrizione}</div></div>
-      <div style={{ fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{fmtDate(evento.data)}</div>
-      <div style={{ flex: 'none' }}>{eventoBadge(evento.stato)}</div>
-      <div style={{ display: 'flex', gap: 2, flex: 'none' }}>
-        <button className="sd-iconbtn" aria-label="Modifica" onClick={onEdit}><Pencil size={14} /></button>
-        <button className="sd-iconbtn" aria-label="Elimina" onClick={onDelete}><Trash2 size={14} /></button>
+      {/* ≤560px: data/badge/azioni scendono su riga piena sotto dot+titolo */}
+      <div className="sd-m-full" style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{fmtDate(evento.data)}</div>
+        <div style={{ flex: 'none' }}>{eventoBadge(evento.stato)}</div>
+        <div style={{ display: 'flex', gap: 2, flex: 'none' }}>
+          <button className="sd-iconbtn" aria-label="Modifica" onClick={onEdit}><Pencil size={14} /></button>
+          <button className="sd-iconbtn" aria-label="Elimina" onClick={onDelete}><Trash2 size={14} /></button>
+        </div>
       </div>
     </div>
   );
@@ -414,7 +417,7 @@ function ProfiloForm({ initial, onSubmit, onCancel }: { initial: UniProfilo; onS
           {SEMESTRE_OPZIONI.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
       </Field>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(90px,1fr))', gap: 12 }}>
         <Field label="CFU totali"><input className="sd-input" type="number" min={0} value={tot} onChange={(e) => setTot(e.target.value)} /></Field>
         <Field label="Superati"><input className="sd-input" type="number" min={0} value={sup} onChange={(e) => setSup(e.target.value)} /></Field>
         <Field label="In corso"><input className="sd-input" type="number" min={0} value={inc} onChange={(e) => setInc(e.target.value)} /></Field>

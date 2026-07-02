@@ -382,13 +382,16 @@ function LivePill() {
 }
 
 function PlugToggle({ on, disabled, onClick }: { on: boolean; disabled?: boolean; onClick: () => void }) {
+  // Hit area estesa per touch: padding trasparente + margin negativo, il track visivo (span) resta 42×24.
   return (
     <button
       type="button" role="switch" aria-checked={on} aria-label={on ? 'Spegni' : 'Accendi'}
       disabled={disabled} onClick={onClick}
-      style={{ flex: 'none', width: 42, height: 24, borderRadius: 999, border: 'none', padding: 3, cursor: disabled ? 'not-allowed' : 'pointer', background: on ? 'rgb(99 102 241/0.95)' : 'rgb(var(--color-card-inner))', opacity: disabled ? 0.5 : 1, transition: 'background .2s' }}
+      style={{ flex: 'none', border: 'none', background: 'transparent', padding: 8, margin: -8, cursor: disabled ? 'not-allowed' : 'pointer' }}
     >
-      <span style={{ display: 'block', width: 18, height: 18, borderRadius: '50%', background: '#fff', transform: on ? 'translateX(18px)' : 'translateX(0)', transition: 'transform .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }} />
+      <span style={{ display: 'block', width: 42, height: 24, borderRadius: 999, padding: 3, background: on ? 'rgb(99 102 241/0.95)' : 'rgb(var(--color-card-inner))', opacity: disabled ? 0.5 : 1, transition: 'background .2s' }}>
+        <span style={{ display: 'block', width: 18, height: 18, borderRadius: '50%', background: '#fff', transform: on ? 'translateX(18px)' : 'translateX(0)', transition: 'transform .2s', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }} />
+      </span>
     </button>
   );
 }
@@ -398,7 +401,7 @@ function Chip({ label, active, color, onClick }: { label: string; active: boolea
     <button
       type="button" onClick={onClick} className="sd-press"
       style={{
-        padding: '5px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s',
+        padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s',
         ...(active && color
           ? { background: `rgb(${color})`, color: '#0b0b10', border: `1px solid rgb(${color})` }
           : { background: 'rgb(var(--color-card-inner))', color: 'rgb(var(--color-tertiary))', border: '1px solid rgb(var(--color-border))' }),
@@ -480,11 +483,13 @@ function CompareBars({ groups, series, thin, dataSince }: { groups: Group[]; ser
             key={i}
             onMouseEnter={() => setHover(i)}
             onMouseLeave={() => setHover(null)}
-            style={{ flex: '1 1 0', height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 2, cursor: 'pointer', borderRadius: 4, background: i === hv ? 'rgb(var(--color-card-inner))' : 'transparent' }}
+            onClick={() => setHover(i)}
+            style={{ flex: '1 1 0', minWidth: 0, height: '100%', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 2, cursor: 'pointer', borderRadius: 4, background: i === hv ? 'rgb(var(--color-card-inner))' : 'transparent' }}
           >
             {series.map((s) => {
               const hp = Math.max(2, ((gr.vals[s.key] || 0) / max) * 100);
-              return <div key={s.key} style={{ width: series.length > 2 ? 5 : 7, height: `${hp}%`, borderRadius: '3px 3px 0 0', background: `rgb(${s.color})` }} />;
+              // flex+maxWidth invece di width fissa: su desktop resta 5/7px, su mobile le barre si stringono senza overflow
+              return <div key={s.key} style={{ flex: '1 1 0', minWidth: 0, maxWidth: series.length > 2 ? 5 : 7, height: `${hp}%`, borderRadius: '3px 3px 0 0', background: `rgb(${s.color})` }} />;
             })}
           </div>
         ))}

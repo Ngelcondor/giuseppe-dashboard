@@ -45,7 +45,9 @@ export function Sheet({
       aria-modal="true"
       onMouseDown={onClose}
       style={{
-        position: 'fixed', inset: 0, zIndex: 90, padding: 20,
+        position: 'fixed', inset: 0, zIndex: 90,
+        // safe-area iOS: il padding cresce solo dentro notch/home-indicator
+        padding: 'max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom))',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         background: 'rgba(17,17,26,0.32)',
         backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
@@ -55,7 +57,7 @@ export function Sheet({
         className="sd-sheet"
         onMouseDown={(e) => e.stopPropagation()}
         style={{
-          width: '100%', maxWidth, maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          width: '100%', maxWidth, maxHeight: 'min(90vh, 90dvh)', display: 'flex', flexDirection: 'column', overflow: 'hidden',
           background: 'rgb(var(--color-card))',
           borderRadius: 22, border: '1px solid rgb(var(--color-border))',
           boxShadow: '0 24px 64px rgba(17,17,26,.22), 0 2px 8px rgba(17,17,26,.08)',
@@ -89,5 +91,5 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 }
 
 export function FieldRow({ children }: { children: React.ReactNode }) {
-  return <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>{children}</div>;
+  return <div className="sd-fieldrow">{children}</div>;
 }

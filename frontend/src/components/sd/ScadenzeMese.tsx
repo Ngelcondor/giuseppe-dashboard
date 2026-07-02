@@ -194,7 +194,8 @@ export function ScadenzeMese() {
               const rowPaid = isDeadline && (isSingle ? !!d?.is_completed : !!it.occPaid);
               const secondary = amountLine(d) || it.sottotitolo;
               return (
-                <div key={it.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderTop: idx === 0 ? undefined : '1px solid rgb(var(--color-border))' }}>
+                // ≤560px: wrappa in [checkbox+data] / [titolo] / [importo+azioni a destra]
+                <div key={it.id} className="sd-m-wrap" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0', borderTop: idx === 0 ? undefined : '1px solid rgb(var(--color-border))' }}>
                   {/* Paid checkbox on every deadline row — single flips is_completed,
                       each rata / subscription charge ticks its own occurrence.
                       Academic rows keep the slot empty for alignment. */}
@@ -204,7 +205,7 @@ export function ScadenzeMese() {
                         type="button"
                         onClick={() => (isSingle ? onCheck(it) : onToggleOcc(it))}
                         disabled={isGuest || savingId === it.id}
-                        className={!isGuest ? 'sd-press' : undefined}
+                        className={!isGuest ? 'sd-press sd-checkbtn' : 'sd-checkbtn'}
                         aria-label={rowPaid ? 'Segna come non pagata' : 'Segna come pagata'}
                         title={rowPaid ? 'Pagata · clic per annullare' : 'Segna come pagata'}
                         style={{ border: 'none', background: 'transparent', padding: 0, display: 'flex', cursor: isGuest ? 'default' : 'pointer', color: rowPaid ? 'rgb(16 185 129)' : 'rgb(var(--color-muted))', opacity: savingId === it.id ? 0.5 : 1 }}
@@ -217,7 +218,7 @@ export function ScadenzeMese() {
                     <div style={{ fontFamily: mono, fontSize: 20, fontWeight: 700, color: dayColor(it), lineHeight: 1 }}>{dayNum(it.data)}</div>
                     <div style={{ fontSize: 10, letterSpacing: '.1em', color: 'rgb(var(--color-tertiary))', textTransform: 'uppercase' }}>{monthAbbr(it.data)}</div>
                   </div>
-                  <div style={{ flex: 1, minWidth: 0, opacity: rowPaid ? 0.6 : 1 }}>
+                  <div className="sd-m-full" style={{ flex: 1, minWidth: 0, opacity: rowPaid ? 0.6 : 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 14.5, fontWeight: 500, color: rowPaid ? 'rgb(var(--color-tertiary))' : 'rgb(var(--color-heading))', textDecoration: rowPaid ? 'line-through' : 'none' }}>{it.titolo}</span>
                       {it.source === 'academic' && <span style={{ fontSize: 9.5, letterSpacing: '.1em', fontWeight: 600, color: 'rgb(var(--color-muted))', fontFamily: mono, background: 'rgb(128 128 128 / 0.12)', padding: '2px 6px', borderRadius: 5 }}>UOC</span>}
@@ -227,15 +228,18 @@ export function ScadenzeMese() {
                     </div>
                     {secondary && <div style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{secondary}</div>}
                   </div>
-                  {itemAmount(it) != null
-                    ? <span style={{ flex: 'none', fontFamily: mono, fontSize: 13.5, fontWeight: 600, color: rowPaid ? 'rgb(var(--color-muted))' : 'rgb(var(--color-heading))', textDecoration: rowPaid ? 'line-through' : 'none' }}>{fmtEur(itemAmount(it)!)}</span>
-                    : daysBadge(it)}
-                  {it.source === 'deadline' && !isGuest && (
-                    <div style={{ display: 'flex', gap: 2, flex: 'none' }}>
-                      <button className="sd-iconbtn" aria-label="Modifica" onClick={() => setEd({ open: true, editing: it.raw ?? null })}><Pencil size={14} /></button>
-                      <button className="sd-iconbtn" aria-label="Elimina" onClick={() => setDel({ id: it.raw?.id ?? it.id, label: it.titolo })}><Trash2 size={14} /></button>
-                    </div>
-                  )}
+                  {/* cluster importo+azioni: gap 14 come il padre → desktop identico */}
+                  <div className="sd-m-auto" style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 'none' }}>
+                    {itemAmount(it) != null
+                      ? <span style={{ flex: 'none', fontFamily: mono, fontSize: 13.5, fontWeight: 600, color: rowPaid ? 'rgb(var(--color-muted))' : 'rgb(var(--color-heading))', textDecoration: rowPaid ? 'line-through' : 'none' }}>{fmtEur(itemAmount(it)!)}</span>
+                      : daysBadge(it)}
+                    {it.source === 'deadline' && !isGuest && (
+                      <div style={{ display: 'flex', gap: 2, flex: 'none' }}>
+                        <button className="sd-iconbtn" aria-label="Modifica" onClick={() => setEd({ open: true, editing: it.raw ?? null })}><Pencil size={14} /></button>
+                        <button className="sd-iconbtn" aria-label="Elimina" onClick={() => setDel({ id: it.raw?.id ?? it.id, label: it.titolo })}><Trash2 size={14} /></button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
