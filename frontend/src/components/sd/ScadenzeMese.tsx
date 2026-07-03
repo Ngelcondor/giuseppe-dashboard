@@ -102,15 +102,20 @@ export function ScadenzeMese() {
   const patchOccPaid = (id: string, occPaid: boolean) =>
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, occPaid } : it)));
 
-  // Single deadlines: the checkbox flips the whole (one-row) deadline's paid flag.
+  // Non-occurrence rows (single deadlines AND the collapsed row of a completed
+  // plan): the checkbox flips the whole deadline's is_completed.
   const onCheck = async (it: ScadenzaItem) => {
     const rt = it.raw?.recurrence_type;
-    if (it.source !== 'deadline' || isGuest || !it.raw || (rt && rt !== 'none')) return;
+    if (it.source !== 'deadline' || isGuest || !it.raw || it.occurrence) return;
     const next = !it.raw.is_completed;
     setSavingId(it.id);
     patchItem(it.id, { ...it.raw, is_completed: next }); // optimistic
-    try { patchItem(it.id, await updateDeadline(it.raw.id, { is_completed: next })); }
-    catch { await load(); }
+    try {
+      patchItem(it.id, await updateDeadline(it.raw.id, { is_completed: next }));
+      // Un piano ricorrente ri-espanso/collassato cambia il numero di righe:
+      // solo un reload ridisegna la lista corretta.
+      if (rt && rt !== 'none') await load();
+    } catch { await load(); }
     finally { setSavingId(null); }
   };
 
@@ -118,7 +123,7 @@ export function ScadenzeMese() {
   // paid/unpaid by its date. Reversible and per-date — independent of the plan's
   // baseline count, so it never advances or loses the rest of the plan.
   const onToggleOcc = async (it: ScadenzaItem) => {
-    if (it.source !== 'deadline' || isGuest || !it.raw) return;
+    if (it.source !== 'deadline' || isGuest || !it.raw || !it.occurrence) return;
     const next = !it.occPaid;
     setSavingId(it.id);
     patchOccPaid(it.id, next); // optimistic
@@ -187,11 +192,10 @@ export function ScadenzeMese() {
             {g.list.map((it, idx) => {
               const d = it.raw;
               const isDeadline = it.source === 'deadline';
-              const recType = d?.recurrence_type;
-              const isSingle = isDeadline && (recType == null || recType === 'none');
-              // Paid state: single deadlines use is_completed; recurring rows (rate /
-              // subscription charges) use the per-occurrence tick (occPaid).
-              const rowPaid = isDeadline && (isSingle ? !!d?.is_completed : !!it.occPaid);
+              // Paid state: expanded occurrence rows use their per-date tick; single
+              // deadlines and collapsed settled plans use is_completed/occPaid (il
+              // collasso porta lo stato saldato in occPaid da expandDeadline).
+              const rowPaid = isDeadline && (it.occurrence ? !!it.occPaid : (!!d?.is_completed || !!it.occPaid));
               const secondary = amountLine(d) || it.sottotitolo;
               return (
                 // ≤560px: wrappa in [checkbox+data] / [titolo] / [importo+azioni a destra]
@@ -203,7 +207,7 @@ export function ScadenzeMese() {
                     {isDeadline && (
                       <button
                         type="button"
-                        onClick={() => (isSingle ? onCheck(it) : onToggleOcc(it))}
+                        onClick={() => (it.occurrence ? onToggleOcc(it) : onCheck(it))}
                         disabled={isGuest || savingId === it.id}
                         className={!isGuest ? 'sd-press sd-checkbtn' : 'sd-checkbtn'}
                         aria-label={rowPaid ? 'Segna come non pagata' : 'Segna come pagata'}

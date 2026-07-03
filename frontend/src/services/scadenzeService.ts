@@ -41,7 +41,12 @@ export interface ScadenzaItem {
   occTotal?: number;
   // Whether THIS occurrence (this date) has been individually ticked as paid.
   // Only meaningful for recurring rows; single deadlines use raw.is_completed.
+  // On the collapsed row of a settled plan it carries the settled state.
   occPaid?: boolean;
+  // True for an EXPANDED occurrence row (one rata / one subscription charge):
+  // the tick must PATCH that occurrence by date. Absent on single deadlines and
+  // on the collapsed row of a completed plan, where the tick flips is_completed.
+  occurrence?: boolean;
 }
 
 // A computed (non-persisted) occurrence of a recurring deadline.
@@ -127,24 +132,28 @@ const addMonths = (iso: string, n: number): string => {
 //   - installments: one row per REMAINING unpaid rata (#paid+1 … #total), spaced
 //     one month apart from due_date — so a rate plan spans future months instead
 //     of collapsing onto its next due date (the bug: list stopped at that month).
-//   - subscription: one row per charge from the next one forward, up to the
-//     projection horizon.
-// A completed deadline collapses back to a single (struck-through) row.
+//   - subscription: one row per charge dall'inizio del MESE CORRENTE (una ricarica
+//     spuntata il giorno 1 resta visibile "Pagata" per tutto il mese, non sparisce
+//     l'indomani), up to the projection horizon.
+// A completed (or fully-paid) plan collapses back to a single row that CARRIES
+// the settled state in occPaid — before, the collapsed row of a paid plan read
+// as unpaid and the tick never survived a reload.
 function expandDeadline(d: Deadline): ScadenzaItem[] {
   const base = deadlineBase(d);
   const paidSet = new Set(d.paid_occurrences ?? []);
-  const single: ScadenzaItem = { ...base, id: d.id, data: d.due_date };
+  const total = d.installments_total ?? 0;
+  const paid = Math.max(0, d.installments_paid ?? 0);
+  const settled = d.is_completed || (d.recurrence_type === 'installments' && total > 0 && paid >= total);
+  const single: ScadenzaItem = { ...base, id: d.id, data: d.due_date, occPaid: settled };
   if (d.is_completed) return [single];
 
   if (d.recurrence_type === 'installments') {
-    const total = d.installments_total ?? 0;
-    const paid = Math.max(0, d.installments_paid ?? 0);
     if (total <= 0) return [single];
     const out: ScadenzaItem[] = [];
     for (let i = 0; i < total - paid; i++) {
       const index = paid + 1 + i;
       const data = addMonths(d.due_date, i);
-      out.push({ ...base, id: `${d.id}#${index}`, data, occIndex: index, occTotal: total, occPaid: paidSet.has(data) });
+      out.push({ ...base, id: `${d.id}#${index}`, data, occIndex: index, occTotal: total, occPaid: paidSet.has(data), occurrence: true });
     }
     return out.length ? out : [single];
   }
@@ -152,13 +161,14 @@ function expandDeadline(d: Deadline): ScadenzaItem[] {
   if (d.recurrence_type === 'subscription') {
     const step = INTERVAL_STEP[d.recurrence_interval ?? 'monthly'];
     const today = isoOf(new Date());
+    const monthStart = today.slice(0, 8) + '01';
     const horizon = addMonths(today, SUBSCRIPTION_HORIZON_MONTHS);
     const out: ScadenzaItem[] = [];
     let when = d.due_date;
     let guard = 0;
-    while (when < today && guard < 1200) { when = addMonths(when, step); guard += 1; }
+    while (when < monthStart && guard < 1200) { when = addMonths(when, step); guard += 1; }
     while (when <= horizon && guard < 1200) {
-      out.push({ ...base, id: `${d.id}@${when}`, data: when, occPaid: paidSet.has(when) });
+      out.push({ ...base, id: `${d.id}@${when}`, data: when, occPaid: paidSet.has(when), occurrence: true });
       when = addMonths(when, step);
       guard += 1;
     }
