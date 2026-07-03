@@ -592,7 +592,9 @@ input[type='checkbox'], input[type='radio'] {
 /* Mobile / tablet portrait: sidebar → topbar compatta (logo + pill bar nav
    scrollabile). Tema e low-stim restano raggiungibili da Impostazioni → Aspetto. */
 @media (max-width: 920px) {
-  .sd-shell { grid-template-columns: 1fr; }
+  /* minmax(0,1fr), non 1fr: col min-width auto il min-content dei contenuti
+     (pill bar, lane orizzontali) allargherebbe la colonna oltre il viewport. */
+  .sd-shell { grid-template-columns: minmax(0, 1fr); }
   .sd-side {
     position: static; height: auto;
     border-right: none !important; border-bottom: 1px solid rgb(var(--color-border));
@@ -605,7 +607,8 @@ input[type='checkbox'], input[type='radio'] {
     scrollbar-width: none; scroll-snap-type: x proximity;
   }
   .sd-nav::-webkit-scrollbar { display: none; }
-  .sd-nav .sd-nav-item { flex: none; white-space: nowrap; scroll-snap-align: start; }
+  /* width:auto batte il width:'100%' inline pensato per la lista verticale */
+  .sd-nav .sd-nav-item { flex: none; width: auto !important; white-space: nowrap; scroll-snap-align: start; }
   .sd-nav-active-bar { display: none; }
   .sd-navsec { display: none; }
   .sd-sidefoot { display: none; }
