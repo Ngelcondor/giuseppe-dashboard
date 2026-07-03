@@ -146,7 +146,7 @@ export default function StudyPage() {
       <header className="sd-reveal" style={{ ['--i' as string]: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap', marginBottom: 24 }}>
         <div>
           <div style={{ fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgb(99 102 241)', fontFamily: mono, marginBottom: 12, fontWeight: 600 }}>Certificazioni · HTB</div>
-          <h1 style={{ margin: 0, fontSize: 38, lineHeight: 1.05, letterSpacing: '-.02em', color: 'rgb(var(--color-heading))', fontWeight: 600 }}>Percorso <span style={{ fontFamily: "'Fraunces',serif", fontStyle: 'italic', fontWeight: 500 }}>CPTS</span></h1>
+          <h1 style={{ margin: 0, fontSize: 'clamp(28px, 7vw, 38px)', lineHeight: 1.05, letterSpacing: '-.02em', color: 'rgb(var(--color-heading))', fontWeight: 600 }}>Percorso <span style={{ fontFamily: "'Fraunces',serif", fontStyle: 'italic', fontWeight: 500 }}>CPTS</span></h1>
           <p style={{ margin: '11px 0 0', fontSize: 15, color: 'rgb(var(--color-tertiary))' }}>{subtitle}</p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -353,12 +353,12 @@ function ModuleCard({
         <button
           type="button" aria-label={m.completed ? 'Segna modulo da fare' : 'Segna modulo completato'}
           onClick={(e) => { e.stopPropagation(); onToggleModule(); }} disabled={!isEditor}
-          className={isEditor ? 'sd-press' : undefined}
+          className={isEditor ? 'sd-press sd-checkbtn' : 'sd-checkbtn'}
           style={{ flex: 'none', border: 'none', background: 'transparent', padding: 0, cursor: isEditor ? 'pointer' : 'default', color: m.completed ? 'rgb(16 185 129)' : 'rgb(var(--color-muted))', display: 'flex' }}
         >
           {m.completed ? <CheckCircle2 size={20} /> : <Circle size={20} />}
         </button>
-        <div style={{ flex: 'none', width: 26, fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-muted))' }}>{String(index + 1).padStart(2, '0')}</div>
+        <div className="sd-m-hide" style={{ flex: 'none', width: 26, fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-muted))' }}>{String(index + 1).padStart(2, '0')}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 14.5, fontWeight: 600, color: m.completed ? 'rgb(var(--color-tertiary))' : 'rgb(var(--color-heading))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</span>
@@ -367,7 +367,7 @@ function ModuleCard({
           {m.brief && <div style={{ fontSize: 12, color: 'rgb(var(--color-muted))', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.brief}</div>}
         </div>
         <span style={{ flex: 'none', fontFamily: mono, fontSize: 11.5, color: 'rgb(var(--color-tertiary))' }}>{m.sections_done}/{m.sections_total}</span>
-        <div style={{ flex: 'none', width: 54, height: 5, borderRadius: 5, background: 'rgb(var(--color-card-inner))', overflow: 'hidden' }}>
+        <div className="sd-m-hide" style={{ flex: 'none', width: 54, height: 5, borderRadius: 5, background: 'rgb(var(--color-card-inner))', overflow: 'hidden' }}>
           <div style={{ height: '100%', width: `${pct}%`, background: m.completed ? 'rgb(16 185 129)' : 'rgb(99 102 241)', borderRadius: 5 }} />
         </div>
         {m.htb_url && (
@@ -388,7 +388,7 @@ function ModuleCard({
             ))
           )}
           {isEditor && (
-            <div style={{ display: 'flex', gap: 16, marginTop: 12, paddingTop: 10, borderTop: '1px solid rgb(var(--color-border))' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 12, paddingTop: 10, borderTop: '1px solid rgb(var(--color-border))' }}>
               <button onClick={onEditModuleHtb} style={editLinkBtn}><Pencil size={12} style={{ marginRight: 5 }} />Modifica link HTB</button>
               <button onClick={onEditModuleObsidian} style={editLinkBtn}><Link2 size={12} style={{ marginRight: 5 }} />{m.obsidian_link ? 'Nota modulo' : 'Aggiungi nota modulo'}</button>
             </div>
@@ -398,7 +398,8 @@ function ModuleCard({
     </div>
   );
 }
-const editLinkBtn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, color: 'rgb(var(--color-tertiary))', padding: 0, fontFamily: 'inherit' };
+// padding + margin negativo: hit area ~30px senza spostare il layout desktop
+const editLinkBtn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, color: 'rgb(var(--color-tertiary))', padding: '8px 0', margin: '-8px 0', fontFamily: 'inherit' };
 
 /* ── Single subchapter row ── */
 function SectionRow({
@@ -412,7 +413,7 @@ function SectionRow({
     <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 0', borderTop: index === 0 ? 'none' : '1px solid rgb(var(--color-border))' }}>
       <button
         type="button" aria-label={s.completed ? 'Segna da fare' : 'Segna completato'} onClick={onToggle} disabled={!isEditor}
-        className={isEditor ? 'sd-press' : undefined}
+        className={isEditor ? 'sd-press sd-checkbtn' : 'sd-checkbtn'}
         style={{ flex: 'none', border: 'none', background: 'transparent', padding: 0, cursor: isEditor ? 'pointer' : 'default', color: s.completed ? 'rgb(16 185 129)' : 'rgb(var(--color-muted))', display: 'flex' }}
       >
         {s.completed ? <CheckCircle2 size={17} /> : <Circle size={17} />}

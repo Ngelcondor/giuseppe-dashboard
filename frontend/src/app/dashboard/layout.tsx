@@ -88,6 +88,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => { cancelAnimationFrame(r1); clearTimeout(t1); clearTimeout(t2); };
   }, [pathname]);
 
+  // Sulla pill bar mobile (nav orizzontale scrollabile) centra la voce attiva
+  // al cambio route. Scroll SOLO orizzontale e SOLO del contenitore nav:
+  // scrollIntoView toccherebbe anche lo scroll di pagina, rompendo la
+  // restoration del Back e causando jump verticali.
+  useEffect(() => {
+    const nav = document.querySelector('.sd-nav');
+    const el = nav?.querySelector('[data-active="true"]');
+    if (!nav || !el || nav.scrollWidth <= nav.clientWidth) return;
+    const navRect = nav.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    nav.scrollLeft += elRect.left - navRect.left - (nav.clientWidth - elRect.width) / 2;
+  }, [pathname]);
+
   const animClass = phase === 'in' ? ' sd-anim' : phase === 'lit' ? ' sd-anim sd-lit' : '';
 
   return (
@@ -146,11 +159,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <Link
                     key={item.href}
                     href={item.href}
+                    data-active={on ? 'true' : undefined}
                     className="sd-nav-item sd-press"
                     style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 11, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: '11px 13px', borderRadius: 11, cursor: 'pointer', color: 'rgb(var(--color-heading))', fontSize: 14.5, fontWeight: 500, textDecoration: 'none' }}
                   >
                     {on && <span style={{ position: 'absolute', inset: 0, borderRadius: 11, background: 'rgb(99 102 241 / 0.09)' }} />}
-                    {on && <span style={{ position: 'absolute', left: 0, top: 10, bottom: 10, width: 3, borderRadius: 3, background: 'rgb(99 102 241)' }} />}
+                    {on && <span className="sd-nav-active-bar" style={{ position: 'absolute', left: 0, top: 10, bottom: 10, width: 3, borderRadius: 3, background: 'rgb(99 102 241)' }} />}
                     <span style={{ position: 'relative', width: 7, height: 7, borderRadius: 2, background: item.dot }} />
                     <span style={{ position: 'relative', minWidth: 0, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
                     {item.wip && (
@@ -173,7 +187,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <button
                 className="sd-press"
                 onClick={() => setTheme('dark')}
-                style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '8px 6px', background: 'transparent', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: 'rgb(var(--color-heading))' }}
+                style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '8px 6px', minHeight: 40, background: 'transparent', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: 'rgb(var(--color-heading))' }}
               >
                 {theme === 'dark' && <span style={{ position: 'absolute', inset: 0, borderRadius: 8, background: 'rgb(var(--lg-accent)/0.16)', border: '1px solid rgb(var(--lg-accent)/0.4)' }} />}
                 <span style={{ position: 'relative', width: 9, height: 9, borderRadius: '50%', background: 'rgb(var(--lg-accent))', boxShadow: '0 0 8px rgb(var(--lg-accent)/0.8)' }} />
@@ -182,7 +196,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <button
                 className="sd-press"
                 onClick={() => setTheme('light')}
-                style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '8px 6px', background: 'transparent', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: 'rgb(var(--color-heading))' }}
+                style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '8px 6px', minHeight: 40, background: 'transparent', border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, color: 'rgb(var(--color-heading))' }}
               >
                 {theme === 'light' && <span style={{ position: 'absolute', inset: 0, borderRadius: 8, background: 'rgb(245 158 11/0.16)', border: '1px solid rgb(245 158 11/0.42)' }} />}
                 <span style={{ position: 'relative', width: 9, height: 9, borderRadius: '50%', background: 'rgb(245 158 11)', boxShadow: '0 0 8px rgb(245 158 11/0.7)' }} />
@@ -207,7 +221,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </aside>
 
         {/* ── Main ── */}
-        <main style={{ padding: '38px 44px 64px' }}>
+        <main className="sd-main">
           <div className="sd-main-inner">{children}</div>
         </main>
       </div>

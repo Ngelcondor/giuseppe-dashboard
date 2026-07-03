@@ -64,8 +64,8 @@ function TerminalClock() {
   const date = now ? cap(now.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })) : '';
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 20, flexWrap: 'wrap', margin: '14px 0 4px' }}>
-      <span style={{ fontSize: 62, fontWeight: 700, letterSpacing: '-.01em', color: TERM.fg, lineHeight: 0.95, fontVariantNumeric: 'tabular-nums' }}>{time}</span>
-      <span style={{ fontSize: 18, color: TERM.dim, whiteSpace: 'nowrap' }}>{date}</span>
+      <span style={{ fontSize: 'clamp(36px, 11vw, 62px)', fontWeight: 700, letterSpacing: '-.01em', color: TERM.fg, lineHeight: 0.95, fontVariantNumeric: 'tabular-nums' }}>{time}</span>
+      <span style={{ fontSize: 'clamp(14px, 4vw, 18px)', color: TERM.dim }}>{date}</span>
     </div>
   );
 }
@@ -226,7 +226,7 @@ export default function HomePage() {
           </div>
           {/* body */}
           <div style={{ padding: '18px 22px 20px' }}>
-            <div style={{ fontSize: 13, lineHeight: 1.75 }}>
+            <div style={{ fontSize: 13, lineHeight: 1.75, overflowWrap: 'anywhere' }}>
               <span style={{ color: TERM.cyan }}>┌──(</span><span style={{ color: TERM.blue, fontWeight: 600 }}>giuseppe</span><span style={{ color: TERM.pink }}>㉿</span><span style={{ color: TERM.blue, fontWeight: 600 }}>study-desk</span><span style={{ color: TERM.cyan }}>)-[</span><span style={{ color: TERM.fg }}>~/sessione-esami</span><span style={{ color: TERM.cyan }}>]</span><br />
               <span style={{ color: TERM.cyan }}>└─$</span> <span style={{ color: TERM.green }}>date</span>
             </div>
@@ -281,7 +281,7 @@ export default function HomePage() {
                       <Badge variant="success" size="sm">In corso</Badge>
                     </div>
                     <div style={{ marginTop: 14 }}>
-                      <Link href="/dashboard/study"><Button variant="primary" size="sm">Riprendi lo studio</Button></Link>
+                      <Link href="/dashboard/study"><Button variant="primary" size="sm" style={{ minHeight: 40 }}>Riprendi lo studio</Button></Link>
                     </div>
                   </LaneNode>
                 );

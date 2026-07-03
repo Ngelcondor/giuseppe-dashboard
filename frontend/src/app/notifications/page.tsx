@@ -88,7 +88,7 @@ export default function NotificationsPage() {
   return (
     <div className="min-h-screen bg-page text-heading">
       <header className="px-6 py-5 border-b border-border-default flex items-center gap-3">
-        <Link href="/dashboard" className="text-tertiary hover:text-body transition-colors">
+        <Link href="/dashboard" className="p-2 -m-2 text-tertiary hover:text-body transition-colors">
           <ArrowLeft size={18} />
         </Link>
         <Bell size={18} className="text-blue-400" />
@@ -96,7 +96,7 @@ export default function NotificationsPage() {
         {unreadCount > 0 && (
           <button
             onClick={handleMarkAllRead}
-            className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
+            className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 py-2 -my-2"
           >
             <CheckCheck size={14} /> Segna tutte come lette
           </button>
@@ -170,7 +170,7 @@ export default function NotificationsPage() {
                   {!notif.is_read && (
                     <button
                       onClick={() => handleMarkRead(notif.id)}
-                      className="p-1 rounded-lg hover:bg-surface-hover text-tertiary hover:text-emerald-400 transition-colors"
+                      className="p-1 sd-touchbtn rounded-lg hover:bg-surface-hover text-tertiary hover:text-emerald-400 transition-colors"
                       title="Segna come letta"
                     >
                       <Check size={14} />
@@ -178,7 +178,7 @@ export default function NotificationsPage() {
                   )}
                   <button
                     onClick={() => handleDelete(notif.id)}
-                    className="p-1 rounded-lg hover:bg-red-600/10 text-muted hover:text-red-400 transition-colors"
+                    className="p-1 sd-touchbtn rounded-lg hover:bg-red-600/10 text-muted hover:text-red-400 transition-colors"
                     title="Elimina"
                   >
                     <Trash2 size={14} />

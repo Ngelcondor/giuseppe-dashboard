@@ -273,13 +273,14 @@ export default function BudgetPage() {
       <header className="sd-reveal" style={{ ['--i' as string]: 0, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap', marginBottom: 24 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 10 }}>
+            {/* padding 10 + margin -8 ≈ padding 2 visivo, ma hit area 36px */}
             <button type="button" className="sd-press" onClick={() => shiftMonth(-1)} aria-label="Mese precedente"
-              style={{ display: 'inline-flex', alignItems: 'center', border: 'none', background: 'transparent', color: 'rgb(16 185 129)', cursor: 'pointer', padding: 2 }}>
+              style={{ display: 'inline-flex', alignItems: 'center', border: 'none', background: 'transparent', color: 'rgb(16 185 129)', cursor: 'pointer', padding: 10, margin: -8 }}>
               <ChevronLeft size={16} />
             </button>
             <span style={{ fontSize: 11, letterSpacing: '.2em', textTransform: 'uppercase', color: 'rgb(16 185 129)', fontFamily: mono, fontWeight: 600, minWidth: 132, textAlign: 'center' }}>Banca · {fmtMonthLabel(periodISO)}</span>
             <button type="button" className="sd-press" onClick={() => canNext && shiftMonth(1)} disabled={!canNext} aria-label="Mese successivo"
-              style={{ display: 'inline-flex', alignItems: 'center', border: 'none', background: 'transparent', color: 'rgb(16 185 129)', cursor: canNext ? 'pointer' : 'default', opacity: canNext ? 1 : 0.3, padding: 2 }}>
+              style={{ display: 'inline-flex', alignItems: 'center', border: 'none', background: 'transparent', color: 'rgb(16 185 129)', cursor: canNext ? 'pointer' : 'default', opacity: canNext ? 1 : 0.3, padding: 10, margin: -8 }}>
               <ChevronRight size={16} />
             </button>
           </div>
@@ -315,14 +316,14 @@ export default function BudgetPage() {
           <div style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'space-between', gap: 36, flexWrap: 'wrap' }}>
             <div style={{ minWidth: 220 }}>
               <div style={eyebrow}>Saldo disponibile</div>
-              <div style={{ fontFamily: mono, fontSize: 44, fontWeight: 600, letterSpacing: '-.03em', color: 'rgb(var(--color-heading))', lineHeight: 1, marginTop: 10 }}>{balance != null ? eur(balance, true) : '€ —'}</div>
+              <div style={{ fontFamily: mono, fontSize: 'clamp(30px, 10vw, 44px)', fontWeight: 600, letterSpacing: '-.03em', color: 'rgb(var(--color-heading))', lineHeight: 1, marginTop: 10 }}>{balance != null ? eur(balance, true) : '€ —'}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 15 }}>
                 <span style={{ width: 9, height: 9, borderRadius: '50%', background: 'rgb(16 185 129)', flex: 'none' }} />
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'rgb(16 185 129)' }}>Connesso</span>
                 <span style={{ fontSize: 13, color: 'rgb(var(--color-tertiary))' }}>· {data.bank_currency} · ultimo sync {fmtSync(data.bank_last_sync)}</span>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 36, alignItems: 'center', paddingLeft: 36, borderLeft: '1px solid rgb(var(--color-border))', flexWrap: 'wrap' }}>
+            <div className="sd-m-full sd-t-noindent" style={{ display: 'flex', gap: 36, alignItems: 'center', paddingLeft: 36, borderLeft: '1px solid rgb(var(--color-border))', flexWrap: 'wrap' }}>
               <Stat label="Entrate" value={eur(income)} color="rgb(16 185 129)" />
               <Stat label="Uscite" value={eur(spent)} color="rgb(239 68 68)" />
               <Stat label="Netto" value={(net >= 0 ? '+' : '−') + eur(Math.abs(net)).replace('−', '')} />
@@ -394,7 +395,7 @@ export default function BudgetPage() {
 
       {view === 'b' && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 18 }} className="sd-grid3">
+          <div style={{ gap: 16, marginBottom: 18 }} className="sd-grid3">
             <SurfaceStat i={3} label={`Entrate · ${fmtMonthLabel(periodISO).split(' ')[0]}`} value={eur(income, true)} color="rgb(16 185 129)" />
             <SurfaceStat i={4} label={`Uscite · ${fmtMonthLabel(periodISO).split(' ')[0]}`} value={eur(spent, true)} color="rgb(239 68 68)" />
             <SurfaceStat i={5} label="Netto" value={(net >= 0 ? '+' : '−') + eur(Math.abs(net), true).replace('−', '')} accent />
@@ -522,8 +523,8 @@ function CatRow({ cat, spent, items }: { cat: Cat; spent: number; items: TxView[
         aria-expanded={canOpen ? open : undefined}
         style={{ cursor: canOpen ? 'pointer' : 'default' }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 7 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: 'rgb(var(--color-heading))', background: 'rgb(var(--color-card-inner))', border: '1px solid rgb(var(--color-border))', borderRadius: 999, padding: '3px 10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 7, flexWrap: 'wrap' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: 'rgb(var(--color-heading))', background: 'rgb(var(--color-card-inner))', border: '1px solid rgb(var(--color-border))', borderRadius: 999, padding: '3px 10px', minWidth: 0 }}>
             <span style={{ width: 7, height: 7, borderRadius: 9, background: `rgb(${cat.color})` }} />{cat.name}
             {canOpen && <span style={{ fontFamily: mono, fontWeight: 600, color: 'rgb(var(--color-muted))' }}>{items.length}</span>}
           </span>
@@ -586,8 +587,8 @@ function TxList({ txs, onDel, onEdit }: { txs: TxView[]; onDel: (t: TxView) => v
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 'none' }}>
-            <span style={{ fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-muted))' }}>{t.dateLabel}</span>
-            <span style={{ fontFamily: mono, fontSize: 14, fontWeight: 600, color: t.amount > 0 ? 'rgb(16 185 129)' : 'rgb(239 68 68)', minWidth: 80, textAlign: 'right' }}>{eur(t.amount, true)}</span>
+            <span className="sd-m-hide" style={{ fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-muted))' }}>{t.dateLabel}</span>
+            <span className="sd-m-minw64" style={{ fontFamily: mono, fontSize: 14, fontWeight: 600, color: t.amount > 0 ? 'rgb(16 185 129)' : 'rgb(239 68 68)', minWidth: 80, textAlign: 'right' }}>{eur(t.amount, true)}</span>
             <button className="sd-iconbtn sd-fin-del" aria-label="Elimina movimento" onClick={() => onDel(t)}><Trash2 size={14} /></button>
           </div>
         </div>
@@ -623,7 +624,8 @@ function Timeline({ scadenze }: { scadenze: ScadenzaPreview[] }) {
           return (
             <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', position: 'relative', opacity: s.pagato ? 0.6 : 1 }}>
               <span style={{ width: 12, height: 12, borderRadius: '50%', flex: 'none', background: `rgb(${col})`, boxShadow: '0 0 0 4px rgb(var(--color-card))' }} />
-              <span style={{ width: 46, flex: 'none', fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{s.scadenza_gg_mm}</span>
+              {/* ≤560px la data esatta è ridondante: la pill relativa basta */}
+              <span className="sd-m-hide" style={{ width: 46, flex: 'none', fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{s.scadenza_gg_mm}</span>
               <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: 'rgb(var(--color-heading))', textDecoration: s.pagato ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.desc}</span>
               {s.importo > 0 && <span style={{ flex: 'none', fontFamily: mono, fontSize: 13, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{eur(s.importo, true)}</span>}
               <span style={{ flex: 'none', fontSize: 11, fontWeight: 600, color: `rgb(${col})`, background: `rgb(${col} / 0.12)`, border: `1px solid rgb(${col} / 0.28)`, borderRadius: 999, padding: '2px 9px', minWidth: 58, textAlign: 'center' }}>{rel}</span>
