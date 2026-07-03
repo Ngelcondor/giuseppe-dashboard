@@ -7,7 +7,8 @@ from datetime import datetime, timedelta
 from typing import List
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_editor
+from app.core.security import require_editor
+from app.core.sections import get_view_user_id
 from app.models.health import Workout
 from app.schemas.health import (
     WorkoutCreate,
@@ -50,13 +51,13 @@ async def create_workout(
 async def list_workouts(
     days: int = Query(30),
     workout_type: str = Query(None),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> List[WorkoutResponse]:
     """List workouts for the last N days."""
     start_date = datetime.utcnow() - timedelta(days=days)
     query = select(Workout).where(
-        (Workout.user_id == current_user["sub"])
+        (Workout.user_id == view_user_id)
         & (Workout.started_at >= start_date)
     )
 
@@ -71,7 +72,7 @@ async def list_workouts(
 
 @router.get("/week-summary", response_model=WorkoutWeekSummary)
 async def get_week_summary(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> WorkoutWeekSummary:
     """Get weekly workout summary."""
@@ -79,7 +80,7 @@ async def get_week_summary(
     result = await db.execute(
         select(Workout)
         .where(
-            (Workout.user_id == current_user["sub"])
+            (Workout.user_id == view_user_id)
             & (Workout.started_at >= start_date)
         )
         .order_by(Workout.started_at.desc())
@@ -113,14 +114,14 @@ async def get_week_summary(
 @router.get("/{workout_id}", response_model=WorkoutResponse)
 async def get_workout(
     workout_id: str,
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> WorkoutResponse:
     """Get a specific workout."""
     result = await db.execute(
         select(Workout).where(
             (Workout.id == workout_id)
-            & (Workout.user_id == current_user["sub"])
+            & (Workout.user_id == view_user_id)
         )
     )
     workout = result.scalars().first()

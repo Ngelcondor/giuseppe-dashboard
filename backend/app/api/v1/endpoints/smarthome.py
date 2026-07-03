@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_editor
+from app.core.sections import get_view_user_id
 from app.services.settings_store import get_setting, set_setting
 from app.services import smarthome_service as sh
 from app.models.shelly_reading import ShellyReading
@@ -50,12 +51,12 @@ def _shelly_ready(cfg: Optional[Dict[str, Any]]) -> bool:
 # ── Status ──
 @router.get("/status", response_model=SmartHomeStatus)
 async def status(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> SmartHomeStatus:
     """Report which Smart Home integrations are configured."""
-    hue_cfg = await get_setting(db, current_user["sub"], HUE_KEY)
-    shelly_cfg = await get_setting(db, current_user["sub"], SHELLY_KEY)
+    hue_cfg = await get_setting(db, view_user_id, HUE_KEY)
+    shelly_cfg = await get_setting(db, view_user_id, SHELLY_KEY)
     return SmartHomeStatus(
         hue_connected=_hue_ready(hue_cfg),
         shelly_connected=_shelly_ready(shelly_cfg),
@@ -65,11 +66,11 @@ async def status(
 # ── Hue lights ──
 @router.get("/hue/lights", response_model=HueLightsResponse)
 async def hue_lights(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> HueLightsResponse:
     """List Hue lights from the local bridge, or connected:false if unset."""
-    cfg = await get_setting(db, current_user["sub"], HUE_KEY)
+    cfg = await get_setting(db, view_user_id, HUE_KEY)
     if not _hue_ready(cfg):
         return HueLightsResponse(connected=False)
 
@@ -115,7 +116,7 @@ async def update_hue_light(
 # ── Shelly devices (live power + cumulative energy) ──
 @router.get("/shelly/devices", response_model=ShellyDevicesResponse)
 async def shelly_devices(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> ShellyDevicesResponse:
     """Live per-device power + cumulative energy from the Shelly Cloud account.
@@ -124,7 +125,7 @@ async def shelly_devices(
     cloud has no historical per-period endpoint — that needs snapshotting,
     a separate build. Returns connected:false when Shelly is unconfigured.
     """
-    cfg = await get_setting(db, current_user["sub"], SHELLY_KEY)
+    cfg = await get_setting(db, view_user_id, SHELLY_KEY)
     if not _shelly_ready(cfg):
         return ShellyDevicesResponse(connected=False)
 
@@ -136,7 +137,7 @@ async def shelly_devices(
             error=f"Shelly Cloud non raggiungibile: {exc}",
         )
 
-    aliases = await _shelly_aliases(db, current_user["sub"])
+    aliases = await _shelly_aliases(db, view_user_id)
     for d in devices:
         alias = aliases.get(d["device_id"])
         if alias:
@@ -200,7 +201,7 @@ async def set_shelly_alias(
 async def shelly_timeseries(
     days: int = Query(7, ge=1, le=14),
     tz_offset: int = Query(0, ge=-840, le=840),  # minutes to ADD to UTC to get local time
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> ShellyTimeseriesResponse:
     """Per-hour household + per-device kWh, derived from the cumulative-counter
@@ -209,11 +210,11 @@ async def shelly_timeseries(
     accumulates from the first snapshot, so sparse windows read mostly 0 —
     samples/data_since make that explicit. Never fabricated.
     """
-    cfg = await get_setting(db, current_user["sub"], SHELLY_KEY)
+    cfg = await get_setting(db, view_user_id, SHELLY_KEY)
     if not _shelly_ready(cfg):
         return ShellyTimeseriesResponse(connected=False)
 
-    uid = current_user["sub"]
+    uid = view_user_id
     aliases = await _shelly_aliases(db, uid)
     offset = timedelta(minutes=tz_offset)
     now_local = datetime.utcnow() + offset
@@ -293,7 +294,7 @@ async def shelly_timeseries(
 @router.get("/shelly/consumption", response_model=ShellyConsumptionResponse)
 async def shelly_consumption(
     period: str = Query("day", pattern="^(day|week|month)$"),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> ShellyConsumptionResponse:
     """Per-device energy consumed in the period, from hourly snapshots.
@@ -303,7 +304,7 @@ async def shelly_consumption(
     so recent windows may read 0 until enough data exists (data_since/samples
     make that explicit). Never fabricated.
     """
-    cfg = await get_setting(db, current_user["sub"], SHELLY_KEY)
+    cfg = await get_setting(db, view_user_id, SHELLY_KEY)
     if not _shelly_ready(cfg):
         return ShellyConsumptionResponse(connected=False, period=period)
 
@@ -315,7 +316,7 @@ async def shelly_consumption(
     else:  # month
         period_start = now - timedelta(days=30)
 
-    uid = current_user["sub"]
+    uid = view_user_id
     # Pull window rows plus ~1 day of lookback so each device has an anchor
     # snapshot taken just before period_start.
     result = await db.execute(

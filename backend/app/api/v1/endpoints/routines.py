@@ -7,7 +7,8 @@ from datetime import datetime
 from typing import List
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_editor
+from app.core.security import require_editor
+from app.core.sections import get_view_user_id
 from app.models.routine import Routine, RoutineStep, RoutineLog, TimeOfDay
 from app.schemas.routine import (
     RoutineCreate, RoutineResponse, RoutineUpdate,
@@ -52,14 +53,14 @@ async def create_routine(
 
 @router.get("", response_model=List[RoutineResponse])
 async def list_routines(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> List[RoutineResponse]:
     """List all routines."""
     result = await db.execute(
         select(Routine)
         .options(selectinload(Routine.steps))
-        .where(Routine.user_id == current_user["sub"])
+        .where(Routine.user_id == view_user_id)
         .order_by(Routine.order)
     )
     routines = result.scalars().all()
@@ -69,7 +70,7 @@ async def list_routines(
 @router.get("/{routine_id}", response_model=RoutineResponse)
 async def get_routine(
     routine_id: str,
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> RoutineResponse:
     """Get a specific routine."""
@@ -78,7 +79,7 @@ async def get_routine(
         .options(selectinload(Routine.steps))
         .where(
             (Routine.id == routine_id)
-            & (Routine.user_id == current_user["sub"])
+            & (Routine.user_id == view_user_id)
         )
     )
     routine = result.scalars().first()
@@ -166,7 +167,7 @@ async def add_routine_step(
 
 @router.get("/today/all", response_model=RoutineTodayResponse)
 async def get_today_routines(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> RoutineTodayResponse:
     """Get routines for today."""
@@ -174,7 +175,7 @@ async def get_today_routines(
         select(Routine)
         .options(selectinload(Routine.steps))
         .where(
-            (Routine.user_id == current_user["sub"])
+            (Routine.user_id == view_user_id)
             & (Routine.is_active == True)
         )
     )

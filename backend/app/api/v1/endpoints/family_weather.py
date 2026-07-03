@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.sections import get_view_user_id
 from app.schemas.family_weather import FamilyWeatherItem
 
 router = APIRouter(prefix="/family-weather", tags=["family-weather"])
@@ -124,14 +124,14 @@ async def _fetch_weather(client: httpx.AsyncClient, member: Dict[str, Any]) -> F
 @router.get("/", response_model=List[FamilyWeatherItem])
 async def get_family_weather(
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
 ) -> List[FamilyWeatherItem]:
     """Meteo reale (Open-Meteo) per le città dei familiari.
 
     Ritorna un array { label, city, temp, code, min, max } — una entry per
     membro/location configurata nel settings store; vuoto se non configurato.
     """
-    user_id = current_user.get("sub")
+    user_id = view_user_id
     family_cfg = await _get_setting(db, user_id, "family")
     weather_cfg = await _get_setting(db, user_id, "weather")
     members = _resolve_members(family_cfg, weather_cfg)

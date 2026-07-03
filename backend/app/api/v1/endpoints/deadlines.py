@@ -8,7 +8,8 @@ from typing import List
 from dateutil.relativedelta import relativedelta
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_editor
+from app.core.security import require_editor
+from app.core.sections import get_view_user_id
 from app.models.deadline import (
     Deadline,
     RecurrenceType,
@@ -55,13 +56,13 @@ async def create_deadline(
 
 @router.get("", response_model=List[DeadlineResponse])
 async def list_deadlines(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> List[DeadlineResponse]:
     """List all deadlines."""
     result = await db.execute(
         select(Deadline)
-        .where(Deadline.user_id == current_user["sub"])
+        .where(Deadline.user_id == view_user_id)
         .order_by(Deadline.due_date)
     )
     deadlines = result.scalars().all()
@@ -71,14 +72,14 @@ async def list_deadlines(
 @router.get("/{deadline_id}", response_model=DeadlineResponse)
 async def get_deadline(
     deadline_id: str,
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> DeadlineResponse:
     """Get a specific deadline."""
     result = await db.execute(
         select(Deadline).where(
             (Deadline.id == deadline_id)
-            & (Deadline.user_id == current_user["sub"])
+            & (Deadline.user_id == view_user_id)
         )
     )
     deadline = result.scalars().first()
@@ -139,7 +140,7 @@ async def delete_deadline(
 
 @router.get("/upcoming/list", response_model=DeadlineUpcomingResponse)
 async def get_upcoming_deadlines(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> DeadlineUpcomingResponse:
     """Get upcoming and overdue deadlines."""
@@ -148,7 +149,7 @@ async def get_upcoming_deadlines(
     # Upcoming
     result = await db.execute(
         select(Deadline).where(
-            (Deadline.user_id == current_user["sub"])
+            (Deadline.user_id == view_user_id)
             & (Deadline.due_date >= today)
             & (Deadline.is_completed == False)
         )
@@ -158,7 +159,7 @@ async def get_upcoming_deadlines(
     # Overdue
     result = await db.execute(
         select(Deadline).where(
-            (Deadline.user_id == current_user["sub"])
+            (Deadline.user_id == view_user_id)
             & (Deadline.due_date < today)
             & (Deadline.is_completed == False)
         )
@@ -264,7 +265,7 @@ def _expand_occurrences(d: Deadline, today: date, horizon_end: date) -> List[Dea
 @router.get("/occurrences/upcoming", response_model=DeadlineOccurrencesResponse)
 async def get_upcoming_occurrences(
     months: int = Query(6, ge=1, le=36),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> DeadlineOccurrencesResponse:
     """Return upcoming occurrences EXPANDED for the next N months.
@@ -277,7 +278,7 @@ async def get_upcoming_occurrences(
     horizon_end = today + relativedelta(months=months)
 
     result = await db.execute(
-        select(Deadline).where(Deadline.user_id == current_user["sub"])
+        select(Deadline).where(Deadline.user_id == view_user_id)
     )
     deadlines = result.scalars().all()
 

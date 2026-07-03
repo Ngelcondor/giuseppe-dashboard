@@ -18,6 +18,7 @@ from sqlalchemy.future import select
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_editor
+from app.core.sections import get_view_user_id
 from app.models.study import (
     StudyTaskState,
     StudyPlan,
@@ -81,10 +82,10 @@ def _apply(row: StudyTaskState, upd: StudyTaskUpsert) -> None:
 @router.get("/state", response_model=List[StudyTaskStateOut])
 async def get_state(
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
 ):
     """Return all task states for the current user."""
-    user_id = UUID(current_user["sub"])
+    user_id = UUID(view_user_id)
     result = await db.execute(
         select(StudyTaskState).where(StudyTaskState.user_id == user_id)
     )
@@ -209,14 +210,14 @@ async def _serialize_plan(db: AsyncSession, plan: StudyPlan) -> StudyPlanOut:
 @router.get("/plan", response_model=StudyPlanOut)
 async def get_plan(
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
 ) -> StudyPlanOut:
     """Return the current user's CPTS plan.
 
     If the user has never initialised a plan, returns an empty plan (no modules)
     — the Studio page shows a 'Reset percorso' CTA. No fabricated rows.
     """
-    user_id = UUID(current_user["sub"])
+    user_id = UUID(view_user_id)
     plan = (
         await db.execute(select(StudyPlan).where(StudyPlan.user_id == user_id))
     ).scalars().first()
@@ -395,7 +396,7 @@ async def update_section(
 @router.get("/htb/profile", response_model=HTBProfile)
 async def htb_profile(
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
 ) -> HTBProfile:
     """Return the user's real HTB stats, or ``connected=False`` if not configured.
 
@@ -403,7 +404,7 @@ async def htb_profile(
     absent/empty, or if the HTB API call fails, returns an honest not_connected
     payload — never fabricated stats.
     """
-    user_id = UUID(current_user["sub"])
+    user_id = UUID(view_user_id)
     cfg = await settings_store.get_setting(db, user_id, "htb")
     token = (cfg or {}).get("api_token") if isinstance(cfg, dict) else None
     if not token:

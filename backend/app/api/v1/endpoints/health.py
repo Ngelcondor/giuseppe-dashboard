@@ -11,7 +11,8 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_editor
+from app.core.security import require_editor
+from app.core.sections import get_view_user_id
 from app.models.health import HealthMetric, Medication, MedicationLog, MetricType
 
 logger = logging.getLogger(__name__)
@@ -60,11 +61,11 @@ async def create_health_metric(
 async def list_health_metrics(
     metric_type: MetricType = Query(None),
     days: int = Query(30),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> List[HealthMetricResponse]:
     """List health metrics."""
-    query = select(HealthMetric).where(HealthMetric.user_id == current_user["sub"])
+    query = select(HealthMetric).where(HealthMetric.user_id == view_user_id)
 
     if metric_type:
         query = query.where(HealthMetric.metric_type == metric_type)
@@ -80,14 +81,14 @@ async def list_health_metrics(
 @router.get("/metrics/{metric_id}", response_model=HealthMetricResponse)
 async def get_health_metric(
     metric_id: str,
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> HealthMetricResponse:
     """Get a specific health metric."""
     result = await db.execute(
         select(HealthMetric).where(
             (HealthMetric.id == metric_id)
-            & (HealthMetric.user_id == current_user["sub"])
+            & (HealthMetric.user_id == view_user_id)
         )
     )
     metric = result.scalars().first()
@@ -149,7 +150,7 @@ async def delete_health_metric(
 @router.get("/summary", response_model=HealthSummary)
 async def get_health_summary(
     period: str = Query("daily"),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> HealthSummary:
     """Get health summary for a period."""
@@ -166,7 +167,7 @@ async def get_health_summary(
     result = await db.execute(
         select(HealthMetric)
         .where(
-            (HealthMetric.user_id == current_user["sub"])
+            (HealthMetric.user_id == view_user_id)
             & (HealthMetric.recorded_at >= start_date)
         )
         .order_by(HealthMetric.recorded_at)
@@ -217,12 +218,12 @@ async def create_medication(
 
 @router.get("/medications", response_model=List[MedicationResponse])
 async def list_medications(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> List[MedicationResponse]:
     """List all medications."""
     result = await db.execute(
-        select(Medication).where(Medication.user_id == current_user["sub"])
+        select(Medication).where(Medication.user_id == view_user_id)
     )
     medications = result.scalars().all()
     return [MedicationResponse.from_orm(m) for m in medications]
@@ -230,14 +231,14 @@ async def list_medications(
 
 @router.get("/medications/today", response_model=MedicationTodayResponse)
 async def get_today_medications(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> MedicationTodayResponse:
     """Get today's medication schedule with log status."""
     # Get all active medications
     result = await db.execute(
         select(Medication).where(
-            (Medication.user_id == current_user["sub"])
+            (Medication.user_id == view_user_id)
             & (Medication.is_active == True)
         )
     )
@@ -250,7 +251,7 @@ async def get_today_medications(
     today_end = datetime.combine(today_local, datetime.max.time(), tzinfo=tz_rome).astimezone(timezone.utc).replace(tzinfo=None)
     logs_result = await db.execute(
         select(MedicationLog).where(
-            (MedicationLog.user_id == current_user["sub"])
+            (MedicationLog.user_id == view_user_id)
             & (MedicationLog.taken_at >= today_start)
             & (MedicationLog.taken_at <= today_end)
         )
@@ -303,7 +304,7 @@ async def get_today_medications(
 async def get_medication_stats(
     year: int = Query(None, description="Anno (default: anno corrente)"),
     month: int = Query(None, description="Mese 1-12 (default: mese corrente)"),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> MedicationStatsResponse:
     """Get medication adherence statistics for a given month.
@@ -340,7 +341,7 @@ async def get_medication_stats(
     # Get all active medications
     result = await db.execute(
         select(Medication).where(
-            (Medication.user_id == current_user["sub"])
+            (Medication.user_id == view_user_id)
             & (Medication.is_active == True)
         )
     )
@@ -349,7 +350,7 @@ async def get_medication_stats(
     # Get all logs in the period
     logs_result = await db.execute(
         select(MedicationLog).where(
-            (MedicationLog.user_id == current_user["sub"])
+            (MedicationLog.user_id == view_user_id)
             & (MedicationLog.taken_at >= period_start_utc)
             & (MedicationLog.taken_at <= period_end_utc)
         )
@@ -543,14 +544,14 @@ async def log_medication(
 async def get_medication_logs(
     medication_id: str,
     days: int = Query(30),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> List[MedicationLogResponse]:
     """Get logs for a medication."""
     result = await db.execute(
         select(Medication).where(
             (Medication.id == medication_id)
-            & (Medication.user_id == current_user["sub"])
+            & (Medication.user_id == view_user_id)
         )
     )
     medication = result.scalars().first()

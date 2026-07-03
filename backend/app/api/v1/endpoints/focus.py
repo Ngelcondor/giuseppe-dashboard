@@ -6,7 +6,8 @@ from datetime import datetime, timedelta, date
 from typing import List
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_editor
+from app.core.security import require_editor
+from app.core.sections import get_view_user_id
 from app.models.focus import PomodoroSession, FocusScore
 from app.schemas.focus import (
     PomodoroSessionCreate, PomodoroSessionResponse, PomodoroSessionUpdate,
@@ -70,7 +71,7 @@ async def stop_pomodoro(
 @router.get("/pomodoro/sessions", response_model=List[PomodoroSessionResponse])
 async def list_pomodoro_sessions(
     days: int = Query(7),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> List[PomodoroSessionResponse]:
     """List Pomodoro sessions."""
@@ -78,7 +79,7 @@ async def list_pomodoro_sessions(
     result = await db.execute(
         select(PomodoroSession)
         .where(
-            (PomodoroSession.user_id == current_user["sub"])
+            (PomodoroSession.user_id == view_user_id)
             & (PomodoroSession.started_at >= start_date)
         )
         .order_by(PomodoroSession.started_at.desc())
@@ -106,14 +107,14 @@ async def create_focus_score(
 
 @router.get("/score/today", response_model=FocusScoreResponse)
 async def get_today_focus_score(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> FocusScoreResponse:
     """Get today's focus score."""
     today = date.today()
     result = await db.execute(
         select(FocusScore).where(
-            (FocusScore.user_id == current_user["sub"])
+            (FocusScore.user_id == view_user_id)
             & (FocusScore.date == today)
         )
     )
@@ -126,7 +127,7 @@ async def get_today_focus_score(
 @router.get("/score/history", response_model=List[FocusScoreResponse])
 async def get_focus_score_history(
     days: int = Query(30),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> List[FocusScoreResponse]:
     """Get focus score history."""
@@ -134,7 +135,7 @@ async def get_focus_score_history(
     result = await db.execute(
         select(FocusScore)
         .where(
-            (FocusScore.user_id == current_user["sub"])
+            (FocusScore.user_id == view_user_id)
             & (FocusScore.date >= start_date)
         )
         .order_by(FocusScore.date.desc())
@@ -146,7 +147,7 @@ async def get_focus_score_history(
 @router.get("/stats", response_model=FocusStatsResponse)
 async def get_focus_stats(
     period: str = Query("week"),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> FocusStatsResponse:
     """Get focus statistics."""
@@ -161,7 +162,7 @@ async def get_focus_stats(
     result = await db.execute(
         select(FocusScore)
         .where(
-            (FocusScore.user_id == current_user["sub"])
+            (FocusScore.user_id == view_user_id)
             & (FocusScore.date >= start_date)
         )
         .order_by(FocusScore.date)

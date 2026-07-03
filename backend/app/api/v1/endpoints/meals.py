@@ -6,7 +6,8 @@ from datetime import date, timedelta
 from typing import List
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_editor
+from app.core.security import require_editor
+from app.core.sections import get_view_user_id
 from app.models.meal import MealPlan
 from app.schemas.meal import (
     MealPlanCreate, MealPlanResponse, MealPlanUpdate,
@@ -36,11 +37,11 @@ async def create_meal_plan(
 @router.get("", response_model=List[MealPlanResponse])
 async def list_meal_plans(
     day: date = Query(None),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> List[MealPlanResponse]:
     """List meal plans."""
-    query = select(MealPlan).where(MealPlan.user_id == current_user["sub"])
+    query = select(MealPlan).where(MealPlan.user_id == view_user_id)
 
     if day:
         query = query.where(MealPlan.date == day)
@@ -53,14 +54,14 @@ async def list_meal_plans(
 @router.get("/{meal_id}", response_model=MealPlanResponse)
 async def get_meal_plan(
     meal_id: str,
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> MealPlanResponse:
     """Get a specific meal plan."""
     result = await db.execute(
         select(MealPlan).where(
             (MealPlan.id == meal_id)
-            & (MealPlan.user_id == current_user["sub"])
+            & (MealPlan.user_id == view_user_id)
         )
     )
     meal = result.scalars().first()
@@ -122,7 +123,7 @@ async def delete_meal_plan(
 @router.get("/week/all", response_model=MealWeekResponse)
 async def get_week_meals(
     start_date: date = Query(None),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> MealWeekResponse:
     """Get meal plan for a week."""
@@ -135,7 +136,7 @@ async def get_week_meals(
 
     result = await db.execute(
         select(MealPlan).where(
-            (MealPlan.user_id == current_user["sub"])
+            (MealPlan.user_id == view_user_id)
             & (MealPlan.date >= start_date)
             & (MealPlan.date <= end_date)
         )
@@ -160,7 +161,7 @@ async def get_week_meals(
 @router.get("/nutrition/summary", response_model=MealNutritionWeeklyResponse)
 async def get_nutrition_summary(
     start_date: date = Query(None),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> MealNutritionWeeklyResponse:
     """Get weekly nutrition summary."""
@@ -173,7 +174,7 @@ async def get_nutrition_summary(
 
     result = await db.execute(
         select(MealPlan).where(
-            (MealPlan.user_id == current_user["sub"])
+            (MealPlan.user_id == view_user_id)
             & (MealPlan.date >= start_date)
             & (MealPlan.date <= end_date)
         )

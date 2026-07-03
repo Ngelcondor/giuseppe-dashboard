@@ -12,6 +12,7 @@ from sqlalchemy import delete as sa_delete
 from app.core.crypto import decrypt_or_plain, encrypt_str
 from app.core.database import get_db
 from app.core.security import get_current_user, require_editor
+from app.core.sections import get_view_user_id
 from app.models.calendar_connection import CalendarConnection
 from app.models.calendar_event import CalendarEvent
 from app.schemas.calendar_connection import (
@@ -94,30 +95,45 @@ async def create_connection(
     return CalendarConnectionResponse.from_orm(connection)
 
 
+def _mask_username(resp: CalendarConnectionResponse) -> CalendarConnectionResponse:
+    """Offusca lo username CalDAV (Apple ID dell'admin) nelle viste ospite:
+    l'ospite deve vedere lo STATO della connessione, non metà credenziale."""
+    if resp.username:
+        resp.username = resp.username[:2] + "•••"
+    return resp
+
+
 @router.get("", response_model=List[CalendarConnectionResponse])
 async def list_connections(
     current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> List[CalendarConnectionResponse]:
     """Elenca tutte le connessioni CalDAV dell'utente."""
     result = await db.execute(
         select(CalendarConnection)
-        .where(CalendarConnection.user_id == current_user["sub"])
+        .where(CalendarConnection.user_id == view_user_id)
         .order_by(CalendarConnection.created_at.desc())
     )
     connections = result.scalars().all()
-    return [CalendarConnectionResponse.from_orm(c) for c in connections]
+    borrowed = current_user["sub"] != view_user_id  # guest che guarda i dati admin
+    return [
+        _mask_username(r) if borrowed else r
+        for r in (CalendarConnectionResponse.from_orm(c) for c in connections)
+    ]
 
 
 @router.get("/{connection_id}", response_model=CalendarConnectionResponse)
 async def get_connection(
     connection_id: str,
     current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> CalendarConnectionResponse:
     """Dettaglio di una connessione CalDAV."""
-    connection = await _get_user_connection(connection_id, current_user["sub"], db)
-    return CalendarConnectionResponse.from_orm(connection)
+    connection = await _get_user_connection(connection_id, view_user_id, db)
+    resp = CalendarConnectionResponse.from_orm(connection)
+    return _mask_username(resp) if current_user["sub"] != view_user_id else resp
 
 
 @router.patch("/{connection_id}", response_model=CalendarConnectionResponse)
@@ -205,11 +221,11 @@ async def test_connection(
 @router.get("/{connection_id}/calendars", response_model=List[CalDAVCalendarInfoSchema])
 async def list_remote_calendars(
     connection_id: str,
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> List[CalDAVCalendarInfoSchema]:
     """Lista i calendari disponibili sul server CalDAV remoto."""
-    connection = await _get_user_connection(connection_id, current_user["sub"], db)
+    connection = await _get_user_connection(connection_id, view_user_id, db)
 
     service = CalDAVService(
         url=connection.caldav_url,

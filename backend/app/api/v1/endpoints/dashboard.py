@@ -5,7 +5,8 @@ from sqlalchemy.future import select
 from datetime import date
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_editor
+from app.core.security import require_editor
+from app.core.sections import get_view_user_id
 from app.models.user import User
 from app.models.deadline import Deadline
 
@@ -14,11 +15,11 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 @router.get("/widgets")
 async def get_dashboard_widgets(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """Get user's dashboard widget configuration."""
-    user_id = current_user["sub"]
+    user_id = view_user_id
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalars().first()
 
@@ -60,11 +61,11 @@ async def update_dashboard_layout(
 
 @router.get("/next-task")
 async def get_next_task(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """Get the single most important task."""
-    user_id = current_user["sub"]
+    user_id = view_user_id
     today = date.today()
 
     # Get overdue or urgent deadlines first

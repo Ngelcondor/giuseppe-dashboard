@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.sections import get_view_user_id
 from app.services.settings_store import get_setting
 
 router = APIRouter(prefix="/calendar/sync", tags=["calendar-integration"])
@@ -60,11 +60,11 @@ def _load_google_credentials(cfg: Dict[str, Any]):
 
 @router.get("/status")
 async def calendar_status(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """Report whether Google Calendar is connected for the current user."""
-    cfg = await get_setting(db, current_user["sub"], SETTING_KEY)
+    cfg = await get_setting(db, view_user_id, SETTING_KEY)
     connected = _is_connected(cfg)
     return {
         "provider": "google_calendar",
@@ -80,7 +80,7 @@ async def calendar_status(
 
 @router.get("/events")
 async def calendar_events(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
     """Return Google Calendar events, or an honest not-connected payload.
@@ -90,7 +90,7 @@ async def calendar_events(
     real events. Until then we never invent events — we return an empty list
     with `connected: false`.
     """
-    cfg = await get_setting(db, current_user["sub"], SETTING_KEY)
+    cfg = await get_setting(db, view_user_id, SETTING_KEY)
 
     if not _is_connected(cfg):
         return {
