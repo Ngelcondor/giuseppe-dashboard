@@ -10,6 +10,7 @@ from calendar import monthrange
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_editor
+from app.core.sections import get_view_user_id
 from app.models.budget import (
     Transaction,
     BudgetGoal,
@@ -246,11 +247,11 @@ async def bank_auth_callback(
 
 @router.get("/bank/connection", response_model=Optional[BankConnectionResponse])
 async def get_bank_connection(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """Get the current active bank connection."""
-    connection = await _active_connection(db, current_user["sub"])
+    connection = await _active_connection(db, view_user_id)
     if not connection:
         return None
     return BankConnectionResponse.from_orm(connection)
@@ -258,11 +259,11 @@ async def get_bank_connection(
 
 @router.get("/bank/balance", response_model=List[BankBalanceResponse])
 async def get_bank_balance(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> List[BankBalanceResponse]:
     """Get current bank account balance."""
-    connection = await _active_connection(db, current_user["sub"])
+    connection = await _active_connection(db, view_user_id)
     if not connection or not connection.account_id:
         raise HTTPException(status_code=404, detail="Nessun conto bancario collegato")
 
@@ -514,11 +515,11 @@ async def list_transactions(
     source: Optional[TransactionSource] = Query(None),
     limit: int = Query(50, ge=1, le=1000),
     offset: int = Query(0, ge=0),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> List[TransactionResponse]:
     """List transactions with optional filters."""
-    query = select(Transaction).where(Transaction.user_id == current_user["sub"])
+    query = select(Transaction).where(Transaction.user_id == view_user_id)
 
     if month and year:
         start = date(year, month, 1)
@@ -541,14 +542,14 @@ async def list_transactions(
 @router.get("/transactions/{transaction_id}", response_model=TransactionResponse)
 async def get_transaction(
     transaction_id: str,
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> TransactionResponse:
     """Get a specific transaction."""
     result = await db.execute(
         select(Transaction).where(
             (Transaction.id == transaction_id)
-            & (Transaction.user_id == current_user["sub"])
+            & (Transaction.user_id == view_user_id)
         )
     )
     transaction = result.scalars().first()
@@ -666,7 +667,7 @@ async def recategorize_transactions(
 async def get_budget_dashboard(
     month: int = Query(None),
     year: int = Query(None),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> BudgetDashboard:
     """
@@ -690,7 +691,7 @@ async def get_budget_dashboard(
     # ── 1. Bank connection & balance ──────────────────────────────────────────
     result = await db.execute(
         select(BankConnection).where(
-            (BankConnection.user_id == current_user["sub"])
+            (BankConnection.user_id == view_user_id)
             & (BankConnection.status == BankConnectionStatus.ACTIVE)
         ).order_by(BankConnection.created_at.desc())
     )
@@ -731,7 +732,7 @@ async def get_budget_dashboard(
     # ── 2. Monthly transactions ───────────────────────────────────────────────
     result = await db.execute(
         select(Transaction).where(
-            (Transaction.user_id == current_user["sub"])
+            (Transaction.user_id == view_user_id)
             & (Transaction.date >= month_start)
             & (Transaction.date <= month_end)
         ).order_by(Transaction.date.desc())
@@ -762,7 +763,7 @@ async def get_budget_dashboard(
     # Get budget goals for this month
     result = await db.execute(
         select(BudgetGoal).where(
-            (BudgetGoal.user_id == current_user["sub"])
+            (BudgetGoal.user_id == view_user_id)
             & (BudgetGoal.month >= month_start)
             & (BudgetGoal.month <= month_end)
         )
@@ -849,7 +850,7 @@ async def get_budget_dashboard(
 async def get_budget_summary(
     month: int = Query(None),
     year: int = Query(None),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> BudgetSummary:
     """Get budget summary for a month."""
@@ -863,7 +864,7 @@ async def get_budget_summary(
 
     result = await db.execute(
         select(Transaction).where(
-            (Transaction.user_id == current_user["sub"])
+            (Transaction.user_id == view_user_id)
             & (Transaction.date >= start)
             & (Transaction.date <= end)
         )
@@ -882,7 +883,7 @@ async def get_budget_summary(
     # Get budget goals
     result = await db.execute(
         select(BudgetGoal).where(
-            (BudgetGoal.user_id == current_user["sub"])
+            (BudgetGoal.user_id == view_user_id)
             & (BudgetGoal.month >= start)
             & (BudgetGoal.month <= end)
         )
@@ -911,7 +912,7 @@ async def get_budget_summary(
 @router.get("/trends", response_model=BudgetTrends)
 async def get_budget_trends(
     period: str = Query("3months"),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> BudgetTrends:
     """Get budget trends."""
@@ -943,7 +944,7 @@ async def get_budget_trends(
 
         result = await db.execute(
             select(Transaction).where(
-                (Transaction.user_id == current_user["sub"])
+                (Transaction.user_id == view_user_id)
                 & (Transaction.date >= start)
                 & (Transaction.date <= end)
             )
@@ -994,12 +995,12 @@ async def create_budget_goal(
 
 @router.get("/goals", response_model=List[BudgetGoalResponse])
 async def list_budget_goals(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> List[BudgetGoalResponse]:
     """List budget goals."""
     result = await db.execute(
-        select(BudgetGoal).where(BudgetGoal.user_id == current_user["sub"])
+        select(BudgetGoal).where(BudgetGoal.user_id == view_user_id)
     )
     goals = result.scalars().all()
     return [BudgetGoalResponse.from_orm(g) for g in goals]

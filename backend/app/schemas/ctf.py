@@ -29,9 +29,16 @@ class CTFPlatformUpdate(BaseModel):
     api_key_encrypted: Optional[str] = None
 
 
-class CTFPlatformResponse(CTFPlatformBase):
-    """CTF platform response schema."""
+class CTFPlatformResponse(BaseModel):
+    """CTF platform response schema.
 
+    NON eredita da Base: api_key_encrypted è write-only (Create/Update) e non
+    deve mai comparire nelle risposte — tantomeno nelle viste ospite.
+    """
+
+    platform_name: CTFPlatformName
+    username: str
+    profile_url: Optional[str] = None
     id: uuid.UUID
     user_id: uuid.UUID
     created_at: datetime

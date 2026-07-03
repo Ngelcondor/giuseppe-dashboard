@@ -9,6 +9,7 @@ from typing import List
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_editor
+from app.core.sections import get_view_user_id
 from app.models.health import SleepSession, SleepPhaseEntry
 from app.schemas.health import (
     SleepSessionCreate,
@@ -74,10 +75,10 @@ async def create_sleep_session(
 async def list_sleep_sessions(
     days: int = Query(30),
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
 ) -> List[SleepSessionResponse]:
     """List sleep sessions for the last N days."""
-    user_id = current_user["sub"]
+    user_id = view_user_id
     start_date = datetime.utcnow() - timedelta(days=days)
     result = await db.execute(
         select(SleepSession)
@@ -95,10 +96,10 @@ async def list_sleep_sessions(
 @router.get("/last-night", response_model=SleepSessionResponse)
 async def get_last_night(
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
 ) -> SleepSessionResponse:
     """Get last night's sleep session."""
-    user_id = current_user["sub"]
+    user_id = view_user_id
     result = await db.execute(
         select(SleepSession)
         .where(SleepSession.user_id == user_id)
@@ -115,10 +116,10 @@ async def get_last_night(
 @router.get("/morning-report", response_model=SleepMorningReport)
 async def get_morning_report(
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
 ) -> SleepMorningReport:
     """Get the morning report based on last night's sleep."""
-    user_id = current_user["sub"]
+    user_id = view_user_id
     result = await db.execute(
         select(SleepSession)
         .where(SleepSession.user_id == user_id)
@@ -179,10 +180,10 @@ async def get_morning_report(
 @router.get("/week-summary", response_model=SleepWeekSummary)
 async def get_week_summary(
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
 ) -> SleepWeekSummary:
     """Get weekly sleep summary."""
-    user_id = current_user["sub"]
+    user_id = view_user_id
     start_date = datetime.utcnow() - timedelta(days=7)
     result = await db.execute(
         select(SleepSession)
@@ -230,10 +231,10 @@ async def get_week_summary(
 async def get_sleep_session(
     session_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
 ) -> SleepSessionResponse:
     """Get a specific sleep session with phase data."""
-    user_id = current_user["sub"]
+    user_id = view_user_id
     result = await db.execute(
         select(SleepSession).where(
             (SleepSession.id == session_id)

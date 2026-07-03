@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_editor
+from app.core.sections import get_view_user_id
 from app.models.habit import Habit, HabitLog
 
 router = APIRouter(
@@ -101,9 +102,9 @@ async def _compute_streaks(habit_id: UUID, db: AsyncSession):
 @router.get("", response_model=List[HabitOut])
 async def list_habits(
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
 ):
-    user_id = UUID(current_user["sub"])
+    user_id = UUID(view_user_id)
     result = await db.execute(
         select(Habit).where(Habit.user_id == user_id, Habit.is_active == True)
     )
@@ -213,10 +214,10 @@ async def get_heatmap(
     habit_id: UUID,
     days: int = 365,
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
 ):
     """Return day-by-day completion for heatmap (last N days)."""
-    user_id = UUID(current_user["sub"])
+    user_id = UUID(view_user_id)
 
     # Verify habit belongs to current user
     habit_check = await db.execute(

@@ -28,6 +28,33 @@ SECTION_KEYS = [
 ]
 
 
+async def get_view_user_id(
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> str:
+    """ID dell'utente di cui LEGGERE i dati.
+
+    L'app è single-tenant: i dati appartengono all'admin. Un ospite (che ha già
+    passato require_section sul router) deve leggere i dati dell'admin, non i
+    propri — che non esistono. Da usare SOLO nelle letture: le scritture restano
+    su current_user["sub"] e per i guest sono comunque bloccate da require_editor.
+    Esclusi per design: settings (credenziali), notifiche, api-token — restano
+    per-utente.
+    """
+    result = await db.execute(select(User).where(User.id == current_user["sub"]))
+    user = result.scalars().first()
+    if not user or (user.role or "admin") != "guest":
+        return current_user["sub"]
+    admin = await db.execute(
+        select(User)
+        .where(User.role == "admin", User.is_active.is_(True))
+        .order_by(User.created_at)
+        .limit(1)
+    )
+    owner = admin.scalars().first()
+    return str(owner.id) if owner else current_user["sub"]
+
+
 def require_section(section: str):
     """Dependency factory: consente admin sempre, guest solo se la sezione
     è tra le sue allowed_sections (o se il campo è NULL = tutte)."""

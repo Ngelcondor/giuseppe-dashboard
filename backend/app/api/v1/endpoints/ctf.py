@@ -5,7 +5,8 @@ from sqlalchemy.future import select
 from typing import List
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_editor
+from app.core.security import require_editor
+from app.core.sections import get_view_user_id
 from app.models.ctf import CTFPlatform, CTFChallenge
 from app.schemas.ctf import (
     CTFPlatformCreate, CTFPlatformResponse, CTFPlatformUpdate,
@@ -35,12 +36,12 @@ async def create_ctf_platform(
 
 @router.get("/platforms", response_model=List[CTFPlatformResponse])
 async def list_ctf_platforms(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> List[CTFPlatformResponse]:
     """List CTF platforms."""
     result = await db.execute(
-        select(CTFPlatform).where(CTFPlatform.user_id == current_user["sub"])
+        select(CTFPlatform).where(CTFPlatform.user_id == view_user_id)
     )
     platforms = result.scalars().all()
     return [CTFPlatformResponse.from_orm(p) for p in platforms]
@@ -49,14 +50,14 @@ async def list_ctf_platforms(
 @router.get("/platforms/{platform_id}", response_model=CTFPlatformResponse)
 async def get_ctf_platform(
     platform_id: str,
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> CTFPlatformResponse:
     """Get a specific CTF platform."""
     result = await db.execute(
         select(CTFPlatform).where(
             (CTFPlatform.id == platform_id)
-            & (CTFPlatform.user_id == current_user["sub"])
+            & (CTFPlatform.user_id == view_user_id)
         )
     )
     platform = result.scalars().first()
@@ -136,11 +137,11 @@ async def create_ctf_challenge(
 @router.get("/challenges", response_model=List[CTFChallengeResponse])
 async def list_ctf_challenges(
     platform_id: str = None,
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> List[CTFChallengeResponse]:
     """List CTF challenges."""
-    query = select(CTFChallenge).where(CTFChallenge.user_id == current_user["sub"])
+    query = select(CTFChallenge).where(CTFChallenge.user_id == view_user_id)
 
     if platform_id:
         query = query.where(CTFChallenge.platform_id == platform_id)
@@ -153,14 +154,14 @@ async def list_ctf_challenges(
 @router.get("/challenges/{challenge_id}", response_model=CTFChallengeResponse)
 async def get_ctf_challenge(
     challenge_id: str,
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> CTFChallengeResponse:
     """Get a specific CTF challenge."""
     result = await db.execute(
         select(CTFChallenge).where(
             (CTFChallenge.id == challenge_id)
-            & (CTFChallenge.user_id == current_user["sub"])
+            & (CTFChallenge.user_id == view_user_id)
         )
     )
     challenge = result.scalars().first()
@@ -221,12 +222,12 @@ async def delete_ctf_challenge(
 
 @router.get("/stats", response_model=CTFStats)
 async def get_ctf_stats(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> CTFStats:
     """Get CTF statistics."""
     result = await db.execute(
-        select(CTFChallenge).where(CTFChallenge.user_id == current_user["sub"])
+        select(CTFChallenge).where(CTFChallenge.user_id == view_user_id)
     )
     challenges = result.scalars().all()
 
@@ -262,14 +263,14 @@ async def get_ctf_stats(
 @router.get("/progress/{platform_id}", response_model=CTFProgress)
 async def get_ctf_progress(
     platform_id: str,
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> CTFProgress:
     """Get CTF progress for a platform."""
     result = await db.execute(
         select(CTFPlatform).where(
             (CTFPlatform.id == platform_id)
-            & (CTFPlatform.user_id == current_user["sub"])
+            & (CTFPlatform.user_id == view_user_id)
         )
     )
     platform = result.scalars().first()

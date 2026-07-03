@@ -6,7 +6,8 @@ from datetime import datetime, timedelta
 from typing import List
 
 from app.core.database import get_db
-from app.core.security import get_current_user, require_editor
+from app.core.security import require_editor
+from app.core.sections import get_view_user_id
 from app.models.calendar_event import CalendarEvent
 from app.schemas.calendar_event import (
     CalendarEventCreate,
@@ -46,13 +47,13 @@ async def create_event(
     response_model_by_alias=True,
 )
 async def list_events(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> List[CalendarEventResponse]:
     """List all calendar events."""
     result = await db.execute(
         select(CalendarEvent)
-        .where(CalendarEvent.user_id == current_user["sub"])
+        .where(CalendarEvent.user_id == view_user_id)
         .order_by(CalendarEvent.start_time)
     )
     events = result.scalars().all()
@@ -66,14 +67,14 @@ async def list_events(
 )
 async def get_event(
     event_id: str,
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> CalendarEventResponse:
     """Get a specific event."""
     result = await db.execute(
         select(CalendarEvent).where(
             (CalendarEvent.id == event_id)
-            & (CalendarEvent.user_id == current_user["sub"])
+            & (CalendarEvent.user_id == view_user_id)
         )
     )
     event = result.scalars().first()
@@ -142,7 +143,7 @@ async def delete_event(
     response_model_by_alias=True,
 )
 async def get_upcoming_events(
-    current_user: dict = Depends(get_current_user),
+    view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> CalendarUpcomingResponse:
     """Get upcoming events."""
@@ -153,7 +154,7 @@ async def get_upcoming_events(
     # Events in next 7 days
     result = await db.execute(
         select(CalendarEvent).where(
-            (CalendarEvent.user_id == current_user["sub"])
+            (CalendarEvent.user_id == view_user_id)
             & (CalendarEvent.start_time >= now)
             & (CalendarEvent.start_time <= next_7_days)
         )
@@ -163,7 +164,7 @@ async def get_upcoming_events(
     # Events in next 30 days
     result = await db.execute(
         select(CalendarEvent).where(
-            (CalendarEvent.user_id == current_user["sub"])
+            (CalendarEvent.user_id == view_user_id)
             & (CalendarEvent.start_time >= next_7_days)
             & (CalendarEvent.start_time <= next_30_days)
         )
