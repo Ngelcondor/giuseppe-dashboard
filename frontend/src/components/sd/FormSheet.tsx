@@ -57,7 +57,9 @@ export function Sheet({
         className="sd-sheet"
         onMouseDown={(e) => e.stopPropagation()}
         style={{
-          width: '100%', maxWidth, maxHeight: 'min(90vh, 90dvh)', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          // max-height sta in .sd-sheet (globals.css): 90vh con override 90dvh,
+          // il fallback a coppia non è esprimibile in uno style inline.
+          width: '100%', maxWidth, display: 'flex', flexDirection: 'column', overflow: 'hidden',
           background: 'rgb(var(--color-card))',
           borderRadius: 22, border: '1px solid rgb(var(--color-border))',
           boxShadow: '0 24px 64px rgba(17,17,26,.22), 0 2px 8px rgba(17,17,26,.08)',

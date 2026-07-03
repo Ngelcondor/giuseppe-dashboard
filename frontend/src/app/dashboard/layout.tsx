@@ -88,12 +88,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => { cancelAnimationFrame(r1); clearTimeout(t1); clearTimeout(t2); };
   }, [pathname]);
 
-  // Sulla pill bar mobile (nav orizzontale scrollabile) porta la voce attiva in
-  // vista al cambio route; block:'nearest' evita scroll verticali della pagina.
+  // Sulla pill bar mobile (nav orizzontale scrollabile) centra la voce attiva
+  // al cambio route. Scroll SOLO orizzontale e SOLO del contenitore nav:
+  // scrollIntoView toccherebbe anche lo scroll di pagina, rompendo la
+  // restoration del Back e causando jump verticali.
   useEffect(() => {
-    document
-      .querySelector('.sd-nav [data-active="true"]')
-      ?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    const nav = document.querySelector('.sd-nav');
+    const el = nav?.querySelector('[data-active="true"]');
+    if (!nav || !el || nav.scrollWidth <= nav.clientWidth) return;
+    const navRect = nav.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    nav.scrollLeft += elRect.left - navRect.left - (nav.clientWidth - elRect.width) / 2;
   }, [pathname]);
 
   const animClass = phase === 'in' ? ' sd-anim' : phase === 'lit' ? ' sd-anim sd-lit' : '';

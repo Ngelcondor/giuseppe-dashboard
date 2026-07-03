@@ -96,7 +96,7 @@ export default function NotificationsPage() {
         {unreadCount > 0 && (
           <button
             onClick={handleMarkAllRead}
-            className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 py-2"
+            className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 py-2 -my-2"
           >
             <CheckCheck size={14} /> Segna tutte come lette
           </button>
@@ -166,11 +166,11 @@ export default function NotificationsPage() {
                   <p className="text-xs text-body mt-0.5">{notif.message}</p>
                   <p className="text-[10px] text-muted mt-1">{timeAgo(notif.created_at)}</p>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-1 flex-shrink-0">
                   {!notif.is_read && (
                     <button
                       onClick={() => handleMarkRead(notif.id)}
-                      className="p-2.5 rounded-lg hover:bg-surface-hover text-tertiary hover:text-emerald-400 transition-colors"
+                      className="p-1 sd-touchbtn rounded-lg hover:bg-surface-hover text-tertiary hover:text-emerald-400 transition-colors"
                       title="Segna come letta"
                     >
                       <Check size={14} />
@@ -178,7 +178,7 @@ export default function NotificationsPage() {
                   )}
                   <button
                     onClick={() => handleDelete(notif.id)}
-                    className="p-2.5 rounded-lg hover:bg-red-600/10 text-muted hover:text-red-400 transition-colors"
+                    className="p-1 sd-touchbtn rounded-lg hover:bg-red-600/10 text-muted hover:text-red-400 transition-colors"
                     title="Elimina"
                   >
                     <Trash2 size={14} />

@@ -293,9 +293,9 @@ function ConsumptionBlock() {
         <div style={{ display: 'inline-flex', background: 'rgb(var(--color-card-inner))', borderRadius: 10, padding: 3, gap: 2 }}>
           {(['day', 'week', 'month'] as ShellyPeriod[]).map((p) => (
             <button
-              key={p} onClick={() => setPeriod(p)}
+              key={p} onClick={() => setPeriod(p)} className="sd-touchpad-y"
               style={{
-                border: 'none', cursor: 'pointer', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 500,
+                border: 'none', cursor: 'pointer', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 500,
                 background: period === p ? 'rgb(var(--color-card))' : 'transparent',
                 color: period === p ? 'rgb(var(--color-heading))' : 'rgb(var(--color-tertiary))',
                 boxShadow: period === p ? '0 1px 2px rgba(17,17,26,.08)' : 'none',

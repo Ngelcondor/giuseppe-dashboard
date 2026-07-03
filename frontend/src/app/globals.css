@@ -566,7 +566,12 @@ input[type='checkbox'], input[type='radio'] {
 .sd-root { font-family: 'Inter Tight', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 .sd-shell { display: grid; grid-template-columns: 252px minmax(0, 1fr); min-height: 100vh; }
 .sd-side { position: sticky; top: 0; height: 100vh; height: 100dvh; overflow: auto; }
-.sd-main { padding: 38px clamp(16px, 4.5vw, 44px) 64px; }
+.sd-main {
+  padding: 38px clamp(16px, 4.5vw, 44px) 64px;
+  /* landscape su iPhone con notch/Dynamic Island: il contenuto non ci va sotto */
+  padding-left: max(clamp(16px, 4.5vw, 44px), env(safe-area-inset-left));
+  padding-right: max(clamp(16px, 4.5vw, 44px), env(safe-area-inset-right));
+}
 .sd-main-inner { max-width: 1140px; margin: 0 auto; }
 .sd-grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
 .sd-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
@@ -598,8 +603,9 @@ input[type='checkbox'], input[type='radio'] {
   .sd-side {
     position: static; height: auto;
     border-right: none !important; border-bottom: 1px solid rgb(var(--color-border));
-    padding: calc(12px + env(safe-area-inset-top)) 14px 6px !important;
+    padding: calc(12px + env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 6px max(14px, env(safe-area-inset-left)) !important;
   }
+  .sd-t-noindent { border-left: none !important; padding-left: 0 !important; }
   .sd-sideflow { display: flex; flex-direction: column; gap: 10px; }
   .sd-nav {
     flex-direction: row !important; margin: 0 -14px !important; padding: 0 10px;
@@ -624,6 +630,8 @@ input[type='checkbox'], input[type='radio'] {
   .sd-m-full { flex-basis: 100% !important; }
   .sd-m-auto { margin-left: auto !important; }
   .sd-m-noindent { border-left: none !important; padding-left: 0 !important; }
+  /* colonna importi compatta dove la data è nascosta (liste transazioni) */
+  .sd-m-minw64 { min-width: 64px !important; }
 }
 
 @keyframes sdFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
@@ -657,7 +665,9 @@ input[type='checkbox'], input[type='radio'] {
 @keyframes sdFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes sdSheetIn { from { opacity: 0; transform: translateY(10px) scale(.975); } to { opacity: 1; transform: none; } }
 .sd-sheet-backdrop { animation: sdFade .18s ease; }
-.sd-sheet { animation: sdSheetIn .24s cubic-bezier(.32,.72,0,1); }
+/* max-height a coppia: 90dvh dove supportato (tiene conto delle toolbar iOS),
+   90vh come fallback — non esprimibile nello style inline del componente. */
+.sd-sheet { animation: sdSheetIn .24s cubic-bezier(.32,.72,0,1); max-height: 90vh; max-height: 90dvh; }
 @media (prefers-reduced-motion: reduce) { .sd-sheet, .sd-sheet-backdrop { animation: none; } }
 [data-stim="on"] .sd-sheet, [data-stim="on"] .sd-sheet-backdrop { animation: none !important; }
 
@@ -706,6 +716,10 @@ input[type='checkbox'], input[type='radio'] {
   .sd-input, .sd-select, .sd-textarea { font-size: 16px; }
   .sd-iconbtn { padding: 12px; }
   .sd-checkbtn { padding: 10px !important; margin: -10px !important; box-sizing: content-box; }
+  /* bottoni icona non-sd (es. azioni notifiche): hit area ~34px solo su touch */
+  .sd-touchbtn { padding: 10px; }
+  /* segmented control / pill compatte: più alte solo su touch */
+  .sd-touchpad-y { padding-top: 9px !important; padding-bottom: 9px !important; }
 }
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -798,6 +812,8 @@ input[type='checkbox'], input[type='radio'] {
 @media (max-width: 920px) {
   .sd-gyro-wrap { display: none; }
   .sd-bgglow.a, .sd-bgglow.b { animation: none; opacity: .35; }
+  /* il low-stim resta più scuro anche su mobile (vincerebbe la regola sopra) */
+  [data-stim='on'] .sd-bgglow.a, [data-stim='on'] .sd-bgglow.b { opacity: .16; }
 }
 
 /* ── light theme: background layers ── */

@@ -323,7 +323,7 @@ export default function BudgetPage() {
                 <span style={{ fontSize: 13, color: 'rgb(var(--color-tertiary))' }}>· {data.bank_currency} · ultimo sync {fmtSync(data.bank_last_sync)}</span>
               </div>
             </div>
-            <div className="sd-m-full sd-m-noindent" style={{ display: 'flex', gap: 36, alignItems: 'center', paddingLeft: 36, borderLeft: '1px solid rgb(var(--color-border))', flexWrap: 'wrap' }}>
+            <div className="sd-m-full sd-t-noindent" style={{ display: 'flex', gap: 36, alignItems: 'center', paddingLeft: 36, borderLeft: '1px solid rgb(var(--color-border))', flexWrap: 'wrap' }}>
               <Stat label="Entrate" value={eur(income)} color="rgb(16 185 129)" />
               <Stat label="Uscite" value={eur(spent)} color="rgb(239 68 68)" />
               <Stat label="Netto" value={(net >= 0 ? '+' : '−') + eur(Math.abs(net)).replace('−', '')} />
@@ -588,7 +588,7 @@ function TxList({ txs, onDel, onEdit }: { txs: TxView[]; onDel: (t: TxView) => v
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 'none' }}>
             <span className="sd-m-hide" style={{ fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-muted))' }}>{t.dateLabel}</span>
-            <span style={{ fontFamily: mono, fontSize: 14, fontWeight: 600, color: t.amount > 0 ? 'rgb(16 185 129)' : 'rgb(239 68 68)', minWidth: 64, textAlign: 'right' }}>{eur(t.amount, true)}</span>
+            <span className="sd-m-minw64" style={{ fontFamily: mono, fontSize: 14, fontWeight: 600, color: t.amount > 0 ? 'rgb(16 185 129)' : 'rgb(239 68 68)', minWidth: 80, textAlign: 'right' }}>{eur(t.amount, true)}</span>
             <button className="sd-iconbtn sd-fin-del" aria-label="Elimina movimento" onClick={() => onDel(t)}><Trash2 size={14} /></button>
           </div>
         </div>
