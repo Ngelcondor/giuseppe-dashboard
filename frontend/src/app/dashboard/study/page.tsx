@@ -240,7 +240,7 @@ export default function StudyPage() {
       {!errored && !hasPlan && (
         <div className="sd-reveal sd-shadow" style={{ ['--i' as string]: 1, ...card, padding: '30px 28px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 14 }}>
           <p style={{ margin: 0, fontSize: 14.5, color: 'rgb(var(--color-tertiary))', lineHeight: 1.55, maxWidth: 560 }}>
-            Nessun percorso inizializzato. {isEditor ? 'Carica il curriculum CPTS ufficiale: 27 moduli con sottocapitoli, brief e link HTB diretti.' : 'Solo un editor può inizializzare il percorso.'}
+            Nessun percorso inizializzato. {isEditor ? 'Carica il curriculum CPTS ufficiale: 28 moduli con sottocapitoli, brief e link HTB diretti.' : 'Solo un editor può inizializzare il percorso.'}
           </p>
           {isEditor && <Button size="sm" variant="primary" onClick={() => setResetOpen(true)}><RotateCcw size={15} style={{ marginRight: 6 }} />Inizializza percorso</Button>}
         </div>
@@ -545,8 +545,8 @@ function ResetForm({ defaultStart, hasPlan, onSubmit, onCancel }: { defaultStart
     <form onSubmit={submit}>
       <p style={{ margin: '0 0 14px', fontSize: 14, color: 'rgb(var(--color-tertiary))', lineHeight: 1.5 }}>
         {hasPlan
-          ? 'I 27 moduli e i loro sottocapitoli verranno ripristinati al curriculum CPTS ufficiale, segnati come da fare, e i link Obsidian rimossi. Il percorso riparte dalla settimana 1.'
-          : 'Verrà creato il percorso con i 27 moduli CPTS, sottocapitoli, brief e link HTB. Tutto parte come da fare.'}
+          ? 'I 28 moduli e i loro sottocapitoli verranno ripristinati al curriculum CPTS ufficiale, segnati come da fare, e i link Obsidian rimossi. Il percorso riparte dalla settimana 1.'
+          : 'Verrà creato il percorso con i 28 moduli CPTS, sottocapitoli, brief e link HTB. Tutto parte come da fare.'}
       </p>
       <Field label="Data di inizio"><input className="sd-input" type="date" value={start} onChange={(e) => setStart(e.target.value)} autoFocus /></Field>
       {error && <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'rgb(239 68 68)' }}>{error}</p>}
