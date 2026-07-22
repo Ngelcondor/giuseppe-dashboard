@@ -27,6 +27,7 @@ from app.models.study import (
     CPTS_CURRICULUM,
     CPTS_TOTAL_WEEKS,
     htb_module_url,
+    resync_curriculum,
 )
 from app.schemas.study import (
     StudyBatchEntry,
@@ -285,6 +286,108 @@ async def reset_plan(
                     title=s_title,
                     completed=False,
                     obsidian_link=None,
+                )
+            )
+
+    await db.commit()
+    await db.refresh(plan)
+    return await _serialize_plan(db, plan)
+
+
+@router.post("/resync", response_model=StudyPlanOut)
+async def resync_plan(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_editor),
+) -> StudyPlanOut:
+    """Reconcile the plan to the canonical CPTS curriculum, preserving progress.
+
+    Unlike ``/reset`` (which wipes completion + Obsidian links), this rebuilds the
+    module/section list to the canonical curriculum — updating titles, order,
+    briefs and HTB URLs — while carrying over each row's ``completed`` state and
+    ``obsidian_link`` by title match (module and section level). New rows (e.g.
+    the Getting Started module) start not-done; rows no longer in the curriculum
+    are dropped. The plan row itself (start_date / current_week) is untouched.
+    Editor-only and idempotent once the plan already matches the curriculum.
+    """
+    user_id = UUID(current_user["sub"])
+    plan = (
+        await db.execute(select(StudyPlan).where(StudyPlan.user_id == user_id))
+    ).scalars().first()
+    if plan is None:
+        raise HTTPException(status_code=404, detail="no plan to resync — POST /study/reset first")
+
+    # Snapshot the current plan (modules + their sections) for progress carry-over.
+    mod_rows = (
+        await db.execute(
+            select(StudyModule)
+            .where(StudyModule.plan_id == plan.id)
+            .order_by(StudyModule.order_index)
+        )
+    ).scalars().all()
+    mod_ids = [m.id for m in mod_rows]
+    sec_rows: list[StudyModuleSection] = []
+    if mod_ids:
+        sec_rows = list(
+            (
+                await db.execute(
+                    select(StudyModuleSection).where(StudyModuleSection.module_id.in_(mod_ids))
+                )
+            ).scalars().all()
+        )
+    secs_by_mod: dict = {}
+    for s in sec_rows:
+        secs_by_mod.setdefault(s.module_id, []).append(s)
+
+    snapshot = [
+        {
+            "title": m.title,
+            "completed": m.completed,
+            "completed_at": m.completed_at,
+            "obsidian_link": m.obsidian_link,
+            "sections": [
+                {
+                    "title": s.title,
+                    "completed": s.completed,
+                    "completed_at": s.completed_at,
+                    "obsidian_link": s.obsidian_link,
+                }
+                for s in sorted(secs_by_mod.get(m.id, []), key=lambda s: s.order_index)
+            ],
+        }
+        for m in mod_rows
+    ]
+
+    rebuilt = resync_curriculum(snapshot)
+
+    # Replace modules + sections; the StudyPlan row (start_date / week) is kept.
+    await db.execute(delete(StudyModuleSection).where(StudyModuleSection.user_id == user_id))
+    await db.execute(delete(StudyModule).where(StudyModule.user_id == user_id))
+    await db.flush()
+
+    for idx, entry in enumerate(rebuilt):
+        module = StudyModule(
+            user_id=user_id,
+            plan_id=plan.id,
+            order_index=idx,
+            title=entry["title"],
+            brief=entry["brief"],
+            htb_url=entry["htb_url"],
+            completed=entry["completed"],
+            completed_at=entry["completed_at"],
+            obsidian_link=entry["obsidian_link"],
+        )
+        db.add(module)
+        await db.flush()  # assign module.id
+        for s_idx, sec in enumerate(entry["sections"]):
+            db.add(
+                StudyModuleSection(
+                    user_id=user_id,
+                    module_id=module.id,
+                    order_index=s_idx,
+                    title=sec["title"],
+                    completed=sec["completed"],
+                    completed_at=sec["completed_at"],
+                    obsidian_link=sec["obsidian_link"],
                 )
             )
 

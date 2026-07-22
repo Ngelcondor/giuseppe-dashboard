@@ -12,6 +12,7 @@ Two complementary stores live here:
 """
 from sqlalchemy import Column, String, Boolean, DateTime, Date, Integer, ForeignKey, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
+import re
 import uuid
 from datetime import datetime, date
 
@@ -435,6 +436,100 @@ CPTS_MODULES: list[str] = [m["title"] for m in CPTS_CURRICULUM]
 
 # CPTS exam/study horizon used by the Studio page header (settimana x / N).
 CPTS_TOTAL_WEEKS: int = 13
+
+
+# ── Progress-preserving reconcile (used by POST /study/reset vs /study/resync) ─
+# `reset` wipes progress; `resync` rebuilds the plan to this canonical curriculum
+# while carrying over the user's completion state and Obsidian links by title.
+_TITLE_NORM = re.compile(r"[^a-z0-9]+")
+
+
+def _norm_title(s: str | None) -> str:
+    return _TITLE_NORM.sub("", (s or "").lower())
+
+
+def _carry_progress(old: list[dict], new_titles: list[str]) -> list[dict]:
+    """Map preserved ``{completed, completed_at, obsidian_link}`` onto ``new_titles``.
+
+    An exact normalised title match carries completion *and* the Obsidian link.
+    A prefix-tolerant fallback (either direction, like the note reconcile logic)
+    carries completion only — a link is title-specific, so it is never moved to a
+    differently-named row. Each old row is consumed at most once.
+    """
+    by_norm: dict[str, dict] = {}
+    for it in old:
+        by_norm.setdefault(_norm_title(it["title"]), it)
+    used: set[str] = set()
+    out: list[dict] = []
+    for title in new_titles:
+        nk = _norm_title(title)
+        exact = by_norm.get(nk)
+        if exact is not None and nk not in used:
+            used.add(nk)
+            out.append({
+                "completed": exact.get("completed", False),
+                "completed_at": exact.get("completed_at"),
+                "obsidian_link": exact.get("obsidian_link"),
+            })
+            continue
+        prefix: dict | None = None
+        if len(nk) >= 4:
+            for ok, it in by_norm.items():
+                if ok in used or len(ok) < 4:
+                    continue
+                if nk.startswith(ok) or ok.startswith(nk):
+                    used.add(ok)
+                    prefix = it
+                    break
+        out.append({
+            "completed": bool(prefix and prefix.get("completed")),
+            "completed_at": prefix.get("completed_at") if prefix else None,
+            "obsidian_link": None,
+        })
+    return out
+
+
+def resync_curriculum(existing_modules: list[dict]) -> list[dict]:
+    """Rebuild the canonical CPTS plan while carrying over user progress.
+
+    ``existing_modules`` is the current plan snapshot::
+
+        [{"title", "completed", "completed_at", "obsidian_link",
+          "sections": [{"title", "completed", "completed_at", "obsidian_link"}]}]
+
+    Returns canonical module dicts (title / brief / htb_url come from
+    ``CPTS_CURRICULUM``) with ``completed`` / ``completed_at`` / ``obsidian_link``
+    preserved by title match at both module and section level. Rows no longer in
+    the curriculum are dropped; new ones (e.g. Getting Started) start not-done
+    with no link. Idempotent once the plan already matches the curriculum.
+    """
+    mod_carry = _carry_progress(
+        [{
+            "title": m["title"],
+            "completed": m.get("completed", False),
+            "completed_at": m.get("completed_at"),
+            "obsidian_link": m.get("obsidian_link"),
+        } for m in existing_modules],
+        [e["title"] for e in CPTS_CURRICULUM],
+    )
+    old_by_mod = {_norm_title(m["title"]): m for m in existing_modules}
+    result: list[dict] = []
+    for entry, carried in zip(CPTS_CURRICULUM, mod_carry):
+        old = old_by_mod.get(_norm_title(entry["title"])) or {}
+        sec_carry = _carry_progress(old.get("sections", []), entry.get("sections", []))
+        result.append({
+            "title": entry["title"],
+            "brief": entry.get("brief"),
+            "htb_url": htb_module_url(entry.get("htb_id")),
+            "completed": carried["completed"],
+            "completed_at": carried["completed_at"],
+            "obsidian_link": carried["obsidian_link"],
+            "sections": [
+                {"title": t, **sc}
+                for t, sc in zip(entry.get("sections", []), sec_carry)
+            ],
+        })
+    return result
 
 
 class StudyTaskState(Base):
