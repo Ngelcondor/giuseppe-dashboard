@@ -139,6 +139,14 @@ export async function resetStudyPlan(startDate: string): Promise<StudyPlan> {
   return data;
 }
 
+// Reconcile the plan to the canonical CPTS curriculum WITHOUT losing progress:
+// updates titles/order/briefs/HTB URLs and adds new modules/sections, carrying
+// over each row's completion and Obsidian link by title match (editor-only).
+export async function resyncStudyPlan(): Promise<StudyPlan> {
+  const { data } = await api.post<StudyPlan>('/study/resync', {});
+  return data;
+}
+
 // Update a module's completion, Obsidian link and/or HTB URL (editor-only).
 // completed cascades to all sections. Pass '' to clear a link field.
 export async function updateStudyModule(

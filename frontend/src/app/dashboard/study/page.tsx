@@ -3,13 +3,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  Link2, ExternalLink, RotateCcw, Trophy, Award, Server, Cpu, Plug,
+  Link2, ExternalLink, RotateCcw, RefreshCw, Trophy, Award, Server, Cpu, Plug,
   CheckCircle2, Circle, ChevronDown, ChevronRight, ArrowRight, BookOpen, Pencil, FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Sheet, Field } from '@/components/sd/FormSheet';
 import {
-  getStudyPlan, resetStudyPlan, updateStudyModule, updateStudySection,
+  getStudyPlan, resetStudyPlan, resyncStudyPlan, updateStudyModule, updateStudySection,
   getHTBProfile, getIsEditor,
   type StudyPlan, type StudyModule, type StudyModuleSection, type HTBProfile,
 } from '@/services/studyService';
@@ -49,6 +49,7 @@ export default function StudyPage() {
 
   const [edit, setEdit] = useState<LinkEdit | null>(null);
   const [resetOpen, setResetOpen] = useState(false);
+  const [resyncOpen, setResyncOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const loadPlan = useCallback(async () => {
@@ -137,6 +138,10 @@ export default function StudyPage() {
     setExpanded(new Set());
     setResetOpen(false);
   };
+  const doResync = async () => {
+    setPlan(await resyncStudyPlan());
+    setResyncOpen(false);
+  };
   const toggleExpand = (id: string) =>
     setExpanded((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
@@ -153,6 +158,11 @@ export default function StudyPage() {
           <a href={OBSIDIAN_APP} style={{ textDecoration: 'none' }}>
             <Button size="sm" variant="secondary"><FileText size={15} style={{ marginRight: 6 }} />Apri Obsidian</Button>
           </a>
+          {isEditor && hasPlan && (
+            <Button size="sm" variant="secondary" onClick={() => setResyncOpen(true)}>
+              <RefreshCw size={15} style={{ marginRight: 6 }} />Risincronizza
+            </Button>
+          )}
           {isEditor && hasPlan && (
             <Button size="sm" variant="secondary" onClick={() => setResetOpen(true)}>
               <RotateCcw size={15} style={{ marginRight: 6 }} />Reset percorso
@@ -267,6 +277,11 @@ export default function StudyPage() {
             onCancel={() => setEdit(null)}
           />
         )}
+      </Sheet>
+
+      {/* ── Resync confirm sheet (non-destructive) ── */}
+      <Sheet open={resyncOpen} onClose={() => setResyncOpen(false)} title="Risincronizza curriculum" subtitle="Allinea a HTB mantenendo i progressi" maxWidth={440}>
+        <ResyncForm key={resyncOpen ? 'r' : 'c'} onSubmit={doResync} onCancel={() => setResyncOpen(false)} />
       </Sheet>
 
       {/* ── Reset confirm sheet ── */}
@@ -524,6 +539,32 @@ function LinkForm({ initial, mode, onSubmit, onCancel }: { initial: string; mode
           <Button type="button" variant="secondary" onClick={onCancel} disabled={submitting}>Annulla</Button>
           <Button type="submit" variant="primary" isLoading={submitting}>Salva</Button>
         </div>
+      </div>
+    </form>
+  );
+}
+
+/* ── Resync confirm form (non-destructive: keeps progress + Obsidian links) ── */
+function ResyncForm({ onSubmit, onCancel }: { onSubmit: () => Promise<void>; onCancel: () => void }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true); setError('');
+    try { await onSubmit(); }
+    catch { setError('Risincronizzazione non riuscita. Riprova.'); setSubmitting(false); }
+  };
+  return (
+    <form onSubmit={submit}>
+      <p style={{ margin: '0 0 14px', fontSize: 14, color: 'rgb(var(--color-tertiary))', lineHeight: 1.5 }}>
+        Aggiorna moduli e sottocapitoli al curriculum CPTS ufficiale (titoli, ordine, brief e link HTB) e
+        aggiunge quelli mancanti. <strong>Completamenti e link Obsidian vengono mantenuti</strong> dove i
+        titoli coincidono: niente viene azzerato.
+      </p>
+      {error && <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'rgb(239 68 68)' }}>{error}</p>}
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8, paddingTop: 6 }}>
+        <Button type="button" variant="secondary" onClick={onCancel} disabled={submitting}>Annulla</Button>
+        <Button type="submit" variant="primary" isLoading={submitting}>Risincronizza</Button>
       </div>
     </form>
   );
