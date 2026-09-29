@@ -7,6 +7,7 @@ from sqlalchemy import func
 from datetime import date, datetime, timedelta
 from typing import List, Optional
 from calendar import monthrange
+from collections import Counter
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_editor
@@ -14,13 +15,13 @@ from app.core.sections import get_view_user_id
 from app.models.budget import (
     Transaction,
     BudgetGoal,
+    BankAccount,
     BankConnection,
     BankConnectionStatus,
     TransactionType,
     TransactionSource,
 )
-from app.models.scadenza import Scadenza
-from app.models.deadline import Deadline, RecurrenceType as DeadlineRecurrenceType
+from app.models.deadline import Deadline
 from app.schemas.budget import (
     TransactionCreate,
     TransactionResponse,
@@ -37,34 +38,39 @@ from app.schemas.budget import (
     BankAuthInitRequest,
     BankAuthInitResponse,
     BankAuthCallbackRequest,
+    BankAccountResponse,
+    BankAccountSummary,
+    BankAccountUpdate,
+    CategoryLimitResponse,
+    CategoryLimitSet,
     BankBalanceResponse,
     InstitutionResponse,
     CSVImportResponse,
 )
 from app.services.bank_factory import get_bank_provider
-from app.services.category_service import categorize, subscription_keywords, TRANSFER_CATEGORY
+from app.services.bank_provider import BankSessionExpired
+from app.services.bank_sync_service import (
+    CONSENT_EXPIRED_MSG,
+    SESSION_REVOKED_MSG,
+    SUPERSEDED_MSG,
+    account_balances,
+    active_connection,
+    connection_accounts,
+    expire_connection,
+    latest_connection,
+    loose_sig,
+    save_accounts,
+    subscription_keywords_for,
+    sync_connection,
+    auto_tick_safely,
+)
+from app.services.category_service import categorize, TRANSFER_CATEGORY
+from app.services.deadline_ledger import in_range, rows_for, totals
 from app.services.csv_import_service import parse_revolut_csv
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/budget", tags=["budget"])
-
-
-async def _subscription_keywords(db: AsyncSession, user_id) -> set[str]:
-    """Match phrases for the user's subscriptions (from the Abbonamenti page)."""
-    result = await db.execute(
-        select(Deadline.title).where(
-            (Deadline.user_id == user_id)
-            & (Deadline.recurrence_type == DeadlineRecurrenceType.SUBSCRIPTION)
-        )
-    )
-    return subscription_keywords([t for (t,) in result.all()])
-
-MESI_NUM = {
-    "Gennaio": 1, "Febbraio": 2, "Marzo": 3, "Aprile": 4,
-    "Maggio": 5, "Giugno": 6, "Luglio": 7, "Agosto": 8,
-    "Settembre": 9, "Ottobre": 10, "Novembre": 11, "Dicembre": 12,
-}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -82,30 +88,6 @@ async def get_bank_status(
         "provider_available": provider is not None,
         "provider_name": provider.provider_name if provider else None,
     }
-
-
-async def _active_connection(db: AsyncSession, user_id) -> Optional[BankConnection]:
-    """Latest ACTIVE connection for the user, honestly expiring stale consents.
-
-    Il consenso PSD2 dura ~90 giorni (expires_at): se è passato, la connessione
-    viene marcata EXPIRED qui — così l'API non finge un conto collegato che il
-    provider rifiuterebbe, e il frontend torna a proporre il collegamento.
-    """
-    result = await db.execute(
-        select(BankConnection).where(
-            (BankConnection.user_id == user_id)
-            & (BankConnection.status == BankConnectionStatus.ACTIVE)
-        ).order_by(BankConnection.created_at.desc())
-    )
-    connection = result.scalars().first()
-    if connection and connection.expires_at and connection.expires_at < datetime.utcnow():
-        connection.status = BankConnectionStatus.EXPIRED
-        connection.last_sync_error = "Consenso PSD2 scaduto — ricollega il conto"
-        db.add(connection)
-        await db.commit()
-        logger.info("Bank connection %s expired (consent past expires_at)", connection.id)
-        return None
-    return connection
 
 
 @router.get("/bank/institutions", response_model=List[InstitutionResponse])
@@ -218,17 +200,30 @@ async def bank_auth_callback(
         if not accounts:
             raise HTTPException(status_code=400, detail="Nessun conto trovato")
 
-        # Use first account; account_id is the provider account UID for later calls
-        acc = accounts[0]
-        connection.account_id = acc.account_id
-        connection.account_iban = acc.iban
-        connection.account_name = acc.name or "Conto"
-        connection.currency = acc.currency
+        # Every account of the consent is stored (Revolut: one per currency) with
+        # the session id, so more accounts can be enabled later without a new
+        # SCA. The primary (first EUR) one stays on the connection for sync.
+        for row in save_accounts(connection, accounts):
+            db.add(row)
         connection.status = BankConnectionStatus.ACTIVE
-        connection.expires_at = datetime.utcnow() + timedelta(days=90)
+        # The expiry the bank actually granted; 90 days only if not reported.
+        connection.expires_at = accounts[0].valid_until or (datetime.utcnow() + timedelta(days=90))
         connection.last_sync_error = None
-
         db.add(connection)
+
+        # A reconnect (renewal) supersedes the previous connection(s).
+        previous = await db.execute(
+            select(BankConnection).where(
+                (BankConnection.user_id == current_user["sub"])
+                & (BankConnection.status == BankConnectionStatus.ACTIVE)
+                & (BankConnection.id != connection.id)
+            )
+        )
+        for old in previous.scalars().all():
+            old.status = BankConnectionStatus.EXPIRED
+            old.last_sync_error = SUPERSEDED_MSG
+            db.add(old)
+
         await db.commit()
         await db.refresh(connection)
 
@@ -251,7 +246,7 @@ async def get_bank_connection(
     db: AsyncSession = Depends(get_db),
 ):
     """Get the current active bank connection."""
-    connection = await _active_connection(db, view_user_id)
+    connection = await active_connection(db, view_user_id)
     if not connection:
         return None
     return BankConnectionResponse.from_orm(connection)
@@ -262,8 +257,8 @@ async def get_bank_balance(
     view_user_id: str = Depends(get_view_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> List[BankBalanceResponse]:
-    """Get current bank account balance."""
-    connection = await _active_connection(db, view_user_id)
+    """Current balance of every account of the active connection (cached)."""
+    connection = await active_connection(db, view_user_id)
     if not connection or not connection.account_id:
         raise HTTPException(status_code=404, detail="Nessun conto bancario collegato")
 
@@ -272,18 +267,55 @@ async def get_bank_balance(
         raise HTTPException(status_code=503, detail="Nessun provider bancario configurato")
 
     try:
-        balances = await provider.get_balances(connection.account_id)
-        return [
-            BankBalanceResponse(
-                amount=b.amount,
-                currency=b.currency,
-                balance_type=b.balance_type,
+        pairs = await account_balances(db, connection, provider)
+    except BankSessionExpired:
+        await expire_connection(db, connection, SESSION_REVOKED_MSG)
+        raise HTTPException(status_code=409, detail=SESSION_REVOKED_MSG)
+    return [
+        BankBalanceResponse(amount=b.amount, currency=b.currency, balance_type="cached" if b.stale else "current")
+        for _, b in pairs if b is not None
+    ]
+
+
+@router.patch("/bank/accounts/{account_id}", response_model=BankAccountResponse)
+async def update_bank_account(
+    account_id: str,
+    body: BankAccountUpdate,
+    current_user: dict = Depends(require_editor),
+    db: AsyncSession = Depends(get_db),
+) -> BankAccountResponse:
+    """Include/exclude an account from the transaction sync.
+
+    Only accounts in the primary account's currency can be enabled:
+    Transaction has no currency, so a USD account would pollute the EUR totals.
+    """
+    result = await db.execute(
+        select(BankAccount).where(
+            (BankAccount.id == account_id) & (BankAccount.user_id == current_user["sub"])
+        )
+    )
+    account = result.scalars().first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Conto non trovato")
+    if account.is_primary and not body.sync_enabled:
+        raise HTTPException(status_code=400, detail="Il conto principale resta sempre sincronizzato")
+    if body.sync_enabled:
+        primary = await db.execute(
+            select(BankAccount.currency).where(
+                (BankAccount.connection_id == account.connection_id) & (BankAccount.is_primary == True)  # noqa: E712
             )
-            for b in balances
-        ]
-    except Exception as e:
-        logger.error(f"Error fetching balance: {e}")
-        raise HTTPException(status_code=502, detail=f"Errore recupero saldo: {str(e)}")
+        )
+        primary_currency = primary.scalar() or "EUR"
+        if account.currency != primary_currency:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Solo i conti in {primary_currency} possono entrare nel bilancio",
+            )
+    account.sync_enabled = body.sync_enabled
+    db.add(account)
+    await db.commit()
+    await db.refresh(account)
+    return BankAccountResponse.from_orm(account)
 
 
 @router.post("/bank/sync", response_model=CSVImportResponse)
@@ -293,11 +325,19 @@ async def sync_bank_transactions(
     db: AsyncSession = Depends(get_db),
 ) -> CSVImportResponse:
     """
-    Sync transactions from the configured bank provider.
-    Deduplicates by external_id (per user).
+    Sync transactions from the configured bank provider (every sync-enabled
+    account of the active connection), then refresh the cached balances — the
+    user is present, so this is the moment to spend a bank call.
+    Deduplicates by external_id (per user), plus a content match against rows
+    from previous connections (reconnects may re-key transactions).
     """
-    connection = await _active_connection(db, current_user["sub"])
+    connection = await active_connection(db, current_user["sub"])
     if not connection or not connection.account_id:
+        # 409 (not 404) when the consent just lapsed: the UI reloads into the
+        # "ricollega" state instead of reporting a generic failure.
+        latest = await latest_connection(db, current_user["sub"])
+        if latest and latest.status == BankConnectionStatus.EXPIRED:
+            raise HTTPException(status_code=409, detail=latest.last_sync_error or CONSENT_EXPIRED_MSG)
         raise HTTPException(status_code=404, detail="Nessun conto collegato")
 
     provider = get_bank_provider()
@@ -305,104 +345,32 @@ async def sync_bank_transactions(
         raise HTTPException(status_code=503, detail="Nessun provider bancario configurato. Usa l'import CSV.")
 
     try:
-        date_from = date.today() - timedelta(days=days_back)
-        tx_data = await provider.get_transactions(
-            connection.account_id,
-            date_from=date_from,
-        )
-
-        sub_kws = await _subscription_keywords(db, current_user["sub"])
-        imported = 0
-        skipped = 0
-        errors = 0
-
-        # Dedup in una query sola: con centinaia di transazioni, un SELECT per
-        # riga teneva il sync oltre il timeout del client.
-        ext_ids = [tx.transaction_id for tx in tx_data.booked if tx.transaction_id]
-        seen_ids: set[str] = set()
-        if ext_ids:
-            existing = await db.execute(
-                select(Transaction.external_id).where(
-                    (Transaction.user_id == current_user["sub"])
-                    & (Transaction.external_id.in_(ext_ids))
-                )
-            )
-            seen_ids = {row[0] for row in existing.all()}
-
-        for tx in tx_data.booked:
-            try:
-                ext_id = tx.transaction_id
-                if not ext_id:
-                    errors += 1
-                    continue
-                if not tx.amount:  # skip €0 entries (auth holds, reversals)
-                    skipped += 1
-                    continue
-
-                if ext_id in seen_ids:
-                    skipped += 1
-                    continue
-                seen_ids.add(ext_id)  # dedup anche i duplicati intra-batch
-
-                txn_type = TransactionType.INCOME if tx.amount > 0 else TransactionType.EXPENSE
-
-                # Category: MCC first, then merchant/description keyword match.
-                mcc = tx.merchant_category_code or ""
-                category = categorize(
-                    description=tx.description,
-                    merchant=tx.creditor_name or tx.debtor_name,
-                    mcc=mcc,
-                    is_income=(txn_type == TransactionType.INCOME),
-                    sub_keywords=sub_kws,
-                    bank_category=tx.bank_transaction_code,
-                    amount=abs(tx.amount),
-                )
-
-                new_tx = Transaction(
-                    user_id=current_user["sub"],
-                    amount=abs(tx.amount),
-                    category=category,
-                    description=(tx.description or "N/A")[:500],
-                    transaction_type=txn_type,
-                    date=tx.booking_date or date.today(),
-                    source=TransactionSource.BANK_SYNC,
-                    external_id=ext_id,
-                    bank_connection_id=connection.id,
-                    merchant_name=tx.creditor_name or tx.debtor_name,
-                    merchant_category_code=mcc,
-                    bank_category=tx.bank_transaction_code,
-                    raw_description=str(tx.raw_data)[:2000],
-                )
-                db.add(new_tx)
-                imported += 1
-
-            except Exception as e:
-                logger.warning(f"Error parsing bank transaction: {e}")
-                errors += 1
-
-        # Update connection sync time
-        connection.last_sync_at = datetime.utcnow()
-        connection.last_sync_error = None
-        db.add(connection)
-
-        await db.commit()
-
-        return CSVImportResponse(
-            imported=imported,
-            skipped=skipped,
-            errors=errors,
-            message=f"Sincronizzate {imported} transazioni da Revolut",
-        )
-
-    except HTTPException:
-        raise
+        stats = await sync_connection(db, connection, provider, days_back=days_back)
+        await account_balances(db, connection, provider, force=True)
+    except BankSessionExpired:
+        # Raised by a fetch; drop any rows staged for earlier accounts. The
+        # rollback expires ORM state, so reload before touching the connection.
+        await db.rollback()
+        await db.refresh(connection)
+        await expire_connection(db, connection, SESSION_REVOKED_MSG)
+        raise HTTPException(status_code=409, detail=SESSION_REVOKED_MSG)
     except Exception as e:
+        await db.rollback()
+        await db.refresh(connection)
         connection.last_sync_at = datetime.utcnow()
         connection.last_sync_error = str(e)
         db.add(connection)
         await db.commit()
         logger.error(f"Error syncing bank transactions: {e}")
         raise HTTPException(status_code=502, detail=f"Errore sync: {str(e)}")
+
+    return CSVImportResponse(
+        imported=stats.imported,
+        skipped=stats.skipped,
+        errors=stats.errors,
+        auto_ticked=stats.auto_ticked,
+        message=f"Sincronizzate {stats.imported} transazioni da {connection.institution_name or 'banca'}",
+    )
 
 
 @router.delete("/bank/connection")
@@ -438,45 +406,66 @@ async def import_csv(
     current_user: dict = Depends(require_editor),
     db: AsyncSession = Depends(get_db),
 ) -> CSVImportResponse:
-    """Import transactions from a Revolut CSV export."""
+    """Import transactions from a Revolut CSV export.
+
+    Skips rows already imported (external_id — checked globally, as the column
+    is globally unique) and rows the bank sync already brought in (same day,
+    amount and direction: the two sources describe a payment differently).
+    """
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Il file deve essere un CSV")
 
+    user_id = current_user["sub"]
     content = await file.read()
-    sub_kws = await _subscription_keywords(db, current_user["sub"])
-    parsed = parse_revolut_csv(content, user_id=str(current_user["sub"]), sub_keywords=sub_kws)
+    sub_kws = await subscription_keywords_for(db, user_id)
+    parsed = parse_revolut_csv(content, user_id=str(user_id), sub_keywords=sub_kws)
 
-    imported = 0
-    skipped = 0
-    errors = 0
+    ext_ids = [t["external_id"] for t in parsed if t.get("external_id")]
+    existing_ids: set[str] = set()
+    if ext_ids:
+        result = await db.execute(select(Transaction.external_id).where(Transaction.external_id.in_(ext_ids)))
+        existing_ids = {row[0] for row in result.all()}
 
+    bank_sigs: Counter = Counter()
+    if parsed:
+        dates = [t["date"] for t in parsed]
+        result = await db.execute(
+            select(Transaction.date, Transaction.amount, Transaction.transaction_type).where(
+                (Transaction.user_id == user_id)
+                & (Transaction.source == TransactionSource.BANK_SYNC)
+                & (Transaction.date >= min(dates))
+                & (Transaction.date <= max(dates))
+            )
+        )
+        bank_sigs = Counter(loose_sig(*row) for row in result.all())
+
+    imported = skipped = errors = from_bank = 0
     for tx_data in parsed:
         try:
-            # Dedup by external_id
-            if tx_data.get("external_id"):
-                existing = await db.execute(
-                    select(Transaction).where(
-                        Transaction.external_id == tx_data["external_id"]
-                    )
-                )
-                if existing.scalars().first():
-                    skipped += 1
-                    continue
-
-            txn = Transaction(**tx_data)
-            db.add(txn)
+            if tx_data.get("external_id") in existing_ids:
+                skipped += 1
+                continue
+            sig = loose_sig(tx_data["date"], tx_data["amount"], tx_data["transaction_type"])
+            if bank_sigs[sig] > 0:
+                bank_sigs[sig] -= 1
+                from_bank += 1
+                continue
+            db.add(Transaction(**tx_data))
             imported += 1
         except Exception as e:
             logger.warning(f"Error importing CSV transaction: {e}")
             errors += 1
 
     await db.commit()
+    ticked = await auto_tick_safely(db, user_id)
 
+    note = f" · {from_bank} già presenti dal sync bancario" if from_bank else ""
     return CSVImportResponse(
         imported=imported,
-        skipped=skipped,
+        skipped=skipped + from_bank,
         errors=errors,
-        message=f"Importate {imported} transazioni da CSV Revolut",
+        auto_ticked=ticked,
+        message=f"Importate {imported} transazioni da CSV Revolut{note}",
     )
 
 
@@ -632,7 +621,7 @@ async def recategorize_transactions(
         select(Transaction).where(Transaction.user_id == current_user["sub"])
     )
     transactions = result.scalars().all()
-    sub_kws = await _subscription_keywords(db, current_user["sub"])
+    sub_kws = await subscription_keywords_for(db, current_user["sub"])
 
     updated = 0
     for txn in transactions:
@@ -671,63 +660,75 @@ async def get_budget_dashboard(
     db: AsyncSession = Depends(get_db),
 ) -> BudgetDashboard:
     """
-    Get unified budget dashboard combining:
-    - Bank balance (if connected)
-    - Monthly transactions summary
-    - Category spending vs goals
-    - Upcoming scadenze with matching
+    Unified finance view for one month:
+    - bank connection status, accounts and (cached) balances
+    - income / expenses / category spending vs carried-forward limits
+    - Scadenze money for the month + unpaid timeline, from the real deadlines
+    - end-of-month forecast (current month only)
     """
-    if not month:
-        month = date.today().month
-    if not year:
-        year = date.today().year
-
     today = date.today()
+    month = month or today.month
+    year = year or today.year
     month_start = date(year, month, 1)
     month_end = date(year, month, monthrange(year, month)[1])
 
     dashboard = BudgetDashboard(month=month_start)
 
-    # ── 1. Bank connection & balance ──────────────────────────────────────────
-    result = await db.execute(
-        select(BankConnection).where(
-            (BankConnection.user_id == view_user_id)
-            & (BankConnection.status == BankConnectionStatus.ACTIVE)
-        ).order_by(BankConnection.created_at.desc())
-    )
-    bank_conn = result.scalars().first()
+    # ── 1. Bank connection, accounts & balance ────────────────────────────────
+    # active_connection flips a lapsed consent to EXPIRED here too — before,
+    # the dashboard kept saying "Connesso" (with a silent null balance) until a
+    # manual sync failed and the card suddenly read "nessuna banca collegata".
+    bank_conn = await active_connection(db, view_user_id)
 
     if bank_conn and bank_conn.account_id:
         dashboard.bank_connected = True
-        dashboard.bank_currency = bank_conn.currency or "EUR"
-        dashboard.bank_last_sync = bank_conn.last_sync_at
-
+        dashboard.bank_currency = (bank_conn.currency or "EUR").upper()
         provider = get_bank_provider()
+        pairs = [(a, None) for a in await connection_accounts(db, bank_conn)]
         if provider:
             try:
-                balances = await provider.get_balances(bank_conn.account_id)
-                logger.info(
-                    "EB balances for %s: %s",
-                    bank_conn.account_id,
-                    [(b.balance_type, b.amount, b.currency) for b in balances],
-                )
-                # Prefer a "current" balance type, but fall back to whatever the
-                # bank returns — EB/ASPSPs use varied balance_type codes.
-                preferred = (
-                    # Berlin Group long names + EB/ISO short codes (EB returns e.g. ITAV)
-                    "closingBooked", "expected", "interimAvailable", "interimBooked",
-                    "openingBooked", "authorised", "forwardAvailable", "information",
-                    "CLBD", "XPCD", "ITAV", "ITBD", "OPBD", "PRCD", "FWAV",
-                )
-                chosen = next((b for b in balances if b.balance_type in preferred), None)
-                if chosen is None and balances:
-                    chosen = balances[0]
-                if chosen is not None:
-                    dashboard.bank_balance = chosen.amount
-                    if chosen.currency:
-                        dashboard.bank_currency = chosen.currency
+                # Cached (≤ 1 bank call per account every few hours): every
+                # server-side read is "unattended" for PSD2 and capped per day.
+                pairs = await account_balances(db, bank_conn, provider)
             except Exception as e:
+                # Deliberately NOT expiring on BankSessionExpired here: this runs
+                # on every load (guests included) and a spurious 4xx would flip a
+                # working connection to EXPIRED, undoable only by a new SCA. The
+                # UI shows "saldo non disponibile"; the user-triggered sync (or
+                # the consent date) is what marks the connection dead.
                 logger.warning(f"Could not fetch balance for dashboard: {e}")
+
+        total, at, stale = None, None, False
+        for acc, bal in pairs:
+            dashboard.bank_accounts.append(BankAccountSummary(
+                id=getattr(acc, "id", None),
+                name=acc.name,
+                iban_tail=(acc.iban or "")[-4:] or None,
+                currency=acc.currency,
+                is_primary=acc.is_primary,
+                sync_enabled=acc.sync_enabled,
+                balance=bal.amount if bal else None,
+                balance_at=bal.at if bal else None,
+                balance_stale=bal.stale if bal else False,
+            ))
+            # "Saldo disponibile" = the accounts that feed the totals.
+            if bal and acc.sync_enabled and acc.currency == dashboard.bank_currency:
+                total = (total or 0.0) + bal.amount
+                at = bal.at if at is None else min(at, bal.at)
+                stale = stale or bal.stale
+        dashboard.bank_balance = round(total, 2) if total is not None else None
+        dashboard.bank_balance_at = at
+        dashboard.bank_balance_stale = stale
+
+    # Status of the live connection, else of the most recent dead one (a failed
+    # reconnect attempt must not mask a still-working connection).
+    shown = bank_conn if dashboard.bank_connected else await latest_connection(db, view_user_id)
+    if shown:
+        dashboard.bank_status = getattr(shown.status, "value", shown.status)
+        dashboard.bank_institution = shown.institution_name
+        dashboard.bank_expires_at = shown.expires_at
+        dashboard.bank_error = shown.last_sync_error
+        dashboard.bank_last_sync = shown.last_sync_at
 
     # ── 2. Monthly transactions ───────────────────────────────────────────────
     result = await db.execute(
@@ -748,97 +749,114 @@ async def get_budget_dashboard(
     dashboard.total_income = round(income, 2)
     dashboard.total_expenses = round(expenses, 2)
     dashboard.net_balance = round(income - expenses, 2)
+    dashboard.recent_transactions = [TransactionResponse.from_orm(t) for t in transactions[:10]]
 
-    # Recent transactions (last 10)
-    dashboard.recent_transactions = [
-        TransactionResponse.from_orm(t) for t in transactions[:10]
-    ]
-
-    # ── 3. Category spending vs goals ─────────────────────────────────────────
+    # ── 3. Category spending vs limits ────────────────────────────────────────
     by_category: dict[str, float] = {}
     for txn in real:
         if txn.transaction_type == TransactionType.EXPENSE:
             by_category[txn.category] = by_category.get(txn.category, 0) + txn.amount
 
-    # Get budget goals for this month
-    result = await db.execute(
-        select(BudgetGoal).where(
-            (BudgetGoal.user_id == view_user_id)
-            & (BudgetGoal.month >= month_start)
-            & (BudgetGoal.month <= month_end)
-        )
-    )
-    goals = {g.category: g.monthly_limit for g in result.scalars().all()}
-
-    # Build category list
-    all_categories = set(list(by_category.keys()) + list(goals.keys()))
-    for cat in sorted(all_categories):
+    limits = await _limits_for_month(db, view_user_id, month_end)
+    for cat in sorted(set(by_category) | set(limits)):
         spent = round(by_category.get(cat, 0), 2)
-        limit = goals.get(cat)
-        remaining = round(limit - spent, 2) if limit else None
-        percentage = round((spent / limit) * 100, 1) if limit and limit > 0 else 0
+        limit = limits.get(cat)
+        dashboard.categories.append(CategorySpending(
+            category=cat,
+            spent=spent,
+            limit=limit,
+            remaining=round(limit - spent, 2) if limit else None,
+            percentage=round((spent / limit) * 100, 1) if limit else 0,
+        ))
 
-        dashboard.categories.append(
-            CategorySpending(
-                category=cat,
-                spent=spent,
-                limit=limit,
-                remaining=remaining,
-                percentage=percentage,
-            )
-        )
+    # ── 4. Scadenze — from the real deadlines ────────────────────────────────
+    # (Was the legacy `scadenze` table: a hand-kept, non-per-user plan frozen
+    # since June, shown above the real list with different numbers.)
+    result = await db.execute(select(Deadline).where(Deadline.user_id == view_user_id))
+    rows = rows_for(result.scalars().all(), today)
 
-    # ── 4. Scadenze for current month ─────────────────────────────────────────
-    mese_nome = None
-    for nome, num in MESI_NUM.items():
-        if num == month:
-            mese_nome = nome
-            break
+    month_totals = totals(in_range(rows, month_start, month_end))
+    dashboard.scadenze_total = month_totals.total
+    dashboard.scadenze_paid = month_totals.paid
+    dashboard.scadenze_remaining = month_totals.remaining
 
-    if mese_nome:
-        result = await db.execute(
-            select(Scadenza).where(Scadenza.mese == mese_nome)
-            .order_by(Scadenza.scadenza_gg_mm)
-        )
-        scadenze = result.scalars().all()
+    unpaid = sorted((r for r in rows if not r.paid and r.amount is not None), key=lambda r: r.date)
+    dashboard.upcoming_scadenze = [
+        _preview(r, today) for r in unpaid if today <= r.date <= today + timedelta(days=30)
+    ]
+    dashboard.overdue_scadenze = [
+        _preview(r, today) for r in unpaid if today - timedelta(days=60) <= r.date < today
+    ]
 
-        total_uscite = sum(s.importo for s in scadenze if s.importo < 0)
-        total_pagate = sum(s.importo for s in scadenze if s.importo < 0 and s.pagato)
-
-        dashboard.scadenze_total = round(abs(total_uscite), 2)
-        dashboard.scadenze_paid = round(abs(total_pagate), 2)
-        dashboard.scadenze_remaining = round(abs(total_uscite) - abs(total_pagate), 2)
-
-        for s in scadenze:
-            try:
-                parts = s.scadenza_gg_mm.split("/")
-                day = int(parts[0])
-                mon = int(parts[1])
-                scad_date = date(year, mon, day)
-                days_until = (scad_date - today).days
-                is_overdue = days_until < 0 and not s.pagato
-
-                preview = ScadenzaPreview(
-                    id=s.id,
-                    desc=s.desc,
-                    importo=s.importo,
-                    scadenza_gg_mm=s.scadenza_gg_mm,
-                    tipo=s.tipo.value if hasattr(s.tipo, 'value') else str(s.tipo),
-                    pagato=s.pagato,
-                    days_until=days_until,
-                    is_overdue=is_overdue,
-                    matched_transaction=False,
-                )
-
-                if is_overdue:
-                    dashboard.overdue_scadenze.append(preview)
-                elif days_until <= 30 and not s.pagato:
-                    dashboard.upcoming_scadenze.append(preview)
-
-            except (ValueError, IndexError):
-                continue
+    # ── 5. End-of-month forecast (current month only) ─────────────────────────
+    if month_start <= today <= month_end:
+        due = totals(r for r in unpaid if month_start <= r.date <= month_end).total
+        dashboard.forecast_due = due
+        if dashboard.bank_balance is not None:
+            dashboard.forecast_balance = round(dashboard.bank_balance - due, 2)
 
     return dashboard
+
+
+def _preview(r, today: date) -> ScadenzaPreview:
+    d = r.deadline
+    label = d.title + (f" · rata {r.index}/{r.total}" if r.index else "")
+    return ScadenzaPreview(
+        id=r.key,
+        desc=label,
+        importo=r.amount or 0,
+        scadenza_gg_mm=r.date.strftime("%d/%m"),
+        tipo=getattr(d.recurrence_type, "value", d.recurrence_type) or "none",
+        pagato=r.paid,
+        days_until=(r.date - today).days,
+        is_overdue=r.date < today,
+        matched_transaction=r.auto,
+    )
+
+
+async def _limits_for_month(db: AsyncSession, user_id, month_end: date) -> dict[str, float]:
+    """Category limits in force for a month: per category, the latest goal set
+    on or before it (a limit carries forward until changed; 0 = removed)."""
+    result = await db.execute(
+        select(BudgetGoal)
+        .where((BudgetGoal.user_id == user_id) & (BudgetGoal.month <= month_end))
+        .order_by(BudgetGoal.month.desc(), BudgetGoal.updated_at.desc())
+    )
+    latest: dict[str, float] = {}
+    for g in result.scalars().all():
+        latest.setdefault(g.category, g.monthly_limit)
+    return {c: round(v, 2) for c, v in latest.items() if v and v > 0}
+
+
+@router.put("/limits", response_model=CategoryLimitResponse)
+async def set_category_limit(
+    body: CategoryLimitSet,
+    current_user: dict = Depends(require_editor),
+    db: AsyncSession = Depends(get_db),
+) -> CategoryLimitResponse:
+    """Set (or remove, with null/0) a category's monthly limit from `month` on.
+
+    Stored as a BudgetGoal dated the 1st of the month; later months inherit it
+    until another limit is set.
+    """
+    m = (body.month or date.today()).replace(day=1)
+    category = body.category.strip()
+    limit = round(body.monthly_limit or 0, 2)
+    result = await db.execute(
+        select(BudgetGoal).where(
+            (BudgetGoal.user_id == current_user["sub"])
+            & (BudgetGoal.category == category)
+            & (BudgetGoal.month == m)
+        )
+    )
+    goal = result.scalars().first()
+    if goal:
+        goal.monthly_limit = limit
+    else:
+        goal = BudgetGoal(user_id=current_user["sub"], category=category, monthly_limit=limit, month=m)
+    db.add(goal)
+    await db.commit()
+    return CategoryLimitResponse(category=category, monthly_limit=limit or None, month=m)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

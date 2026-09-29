@@ -10,6 +10,11 @@ from datetime import date, datetime
 from typing import Optional
 
 
+class BankSessionExpired(Exception):
+    """The provider rejected the account session: PSD2 consent expired or was
+    revoked by the bank/user. Only a new authorization (SCA) can fix it."""
+
+
 @dataclass
 class BankAuthResult:
     """Result of initiating bank authorization."""
@@ -30,6 +35,10 @@ class BankAccountInfo:
     name: Optional[str] = None
     currency: str = "EUR"
     owner_name: Optional[str] = None
+    # Consent expiry granted by the bank (naive UTC), when the provider reports it.
+    valid_until: Optional[datetime] = None
+    # Provider session the account belongs to (same for every account of a consent).
+    session_id: Optional[str] = None
 
 
 @dataclass

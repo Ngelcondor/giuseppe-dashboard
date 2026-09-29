@@ -52,6 +52,14 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.periodic.check_medication_reminders",
         "schedule": crontab(minute="0,30"),
     },
+    # Sync bancario notturno (transazioni + auto-spunta scadenze + saldo) e
+    # avvisi di scadenza del consenso PSD2. 04:30 UTC: una sola chiamata non
+    # presidiata al giorno per conto, dentro il limite PSD2 (~4/giorno).
+    "sync-bank-connections-nightly": {
+        "task": "app.tasks.periodic.sync_bank_connections",
+        "schedule": crontab(hour=4, minute=30),
+        "options": {"expires": 3600},
+    },
     # Check routine reminders ogni 30 minuti
     "check-routine-reminders": {
         "task": "app.tasks.periodic.check_routine_reminders",

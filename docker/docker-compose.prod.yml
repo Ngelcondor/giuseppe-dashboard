@@ -108,6 +108,13 @@ services:
       LOG_LEVEL: warning
       CALDAV_SYNC_ENABLED: ${CALDAV_SYNC_ENABLED:-true}
       CALDAV_DEFAULT_SYNC_INTERVAL: ${CALDAV_DEFAULT_SYNC_INTERVAL:-15}
+      # Nightly bank sync (sync_bank_connections) + its push notifications need
+      # the same Enable Banking / VAPID config as the backend.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      ENABLE_BANKING_APP_ID: ${ENABLE_BANKING_APP_ID:-ce2e676c-fd45-4df0-9055-cc4fbe0c2447}
+      ENABLE_BANKING_APP_SECRET: ${ENABLE_BANKING_APP_SECRET:-}
+      ENABLE_BANKING_REDIRECT_URL: ${ENABLE_BANKING_REDIRECT_URL:-https://dashboard.elcondor.dev/dashboard/budget}
     depends_on:
       redis:
         condition: service_healthy

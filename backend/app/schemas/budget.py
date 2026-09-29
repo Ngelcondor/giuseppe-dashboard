@@ -71,6 +71,40 @@ class BankBalanceResponse(BaseModel):
     balance_type: str  # "closingBooked", "expected", etc.
 
 
+class BankAccountResponse(BaseModel):
+    """One account of a bank connection."""
+
+    id: uuid.UUID
+    name: Optional[str] = None
+    iban: Optional[str] = None
+    currency: str = "EUR"
+    is_primary: bool = False
+    sync_enabled: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class BankAccountUpdate(BaseModel):
+    """Include/exclude an account from the transaction sync."""
+
+    sync_enabled: bool
+
+
+class BankAccountSummary(BaseModel):
+    """Account + cached balance, as shown in the Conto card."""
+
+    id: Optional[uuid.UUID] = None   # None for pre-multi-account connections
+    name: Optional[str] = None
+    iban_tail: Optional[str] = None  # last 4 chars only
+    currency: str = "EUR"
+    is_primary: bool = False
+    sync_enabled: bool = False
+    balance: Optional[float] = None
+    balance_at: Optional[datetime] = None
+    balance_stale: bool = False
+
+
 class InstitutionResponse(BaseModel):
     """Available banking institution."""
 
@@ -134,6 +168,9 @@ class TransactionResponse(TransactionBase):
     bank_category: Optional[str] = None
     raw_description: Optional[str] = None
     linked_scadenza_id: Optional[uuid.UUID] = None
+    # Deadline occurrence this transaction paid (bank auto-tick).
+    linked_deadline_id: Optional[uuid.UUID] = None
+    linked_occurrence: Optional[date] = None
     bank_connection_id: Optional[uuid.UUID] = None
     created_at: datetime
     updated_at: datetime
@@ -149,7 +186,8 @@ class BudgetGoalBase(BaseModel):
     """Base budget goal schema."""
 
     category: str
-    monthly_limit: float = Field(..., gt=0)
+    # ge=0 on output: a 0 goal is a "limit removed from this month" marker.
+    monthly_limit: float = Field(..., ge=0)
     month: date
     notes: Optional[str] = None
 
@@ -157,7 +195,21 @@ class BudgetGoalBase(BaseModel):
 class BudgetGoalCreate(BudgetGoalBase):
     """Budget goal creation schema."""
 
-    pass
+    monthly_limit: float = Field(..., gt=0)
+
+
+class CategoryLimitSet(BaseModel):
+    """Set a category's monthly limit from `month` on (null/0 removes it)."""
+
+    category: str = Field(..., min_length=1, max_length=100)
+    monthly_limit: Optional[float] = Field(None, ge=0)
+    month: Optional[date] = None  # defaults to the current month
+
+
+class CategoryLimitResponse(BaseModel):
+    category: str
+    monthly_limit: Optional[float] = None
+    month: date
 
 
 class BudgetGoalUpdate(BaseModel):
@@ -194,9 +246,9 @@ class CategorySpending(BaseModel):
 
 
 class ScadenzaPreview(BaseModel):
-    """Upcoming deadline preview for budget dashboard."""
+    """One unpaid deadline occurrence for the dashboard timeline."""
 
-    id: uuid.UUID
+    id: str                      # "<deadline uuid>@<YYYY-MM-DD>"
     desc: str
     importo: float
     scadenza_gg_mm: str
@@ -226,6 +278,22 @@ class BudgetDashboard(BaseModel):
     bank_balance: Optional[float] = None
     bank_currency: str = "EUR"
     bank_last_sync: Optional[datetime] = None
+    # Latest non-pending connection, even when it's no longer usable, so the UI
+    # can say "consenso scaduto il …" instead of "nessuna banca collegata".
+    bank_status: Optional[str] = None          # active | expired | error
+    bank_institution: Optional[str] = None
+    bank_expires_at: Optional[datetime] = None
+    bank_error: Optional[str] = None
+    # When the shown balance was read from the bank (it's cached — PSD2 caps
+    # unattended reads) and whether it's a last-known value after a failure.
+    bank_balance_at: Optional[datetime] = None
+    bank_balance_stale: bool = False
+    bank_accounts: List[BankAccountSummary] = []
+
+    # End-of-month forecast (current month only): balance minus the unpaid
+    # deadlines still due this month. Covers registered Scadenze only.
+    forecast_due: Optional[float] = None
+    forecast_balance: Optional[float] = None
 
     # Monthly summary
     month: date
@@ -236,11 +304,11 @@ class BudgetDashboard(BaseModel):
     # Category breakdown
     categories: List[CategorySpending] = []
 
-    # Upcoming scadenze (next 30 days)
+    # Unpaid deadline occurrences: next 30 days / overdue (last 60 days)
     upcoming_scadenze: List[ScadenzaPreview] = []
     overdue_scadenze: List[ScadenzaPreview] = []
 
-    # Scadenze stats for current month
+    # Scadenze money for the selected month (same numbers as its month header)
     scadenze_total: float = 0
     scadenze_paid: float = 0
     scadenze_remaining: float = 0
@@ -266,3 +334,5 @@ class CSVImportResponse(BaseModel):
     skipped: int
     errors: int
     message: str
+    # Deadlines auto-marked paid from the imported transactions.
+    auto_ticked: int = 0

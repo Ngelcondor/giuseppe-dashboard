@@ -42,7 +42,10 @@ export const toAmount = (v: number | string | null | undefined): number | null =
   const n = typeof v === 'number' ? v : parseFloat(v);
   return Number.isFinite(n) ? n : null;
 };
-export const fmtEur = (n: number) => `€${n.toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+// Whole euros stay bare (€120); anything with cents shows both digits (€289,90, not €289,9).
+export const fmtEur = (n: number) => `€${n.toLocaleString('it-IT', Number.isInteger(n)
+  ? { maximumFractionDigits: 0 }
+  : { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const errStyle: React.CSSProperties = { margin: '2px 0 0', fontSize: 12.5, color: 'rgb(239 68 68)' };
 

@@ -85,6 +85,11 @@ class Deadline(Base):
     # installments_paid (which is the pre-app baseline), so each occurrence can be
     # checked/unchecked reversibly. Nullable so _sync_missing_columns can ALTER it in.
     paid_occurrences = Column(JSON, nullable=True)
+    # Subset of the paid dates ticked automatically from a matching bank
+    # transaction (shown as "auto" in the UI), and the auto-ticks the user undid:
+    # a rejected date is never auto-ticked again. Nullable → _sync_missing_columns.
+    auto_paid_occurrences = Column(JSON, nullable=True)
+    auto_rejected_occurrences = Column(JSON, nullable=True)
 
     # Additional info
     notes = Column(String(2000), nullable=True)

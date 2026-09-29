@@ -19,7 +19,6 @@ from app.api.v1.endpoints import (
     meals,
     feed,
     dashboard,
-    scadenze,
     habits_api,
     mood_api,
     api_tokens,
@@ -70,7 +69,6 @@ router.include_router(ctf.router, dependencies=_sec("studio"))
 router.include_router(meals.router, dependencies=_sec("salute"))
 router.include_router(feed.router, dependencies=_sec("feed"))
 router.include_router(dashboard.router)
-router.include_router(scadenze.router, dependencies=_sec("finanze"))
 router.include_router(habits_api.router, dependencies=_sec("salute"))
 router.include_router(mood_api.router, dependencies=_sec("salute"))
 router.include_router(api_tokens.router)

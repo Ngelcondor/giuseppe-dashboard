@@ -122,6 +122,17 @@ def parse_revolut_csv(
             logger.warning(f"Error parsing CSV row: {e}, row: {row}")
             continue
 
+    # Two identical rows in one export (same day, description, amount — e.g. two
+    # coffees) would share an external_id and the unique constraint would fail
+    # the whole import. Suffix the repeats in file order ("#2", "#3"): stable
+    # across re-imports of the same file, so dedup still works.
+    seen: dict[str, int] = {}
+    for t in transactions:
+        base = t["external_id"]
+        seen[base] = seen.get(base, 0) + 1
+        if seen[base] > 1:
+            t["external_id"] = f"{base}#{seen[base]}"
+
     logger.info(f"Parsed {len(transactions)} transactions from Revolut CSV")
     return transactions
 

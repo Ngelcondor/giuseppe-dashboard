@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Trash2, FileUp, Landmark, RefreshCw, Tags, Tag, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Trash2, FileUp, Landmark, RefreshCw, Tags, Tag, ChevronDown, ChevronLeft, ChevronRight, Target } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Sheet, Field, FieldRow } from '@/components/sd/FormSheet';
 import {
@@ -9,10 +9,12 @@ import {
   listTransactions, createTransaction, updateTransaction, deleteTransaction, importCSV,
   recategorizeTransactions,
   initBankAuth, completeBankAuth, listInstitutions, syncBankTransactions,
-  type BudgetDashboard, type CategorySpending,
+  setAccountSync, setCategoryLimit,
+  type BudgetDashboard, type CategorySpending, type BankAccountSummary,
   type Transaction, type ScadenzaPreview, type Institution,
 } from '@/services/budgetService';
 import { getCurrentUserRole } from '@/services/scadenzeService';
+import { ApiError } from '@/types';
 import { ScadenzeMese } from '@/components/sd/ScadenzeMese';
 import { Abbonamenti } from '@/components/sd/Abbonamenti';
 
@@ -30,6 +32,9 @@ const errStyle: React.CSSProperties = { margin: '2px 0 0', fontSize: 12.5, color
 
 const FALLBACK: BudgetDashboard = {
   bank_connected: false, bank_balance: null, bank_currency: 'EUR', bank_last_sync: null,
+  bank_status: null, bank_institution: null, bank_expires_at: null, bank_error: null,
+  bank_balance_at: null, bank_balance_stale: false, bank_accounts: [],
+  forecast_due: null, forecast_balance: null,
   month: monthFirstISO(new Date().getFullYear(), new Date().getMonth() + 1), total_income: 0, total_expenses: 0, net_balance: 0,
   categories: [], upcoming_scadenze: [], overdue_scadenze: [],
   scadenze_total: 0, scadenze_paid: 0, scadenze_remaining: 0, recent_transactions: [],
@@ -70,8 +75,17 @@ const fmtTxDate = (iso: string) =>
 const fmtMonthLabel = (iso: string) =>
   new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })
     .replace(/^./, (c) => c.toUpperCase());
+// The backend serialises naive UTC datetimes (no offset): without the 'Z' the
+// browser reads them as local time — 2h off in CEST.
+const parseUtc = (iso: string) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + 'Z');
 const fmtSync = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'mai';
+  iso ? parseUtc(iso).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'mai';
+const fmtDay = (iso: string) => parseUtc(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' });
+// Warn this many days before the PSD2 consent lapses.
+const CONSENT_WARN_DAYS = 14;
+const fmtTime = (iso: string) => parseUtc(iso).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+// "N scadenze spuntate in automatico" suffix for sync / import messages.
+const autoNote = (n?: number) => (n ? ` · ${n} ${n === 1 ? 'scadenza spuntata' : 'scadenze spuntate'} in automatico` : '');
 
 type Cat = { name: string; color: string; amount: number };
 function toCats(categories: CategorySpending[]): Cat[] {
@@ -99,6 +113,7 @@ export default function BudgetPage() {
   const [busy, setBusy] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
   const [recatting, setRecatting] = useState(false);
+  const [limitsOpen, setLimitsOpen] = useState(false);
 
   // ── Bank connection (Enable Banking) ──
   const [bankOpen, setBankOpen] = useState(false);
@@ -161,9 +176,15 @@ export default function BudgetPage() {
       // Refresh di routine: 30 giorni bastano (lo storico è già in DB) e
       // dimezzano le pagine Enable Banking → sync ben sotto il timeout.
       const r = await syncBankTransactions(30);
-      setImportMsg(`${r.imported} transazioni sincronizzate${r.skipped ? ` · ${r.skipped} già presenti` : ''}`);
+      setImportMsg(`${r.imported} transazioni sincronizzate${r.skipped ? ` · ${r.skipped} già presenti` : ''}${autoNote(r.auto_ticked)}`);
       await load();
-    } catch { setImportErr('Sincronizzazione non riuscita. Riprova.'); }
+    } catch (e) {
+      // 409 = consenso scaduto/revocato: il reload porta la card in "Ricollega".
+      if (e instanceof ApiError && e.statusCode === 409) {
+        setImportErr(typeof e.data?.detail === 'string' ? e.data.detail : 'Consenso bancario scaduto — ricollega il conto.');
+        await load();
+      } else setImportErr('Sincronizzazione non riuscita. Riprova.');
+    }
     finally { setSyncing(false); }
   };
 
@@ -178,12 +199,15 @@ export default function BudgetPage() {
     (async () => {
       try {
         await completeBankAuth(code, state);
-        let synced = 0;
-        try { synced = (await syncBankTransactions(90)).imported; } catch {/* balance still works */}
+        let synced = 0, skipped = 0, ticked = 0;
+        try { const r = await syncBankTransactions(90); synced = r.imported; skipped = r.skipped; ticked = r.auto_ticked ?? 0; } catch {/* balance still works */}
         await load();
         if (!alive) return;
         setBankCallback('done');
-        setBankCallbackMsg(synced > 0 ? `Conto collegato · ${synced} transazioni importate.` : 'Conto collegato. Saldo aggiornato; nessuna transazione recente.');
+        // "già presenti" matters after a reconnect: it's the dedup at work.
+        setBankCallbackMsg(synced > 0 || skipped > 0
+          ? `Conto collegato · ${synced} nuove transazioni${skipped ? ` · ${skipped} già presenti` : ''}${autoNote(ticked)}.`
+          : 'Conto collegato. Saldo aggiornato; nessuna transazione recente.');
       } catch {
         if (!alive) return;
         setBankCallback('error');
@@ -205,6 +229,26 @@ export default function BudgetPage() {
   const net = Math.round(data.net_balance);
   const balance = data.bank_balance;                 // number | null
   const bankConnected = data.bank_connected || balance != null;
+  // Was connected, now isn't (consent lapsed / revoked / failed): offer a
+  // one-tap reconnect instead of the first-time "Nessuna banca collegata".
+  const bankLapsed = !bankConnected && (data.bank_status === 'expired' || data.bank_status === 'error');
+  const bankName = data.bank_institution || 'Conto';
+  // Calendar days (local), so "5 ottobre" seen on 29 settembre reads "tra 6 giorni".
+  const consentDaysLeft = bankConnected && data.bank_expires_at
+    ? (() => {
+        const e = parseUtc(data.bank_expires_at);
+        return Math.round((new Date(e.getFullYear(), e.getMonth(), e.getDate()).getTime()
+          - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86_400_000);
+      })()
+    : null;
+  const consentExpiring = consentDaysLeft != null && consentDaysLeft <= CONSENT_WARN_DAYS;
+  // Other accounts of the consent (Revolut: one per currency). Shown only when
+  // there's more than the primary.
+  const extraAccounts = data.bank_accounts.length > 1 ? data.bank_accounts : [];
+  const isCurrentMonth = selKey === curKey;
+  // Category limits (carried forward month to month by the backend).
+  const limitsByCat = Object.fromEntries(data.categories.filter((c) => c.limit != null).map((c) => [c.category, c.limit as number]));
+  const overLimit = data.categories.filter((c) => c.limit != null && c.spent > (c.limit as number)).length;
 
   // All categories offered in pickers: the canonical set + whatever's in use.
   const categoryNames = Array.from(
@@ -240,7 +284,7 @@ export default function BudgetPage() {
     setImporting(true); setImportErr(null); setImportMsg(null);
     try {
       const res = await importCSV(f);
-      setImportMsg(`${res.imported} importate · ${res.skipped} saltate${res.errors ? ` · ${res.errors} errori` : ''}`);
+      setImportMsg(`${res.imported} importate · ${res.skipped} saltate${res.errors ? ` · ${res.errors} errori` : ''}${autoNote(res.auto_ticked)}`);
       await load();
     } catch { setImportErr('Import non riuscito. Usa un estratto conto Revolut in formato .csv.'); }
     finally { setImporting(false); }
@@ -290,7 +334,7 @@ export default function BudgetPage() {
           <Button size="md" variant="secondary" isLoading={importing} onClick={() => fileRef.current?.click()}><FileUp size={15} style={{ marginRight: 6 }} />Importa CSV</Button>
           {bankConnected
             ? <Button size="md" variant="secondary" isLoading={syncing} onClick={doSync}><RefreshCw size={15} style={{ marginRight: 6 }} />Sincronizza</Button>
-            : <Button size="md" variant="primary" onClick={() => setBankOpen(true)}><Landmark size={15} style={{ marginRight: 6 }} />Aggiungi banca</Button>}
+            : <Button size="md" variant="primary" onClick={() => setBankOpen(true)}><Landmark size={15} style={{ marginRight: 6 }} />{bankLapsed ? 'Ricollega' : 'Aggiungi banca'}</Button>}
         </div>
       </header>
 
@@ -315,13 +359,86 @@ export default function BudgetPage() {
         <Card i={1} pad="24px 28px" style={{ marginBottom: 18 }}>
           <div style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'space-between', gap: 36, flexWrap: 'wrap' }}>
             <div style={{ minWidth: 220 }}>
-              <div style={eyebrow}>Saldo disponibile</div>
+              <div style={eyebrow} title="Il saldo viene riletto dalla banca al massimo ogni 6 ore (limite PSD2 sugli accessi automatici) e subito con Sincronizza.">
+                Saldo disponibile{data.bank_balance_at ? ` · alle ${fmtTime(data.bank_balance_at)}` : ''}
+              </div>
               <div style={{ fontFamily: mono, fontSize: 'clamp(30px, 10vw, 44px)', fontWeight: 600, letterSpacing: '-.03em', color: 'rgb(var(--color-heading))', lineHeight: 1, marginTop: 10 }}>{balance != null ? eur(balance, true) : '€ —'}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 15 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 15, flexWrap: 'wrap' }}>
                 <span style={{ width: 9, height: 9, borderRadius: '50%', background: 'rgb(16 185 129)', flex: 'none' }} />
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'rgb(16 185 129)' }}>Connesso</span>
                 <span style={{ fontSize: 13, color: 'rgb(var(--color-tertiary))' }}>· {data.bank_currency} · ultimo sync {fmtSync(data.bank_last_sync)}</span>
               </div>
+              {balance == null && (
+                <p style={{ margin: '8px 0 0', fontSize: 12.5, color: 'rgb(var(--color-muted))' }}>Saldo non disponibile al momento — la banca non ha risposto.</p>
+              )}
+              {balance != null && data.bank_balance_stale && (
+                <p style={{ margin: '8px 0 0', fontSize: 12.5, color: 'rgb(var(--color-muted))' }}>Ultimo saldo noto — la banca ora non risponde.</p>
+              )}
+              {/* Previsione: solo mese corrente, solo scadenze registrate. */}
+              {isCurrentMonth && data.forecast_balance != null && (
+                <div title="Saldo attuale meno le scadenze non ancora pagate di questo mese (solo quelle registrate in Scadenze: spese quotidiane ed entrate non incluse)."
+                  style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12.5, color: 'rgb(var(--color-tertiary))' }}>Fine mese</span>
+                  <span style={{ fontFamily: mono, fontSize: 15, fontWeight: 700, color: data.forecast_balance < 0 ? 'rgb(239 68 68)' : 'rgb(var(--color-heading))' }}>{eur(data.forecast_balance, true)}</span>
+                  <span style={{ fontSize: 12, color: 'rgb(var(--color-muted))' }}>
+                    {data.forecast_due ? `dopo ${eur(data.forecast_due, true)} di scadenze da pagare` : 'nessuna scadenza ancora da pagare'}
+                  </span>
+                </div>
+              )}
+              {extraAccounts.length > 0 && (
+                <AccountList accounts={extraAccounts} readOnly={isGuest} onChanged={load} />
+              )}
+              {data.bank_error && (
+                <p title={data.bank_error} style={{ margin: '8px 0 0', fontSize: 12.5, color: 'rgb(245 158 11)' }}>Ultimo sync non riuscito — riprova con Sincronizza.</p>
+              )}
+              {consentExpiring && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, padding: '8px 12px', borderRadius: 10, background: 'rgb(245 158 11/0.10)', border: '1px solid rgb(245 158 11/0.32)', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12.5, color: 'rgb(var(--color-heading))' }}>
+                    Il consenso {bankName} scade {consentDaysLeft! <= 0 ? 'oggi' : consentDaysLeft === 1 ? 'domani' : `tra ${consentDaysLeft} giorni`} ({fmtDay(data.bank_expires_at!)}).
+                  </span>
+                  {!isGuest && (
+                    <button type="button" onClick={() => setBankOpen(true)}
+                      style={{ fontSize: 12.5, fontWeight: 600, color: 'rgb(245 158 11)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+                      Rinnova ora →
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="sd-m-full sd-t-noindent" style={{ display: 'flex', gap: 36, alignItems: 'center', paddingLeft: 36, borderLeft: '1px solid rgb(var(--color-border))', flexWrap: 'wrap' }}>
+              <Stat label="Entrate" value={eur(income)} color="rgb(16 185 129)" />
+              <Stat label="Uscite" value={eur(spent)} color="rgb(239 68 68)" />
+              <Stat label="Netto" value={(net >= 0 ? '+' : '−') + eur(Math.abs(net)).replace('−', '')} />
+            </div>
+          </div>
+        </Card>
+      ) : bankLapsed ? (
+        <Card i={1} pad="24px 28px" style={{ marginBottom: 18, borderColor: 'rgb(245 158 11/0.45)' }}>
+          <div style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'space-between', gap: 36, flexWrap: 'wrap' }}>
+            <div style={{ minWidth: 220, flex: 1, maxWidth: 520 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: 'rgb(245 158 11)', flex: 'none' }} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'rgb(245 158 11)' }}>Scollegato</span>
+                <span style={{ fontSize: 13, color: 'rgb(var(--color-tertiary))' }}>· {bankName} · ultimo sync {fmtSync(data.bank_last_sync)}</span>
+              </div>
+              <div style={{ fontSize: 17, fontWeight: 600, color: 'rgb(var(--color-heading))', marginTop: 12 }}>
+                {data.bank_status === 'expired' && data.bank_expires_at && parseUtc(data.bank_expires_at).getTime() <= Date.now()
+                  ? `Il consenso ${bankName} è scaduto il ${fmtDay(data.bank_expires_at)}`
+                  : `${bankName} non è più collegato`}
+              </div>
+              {/* Raw provider errors are technical: kept in the tooltip, not the copy. */}
+              <p title={data.bank_error ?? undefined} style={{ margin: '6px 0 0', fontSize: 13.5, color: 'rgb(var(--color-tertiary))', lineHeight: 1.5 }}>
+                {data.bank_status === 'error'
+                  ? 'L’ultimo tentativo di collegamento non è andato a buon fine. '
+                  : 'Per legge (PSD2) l’accesso in lettura va riconfermato periodicamente nell’app della banca. '}
+                Le transazioni già importate restano; ricollegando riprendono saldo e sincronizzazione.
+              </p>
+              {!isGuest && (
+                <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <Button variant="primary" onClick={() => setBankOpen(true)}><Landmark size={15} style={{ marginRight: 6 }} />Ricollega {bankName}</Button>
+                  <Button variant="secondary" onClick={() => fileRef.current?.click()}>Importa CSV</Button>
+                </div>
+              )}
             </div>
             <div className="sd-m-full sd-t-noindent" style={{ display: 'flex', gap: 36, alignItems: 'center', paddingLeft: 36, borderLeft: '1px solid rgb(var(--color-border))', flexWrap: 'wrap' }}>
               <Stat label="Entrate" value={eur(income)} color="rgb(16 185 129)" />
@@ -360,7 +477,16 @@ export default function BudgetPage() {
           <Card i={3} pad="22px 24px">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 6 }}>
               <h3 style={h3}>Spese per categoria</h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                {overLimit > 0 && (
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: 'rgb(239 68 68)' }}>{overLimit} oltre il limite</span>
+                )}
+                {!isGuest && (
+                  <button onClick={() => setLimitsOpen(true)} title="Imposta un tetto mensile per categoria"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 500, color: 'rgb(99 102 241)', cursor: 'pointer', background: 'none', border: 'none', fontFamily: 'inherit' }}>
+                    <Target size={13} />Limiti
+                  </button>
+                )}
                 {!isGuest && (
                   <button onClick={doRecat} disabled={recatting} title="Riassegna le categorie alle transazioni importate"
                     style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 500, color: 'rgb(99 102 241)', cursor: recatting ? 'default' : 'pointer', background: 'none', border: 'none', fontFamily: 'inherit', opacity: recatting ? 0.6 : 1 }}>
@@ -374,7 +500,7 @@ export default function BudgetPage() {
               <>
                 <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 20px' }}><CompositionDonut cats={cats} total={catTotal} /></div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {cats.map((c) => <CatRow key={c.name} cat={c} spent={catTotal} items={expenseByCat[c.name] || []} />)}
+                  {cats.map((c) => <CatRow key={c.name} cat={c} spent={catTotal} limit={limitsByCat[c.name]} items={expenseByCat[c.name] || []} />)}
                 </div>
               </>
             )}
@@ -423,7 +549,7 @@ export default function BudgetPage() {
 
       {view === 'c' && (
         <>
-          <Timeline scadenze={data.upcoming_scadenze} />
+          <Timeline upcoming={data.upcoming_scadenze} overdue={data.overdue_scadenze} />
           <ScadenzeMese />
         </>
       )}
@@ -444,8 +570,12 @@ export default function BudgetPage() {
           <Button variant="danger" isLoading={busy} onClick={confirmDelete}>Elimina</Button>
         </div>
       </Sheet>
-      <Sheet open={bankOpen} onClose={() => setBankOpen(false)} title="Aggiungi banca" subtitle="Open Banking · Enable Banking · sola lettura">
-        <BankConnectForm key={bankOpen ? 'open' : 'closed'} onCancel={() => setBankOpen(false)} />
+      <Sheet open={limitsOpen} onClose={() => setLimitsOpen(false)} title="Limiti mensili" subtitle={`Da ${fmtMonthLabel(periodISO)} in poi · valgono finché non li cambi`}>
+        <LimitsForm key={limitsOpen ? `l-${periodISO}` : 'l'} categoryNames={categoryNames} current={limitsByCat} month={periodISO}
+          onSaved={async () => { setLimitsOpen(false); await load(); }} onCancel={() => setLimitsOpen(false)} />
+      </Sheet>
+      <Sheet open={bankOpen} onClose={() => setBankOpen(false)} title={data.bank_institution ? 'Ricollega banca' : 'Aggiungi banca'} subtitle="Open Banking · Enable Banking · sola lettura">
+        <BankConnectForm key={bankOpen ? 'open' : 'closed'} preferred={data.bank_institution} onCancel={() => setBankOpen(false)} />
       </Sheet>
     </div>
   );
@@ -510,10 +640,13 @@ function CompositionDonut({ cats, total }: { cats: Cat[]; total: number }) {
   );
 }
 
-function CatRow({ cat, spent, items }: { cat: Cat; spent: number; items: TxView[] }) {
+function CatRow({ cat, spent, limit, items }: { cat: Cat; spent: number; limit?: number; items: TxView[] }) {
   const [open, setOpen] = useState(false);
-  const frac = spent ? cat.amount / spent : 0;
-  const pct = Math.round(frac * 100);
+  // With a limit the bar measures spending against it (amber ≥80%, red over);
+  // without, it's the category's share of the month's spending.
+  const frac = limit ? Math.min(cat.amount / limit, 1) : spent ? cat.amount / spent : 0;
+  const pct = Math.round((limit ? cat.amount / limit : frac) * 100);
+  const barColor = !limit ? `rgb(${cat.color})` : cat.amount > limit ? 'rgb(239 68 68)' : cat.amount >= limit * 0.8 ? 'rgb(245 158 11)' : `rgb(${cat.color})`;
   const canOpen = items.length > 0;
   return (
     <div className="sd-fin-legend">
@@ -529,12 +662,13 @@ function CatRow({ cat, spent, items }: { cat: Cat; spent: number; items: TxView[
             {canOpen && <span style={{ fontFamily: mono, fontWeight: 600, color: 'rgb(var(--color-muted))' }}>{items.length}</span>}
           </span>
           <span style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontFamily: mono, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{eur(cat.amount, true)}</span> · {pct}%
+            <span style={{ fontFamily: mono, fontWeight: 600, color: limit && cat.amount > limit ? 'rgb(239 68 68)' : 'rgb(var(--color-heading))' }}>{eur(cat.amount, true)}</span>
+            {limit ? <span style={{ fontFamily: mono }}>/ {eur(limit)}</span> : null} · {pct}%
             {canOpen && <ChevronDown size={13} style={{ color: 'rgb(var(--color-muted))', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />}
           </span>
         </div>
         <div style={{ height: 8, borderRadius: 8, background: 'rgb(var(--color-card-inner))', overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${(frac * 100).toFixed(0)}%`, borderRadius: 8, background: `rgb(${cat.color})` }} />
+          <div style={{ height: '100%', width: `${(frac * 100).toFixed(0)}%`, borderRadius: 8, background: barColor }} />
         </div>
       </div>
       {open && (
@@ -597,43 +731,152 @@ function TxList({ txs, onDel, onEdit }: { txs: TxView[]; onDel: (t: TxView) => v
   );
 }
 
-/* ── Scadenze timeline (forward, next 30 days) ── */
-function Timeline({ scadenze }: { scadenze: ScadenzaPreview[] }) {
+/* ── Prossimi pagamenti: overdue first, then the next 30 days ── */
+function Timeline({ upcoming, overdue }: { upcoming: ScadenzaPreview[]; overdue: ScadenzaPreview[] }) {
   const MAXD = 30;
-  const items = scadenze.filter((s) => s.days_until >= 0 && s.days_until <= MAXD).slice(0, 8);
-  if (items.length === 0) return null;
+  const next = upcoming.filter((s) => s.days_until >= 0 && s.days_until <= MAXD).slice(0, 8);
+  const late = overdue.slice(-5);
+  if (next.length === 0 && late.length === 0) return null;
+  const dueNext = next.reduce((a, s) => a + s.importo, 0);
+  const row = (s: ScadenzaPreview) => {
+    const isLate = s.days_until < 0;
+    const col = isLate ? '239 68 68' : s.days_until === 0 ? '239 68 68' : s.days_until <= 7 ? '245 158 11' : '99 102 241';
+    const rel = isLate ? `${-s.days_until}g fa` : s.days_until === 0 ? 'oggi' : s.days_until === 1 ? 'domani' : `tra ${s.days_until}g`;
+    return (
+      <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', position: 'relative' }}>
+        <span style={{ width: 12, height: 12, borderRadius: '50%', flex: 'none', background: `rgb(${col})`, boxShadow: '0 0 0 4px rgb(var(--color-card))' }} />
+        {/* ≤560px la data esatta è ridondante: la pill relativa basta */}
+        <span className="sd-m-hide" style={{ width: 46, flex: 'none', fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{s.scadenza_gg_mm}</span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: 'rgb(var(--color-heading))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.desc}</span>
+        {s.importo > 0 && <span style={{ flex: 'none', fontFamily: mono, fontSize: 13, fontWeight: 600, color: isLate ? 'rgb(239 68 68)' : 'rgb(var(--color-heading))' }}>{eur(s.importo, true)}</span>}
+        <span style={{ flex: 'none', fontSize: 11, fontWeight: 600, color: `rgb(${col})`, background: `rgb(${col} / 0.12)`, border: `1px solid rgb(${col} / 0.28)`, borderRadius: 999, padding: '2px 9px', minWidth: 58, textAlign: 'center' }}>{rel}</span>
+      </div>
+    );
+  };
   return (
     <Card i={1} pad="22px 24px" style={{ marginBottom: 18 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <h3 style={h3}>Linea del tempo</h3>
-        <span style={{ fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>prossimi {MAXD} giorni</span>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
+        <h3 style={h3}>Prossimi pagamenti</h3>
+        <span style={{ fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>
+          {next.length > 0 ? `${eur(dueNext, true)} nei prossimi ${MAXD} giorni` : `prossimi ${MAXD} giorni`}
+        </span>
       </div>
       <div style={{ position: 'relative', marginTop: 4 }}>
         {/* vertical rail */}
         <div style={{ position: 'absolute', left: 5, top: 16, bottom: 16, width: 2, background: 'rgb(var(--color-border))' }} />
-
+        {late.length > 0 && (
+          <>
+            <div style={{ padding: '4px 0 2px 24px', fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: 600, color: 'rgb(239 68 68)' }}>Scadute, non spuntate</div>
+            {late.map(row)}
+          </>
+        )}
         {/* Oggi anchor */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', position: 'relative' }}>
           <span style={{ width: 12, height: 12, borderRadius: '50%', flex: 'none', background: 'rgb(var(--color-card))', border: '2px solid rgb(99 102 241)', boxShadow: '0 0 0 4px rgb(var(--color-card))' }} />
           <span style={{ fontFamily: mono, fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: 600, color: 'rgb(99 102 241)' }}>Oggi</span>
         </div>
-
-        {items.map((s) => {
-          const col = s.pagato ? '16 185 129' : s.days_until === 0 ? '239 68 68' : s.days_until <= 7 ? '245 158 11' : '99 102 241';
-          const rel = s.pagato ? 'pagata' : s.days_until === 0 ? 'oggi' : s.days_until === 1 ? 'domani' : `tra ${s.days_until}g`;
-          return (
-            <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', position: 'relative', opacity: s.pagato ? 0.6 : 1 }}>
-              <span style={{ width: 12, height: 12, borderRadius: '50%', flex: 'none', background: `rgb(${col})`, boxShadow: '0 0 0 4px rgb(var(--color-card))' }} />
-              {/* ≤560px la data esatta è ridondante: la pill relativa basta */}
-              <span className="sd-m-hide" style={{ width: 46, flex: 'none', fontFamily: mono, fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>{s.scadenza_gg_mm}</span>
-              <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: 'rgb(var(--color-heading))', textDecoration: s.pagato ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.desc}</span>
-              {s.importo > 0 && <span style={{ flex: 'none', fontFamily: mono, fontSize: 13, fontWeight: 600, color: 'rgb(var(--color-heading))' }}>{eur(s.importo, true)}</span>}
-              <span style={{ flex: 'none', fontSize: 11, fontWeight: 600, color: `rgb(${col})`, background: `rgb(${col} / 0.12)`, border: `1px solid rgb(${col} / 0.28)`, borderRadius: 999, padding: '2px 9px', minWidth: 58, textAlign: 'center' }}>{rel}</span>
-            </div>
-          );
-        })}
+        {next.map(row)}
       </div>
     </Card>
+  );
+}
+
+/* ── Accounts of the consent (Revolut: one per currency) ── */
+function AccountList({ accounts, readOnly, onChanged }: { accounts: BankAccountSummary[]; readOnly: boolean; onChanged: () => Promise<void> }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const primaryCur = accounts.find((a) => a.is_primary)?.currency ?? 'EUR';
+  const money = (n: number, cur: string) => {
+    try { return n.toLocaleString('it-IT', { style: 'currency', currency: cur }); } catch { return `${n.toFixed(2)} ${cur}`; }
+  };
+  const toggle = async (a: BankAccountSummary) => {
+    if (!a.id) return;
+    setBusy(a.id); setError('');
+    try { await setAccountSync(a.id, !a.sync_enabled); await onChanged(); }
+    catch { setError('Modifica non riuscita. Riprova.'); }
+    finally { setBusy(null); }
+  };
+  return (
+    <div style={{ marginTop: 14, paddingTop: 10, borderTop: '1px solid rgb(var(--color-border))', maxWidth: 420 }}>
+      <div style={{ ...eyebrow, marginBottom: 4 }}>Conti</div>
+      {accounts.map((a) => {
+        // Only same-currency accounts can join the totals (transactions carry no currency).
+        const canToggle = !readOnly && !a.is_primary && !!a.id && a.currency === primaryCur;
+        const state = a.is_primary ? 'principale' : a.currency !== primaryCur ? 'solo saldo' : a.sync_enabled ? 'nel saldo' : 'escluso';
+        return (
+          <div key={a.id ?? `${a.currency}-${a.iban_tail}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 0', fontSize: 12.5 }}>
+            <span style={{ fontFamily: mono, fontWeight: 600, width: 34, flex: 'none', color: 'rgb(var(--color-heading))' }}>{a.currency}</span>
+            <span style={{ flex: 1, minWidth: 0, color: 'rgb(var(--color-tertiary))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {a.name || 'Conto'}{a.iban_tail ? ` ··${a.iban_tail}` : ''}
+            </span>
+            <span style={{ fontFamily: mono, fontWeight: 600, flex: 'none', color: 'rgb(var(--color-heading))' }} title={a.balance_stale ? 'Ultimo saldo noto' : undefined}>
+              {a.balance != null ? money(a.balance, a.currency) : '—'}
+            </span>
+            {canToggle ? (
+              <button type="button" role="switch" aria-checked={a.sync_enabled} disabled={busy === a.id} onClick={() => toggle(a)}
+                title={a.sync_enabled ? 'Escludi dal saldo e dalla sincronizzazione' : 'Includi nel saldo e nella sincronizzazione'}
+                style={{ flex: 'none', width: 72, fontSize: 11, fontWeight: 600, borderRadius: 999, padding: '2px 8px', cursor: 'pointer', fontFamily: 'inherit',
+                  color: a.sync_enabled ? 'rgb(16 185 129)' : 'rgb(var(--color-muted))', background: a.sync_enabled ? 'rgb(16 185 129 / 0.12)' : 'transparent',
+                  border: `1px solid ${a.sync_enabled ? 'rgb(16 185 129 / 0.35)' : 'rgb(var(--color-border))'}`, opacity: busy === a.id ? 0.5 : 1 }}>
+                {state}
+              </button>
+            ) : (
+              <span style={{ flex: 'none', width: 72, textAlign: 'center', fontSize: 11, color: 'rgb(var(--color-muted))' }}>{state}</span>
+            )}
+          </div>
+        );
+      })}
+      {error && <p style={errStyle}>{error}</p>}
+    </div>
+  );
+}
+
+/* ── Monthly limits per category (carried forward until changed) ── */
+function LimitsForm({ categoryNames, current, month, onSaved, onCancel }: {
+  categoryNames: string[]; current: Record<string, number>; month: string;
+  onSaved: () => Promise<void>; onCancel: () => void;
+}) {
+  const cats = Array.from(new Set([...categoryNames, ...Object.keys(current)]))
+    .filter((c) => !['Entrate', 'Trasferimenti', 'Altro'].includes(c))
+    .sort((a, b) => Number(b in current) - Number(a in current) || a.localeCompare(b));
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(cats.map((c) => [c, current[c] != null ? String(current[c]) : ''])));
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const changed = cats.filter((c) => (values[c] ?? '') !== (current[c] != null ? String(current[c]) : ''));
+    const bad = changed.find((c) => values[c].trim() !== '' && !(Number(values[c].replace(',', '.')) >= 0));
+    if (bad) { setError(`Importo non valido per ${bad}.`); return; }
+    setSubmitting(true); setError('');
+    try {
+      for (const c of changed) {
+        const v = values[c].trim();
+        await setCategoryLimit(c, v === '' || Number(v.replace(',', '.')) === 0 ? null : Number(v.replace(',', '.')), month);
+      }
+      await onSaved();
+    } catch { setError('Salvataggio non riuscito. Riprova.'); setSubmitting(false); }
+  };
+  return (
+    <form onSubmit={submit}>
+      <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'rgb(var(--color-muted))' }}>Lascia vuoto per nessun limite. La barra diventa ambra all’80% e rossa oltre il limite.</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 380, overflowY: 'auto', paddingRight: 4 }}>
+        {cats.map((c) => (
+          <label key={c} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ width: 9, height: 9, borderRadius: 9, flex: 'none', background: `rgb(${colorFor(c)})` }} />
+            <span style={{ flex: 1, fontSize: 13.5, color: 'rgb(var(--color-heading))' }}>{c}</span>
+            <input className="sd-input" inputMode="decimal" value={values[c] ?? ''} placeholder="—" aria-label={`Limite mensile ${c}`}
+              onChange={(e) => setValues((v) => ({ ...v, [c]: e.target.value }))} style={{ width: 110, textAlign: 'right' }} />
+            <span style={{ fontSize: 12, color: 'rgb(var(--color-muted))', width: 36 }}>€/m</span>
+          </label>
+        ))}
+      </div>
+      {error && <p style={errStyle}>{error}</p>}
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
+        <Button type="button" variant="secondary" onClick={onCancel} disabled={submitting}>Annulla</Button>
+        <Button type="submit" variant="primary" isLoading={submitting}>Salva</Button>
+      </div>
+    </form>
   );
 }
 
@@ -721,7 +964,7 @@ function CategoryEditForm({ current, categoryNames, onSubmit, onCancel }: { curr
 }
 
 /* ── Bank connect (Enable Banking) ── */
-function BankConnectForm({ onCancel }: { onCancel: () => void }) {
+function BankConnectForm({ preferred, onCancel }: { preferred?: string | null; onCancel: () => void }) {
   const [country, setCountry] = useState<'ES' | 'IT'>('ES');
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [loading, setLoading] = useState(false);
@@ -732,11 +975,12 @@ function BankConnectForm({ onCancel }: { onCancel: () => void }) {
     let alive = true;
     setLoading(true); setError('');
     listInstitutions(country)
-      .then((list) => { if (alive) setInstitutions(list); })
+      // The previously connected bank goes first: a reconnect is one tap.
+      .then((list) => { if (alive) setInstitutions(preferred ? [...list].sort((a, b) => Number(b.name === preferred) - Number(a.name === preferred)) : list); })
       .catch(() => { if (alive) { setInstitutions([]); setError('Impossibile caricare le banche. Riprova più tardi.'); } })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [country]);
+  }, [country, preferred]);
 
   const connect = async (bankId: string) => {
     setConnectingId(bankId); setError('');
@@ -781,7 +1025,9 @@ function BankConnectForm({ onCancel }: { onCancel: () => void }) {
                   : <Landmark size={17} />}
               </span>
               <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 500, color: 'rgb(var(--color-heading))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{inst.name}</span>
-              {connectingId === inst.id && <span style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>Avvio…</span>}
+              {connectingId === inst.id
+                ? <span style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>Avvio…</span>
+                : inst.name === preferred && <span style={{ fontSize: 11, fontWeight: 600, color: 'rgb(16 185 129)', flex: 'none' }}>ultimo usato</span>}
             </button>
           ))}
         </div>
