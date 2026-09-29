@@ -149,8 +149,9 @@ export function ScadenzeMese() {
   };
   const patchItem = (id: string, raw: Deadline) =>
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, raw } : it)));
+  // An untick also drops the "auto" mark (the backend remembers the rejection).
   const patchOccPaid = (id: string, occPaid: boolean) =>
-    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, occPaid } : it)));
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, occPaid, occAuto: occPaid && it.occAuto } : it)));
 
   // Non-occurrence rows (single deadlines AND the collapsed row of a completed
   // plan): the checkbox flips the whole deadline's is_completed.
@@ -282,7 +283,10 @@ export function ScadenzeMese() {
             <span style={{ fontSize: 14.5, fontWeight: 500, color: rowPaid ? 'rgb(var(--color-tertiary))' : 'rgb(var(--color-heading))', textDecoration: rowPaid ? 'line-through' : 'none' }}>{it.titolo}</span>
             {it.source === 'academic' && <span style={{ fontSize: 9.5, letterSpacing: '.1em', fontWeight: 600, color: MUTED, fontFamily: mono, background: 'rgb(128 128 128 / 0.12)', padding: '2px 6px', borderRadius: 5 }}>UOC</span>}
             {rowPaid
-              ? <span style={{ flex: 'none', width: 'max-content', fontSize: 10.5, fontWeight: 600, color: GREEN, background: 'rgb(16 185 129 / 0.12)', border: '1px solid rgb(16 185 129 / 0.3)', borderRadius: 6, padding: '1px 7px' }}>Pagata</span>
+              ? <span title={it.occAuto ? 'Spuntata in automatico: trovata la transazione bancaria corrispondente. Togli la spunta se è sbagliata.' : undefined}
+                  style={{ flex: 'none', width: 'max-content', fontSize: 10.5, fontWeight: 600, color: GREEN, background: 'rgb(16 185 129 / 0.12)', border: '1px solid rgb(16 185 129 / 0.3)', borderRadius: 6, padding: '1px 7px' }}>
+                  {it.occAuto ? 'Pagata · auto' : 'Pagata'}
+                </span>
               : recurrenceBadge(it)}
             {overdue && <span style={{ flex: 'none', width: 'max-content', fontSize: 10.5, fontWeight: 600, color: RED, background: 'rgb(239 68 68 / 0.10)', border: '1px solid rgb(239 68 68 / 0.3)', borderRadius: 6, padding: '1px 7px' }}>Scaduta</span>}
           </div>

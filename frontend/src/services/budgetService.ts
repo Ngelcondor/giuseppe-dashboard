@@ -66,6 +66,7 @@ export interface CategorySpending {
   percentage: number;
 }
 
+// One unpaid deadline occurrence ("<deadline id>@<YYYY-MM-DD>") for the timeline.
 export interface ScadenzaPreview {
   id: string;
   desc: string;
@@ -89,6 +90,15 @@ export interface BudgetDashboard {
   bank_institution: string | null;
   bank_expires_at: string | null;
   bank_error: string | null;
+  // The balance is cached (PSD2 caps unattended bank reads): when it was read,
+  // and whether it's a last-known value after a failed refresh.
+  bank_balance_at: string | null;
+  bank_balance_stale: boolean;
+  bank_accounts: BankAccountSummary[];
+  // End-of-month forecast (current month only): unpaid Scadenze still due this
+  // month, and the balance after paying them. Registered deadlines only.
+  forecast_due: number | null;
+  forecast_balance: number | null;
   month: string;
   total_income: number;
   total_expenses: number;
@@ -115,6 +125,25 @@ export interface ImportResult {
   skipped: number;
   errors: number;
   message: string;
+  // Scadenze ticked paid automatically from the imported transactions.
+  auto_ticked?: number;
+}
+
+export interface BankAccountSummary {
+  id: string | null;          // null for connections made before multi-account
+  name: string | null;
+  iban_tail: string | null;   // last 4 chars
+  currency: string;
+  is_primary: boolean;
+  sync_enabled: boolean;
+  balance: number | null;
+  balance_at: string | null;
+  balance_stale: boolean;
+}
+
+/** Include/exclude a (same-currency) account from sync and the balance total. */
+export async function setAccountSync(accountId: string, syncEnabled: boolean): Promise<void> {
+  await api.patch(`/budget/bank/accounts/${accountId}`, { sync_enabled: syncEnabled });
 }
 
 // ─── Bank Connection ─────────────────────────────────────────────────────────
@@ -245,6 +274,12 @@ export async function importCSV(file: File): Promise<ImportResult> {
 }
 
 // ─── Budget Goals ────────────────────────────────────────────────────────────
+
+/** Set a category's monthly limit from `month` (YYYY-MM-01) on; null removes it.
+ *  Later months inherit it until changed. */
+export async function setCategoryLimit(category: string, monthlyLimit: number | null, month: string): Promise<void> {
+  await api.put('/budget/limits', { category, monthly_limit: monthlyLimit, month });
+}
 
 export async function listGoals(): Promise<BudgetGoal[]> {
   const { data } = await api.get('/budget/goals');
