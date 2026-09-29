@@ -34,6 +34,7 @@ from app.services.bank_provider import (
     BankAuthResult,
     BankAccountInfo,
     BankBalance,
+    BankSessionExpired,
     BankTransaction,
     BankTransactionList,
 )
@@ -42,6 +43,51 @@ logger = logging.getLogger(__name__)
 
 # Enable Banking API base
 EB_BASE = "https://api.enablebanking.com"
+
+# Consent length: ask for the bank's own maximum (ASPSP maximum_consent_validity)
+# capped at the PSD2 ceiling of 180 days; 90 days if the bank doesn't say.
+CONSENT_DEFAULT = timedelta(days=90)
+CONSENT_CAP = timedelta(days=180)
+def _session_gone(resp: httpx.Response) -> bool:
+    """Does this /accounts/* error mean the consent/session is dead?
+
+    Per-account calls answer 401 once the session is expired or revoked (our JWT
+    is freshly signed on every call, so a 401 is about the consent, not us).
+    403/404 count only when the body says so: marking a connection EXPIRED is
+    only undone by a new SCA, so a transient or rate-limit 4xx must not do it.
+    """
+    if resp.status_code == 401:
+        return True
+    if resp.status_code in (403, 404):
+        body = resp.text.lower()
+        return "session" in body or "consent" in body
+    return False
+
+
+def _raise_for_account_status(resp: httpx.Response, op: str) -> None:
+    """raise_for_status for /accounts/* calls, mapping a dead session to BankSessionExpired."""
+    try:
+        resp.raise_for_status()
+    except httpx.HTTPStatusError:
+        logger.error("EB %s HTTP %s: %s", op, resp.status_code, resp.text)
+        if _session_gone(resp):
+            raise BankSessionExpired(
+                f"Sessione bancaria scaduta o revocata (HTTP {resp.status_code})"
+            )
+        raise
+
+
+def _parse_utc_naive(value) -> Optional[datetime]:
+    """ISO timestamp → naive UTC datetime (the DB columns are naive, compared to utcnow())."""
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
 
 
 def _to_float(value, default: float = 0.0) -> float:
@@ -140,6 +186,31 @@ class EnableBankingProvider(BankProvider):
             )
         return result
 
+    async def _consent_validity(self, name: str, country: str) -> timedelta:
+        """Longest consent the bank grants (ASPSP maximum_consent_validity, seconds).
+
+        Asking for more than the bank allows makes POST /auth fail, asking for
+        less forces a re-authorization sooner than needed (the old fixed 90 days).
+        Any lookup failure falls back to 90 days — never blocks the connect flow.
+        """
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.get(
+                    f"{EB_BASE}/aspsps", params={"country": country}, headers=self._auth_headers()
+                )
+                resp.raise_for_status()
+                data = resp.json()
+            for a in data.get("aspsps", []) if isinstance(data, dict) else []:
+                if isinstance(a, dict) and a.get("name") == name:
+                    seconds = int(a.get("maximum_consent_validity") or 0)
+                    if seconds > 0:
+                        # 1h margin: EB rejects a valid_until past the bank's max.
+                        return min(timedelta(seconds=seconds) - timedelta(hours=1), CONSENT_CAP)
+                    break
+        except Exception as e:  # noqa: BLE001 — best effort, fallback below
+            logger.warning("EB consent validity lookup failed for %s/%s: %s", name, country, e)
+        return CONSENT_DEFAULT
+
     # ─── Initiate authorization ───────────────────────────────────────────────
 
     async def initiate_auth(
@@ -153,12 +224,14 @@ class EnableBankingProvider(BankProvider):
         Send the user to the returned URL; the bank redirects back to redirect_url
         with ?code=<code>&state=<state>.
         """
-        headers = self._auth_headers()
         redirect = redirect_url or self._redirect_url
         state = uuid.uuid4().hex
+        validity = await self._consent_validity(institution_id, country)
+        logger.info("EB consent for %s/%s: requesting %s days", institution_id, country, validity.days)
         valid_until = (
-            datetime.now(tz=timezone.utc) + timedelta(days=90)
+            datetime.now(tz=timezone.utc) + validity
         ).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        headers = self._auth_headers()
 
         body = {
             "access": {"valid_until": valid_until},
@@ -221,11 +294,14 @@ class EnableBankingProvider(BankProvider):
 
         raw_accounts = data.get("accounts", []) or []
         accounts: list[BankAccountInfo] = []
+        # The consent the bank actually granted (may differ from what we asked).
+        access = data.get("access") if isinstance(data.get("access"), dict) else {}
+        valid_until = _parse_utc_naive(access.get("valid_until"))
 
         for acc in raw_accounts:
             # accounts items may be plain uid strings or full objects
             if isinstance(acc, str):
-                accounts.append(BankAccountInfo(account_id=acc))
+                accounts.append(BankAccountInfo(account_id=acc, valid_until=valid_until))
                 continue
             if not isinstance(acc, dict):
                 logger.warning("EB complete_auth: skipping account of type %s", type(acc))
@@ -250,6 +326,7 @@ class EnableBankingProvider(BankProvider):
                     name=name,
                     currency=currency,
                     owner_name=owner_name,
+                    valid_until=valid_until,
                 )
             )
 
@@ -268,11 +345,7 @@ class EnableBankingProvider(BankProvider):
                 f"{EB_BASE}/accounts/{account_id}/balances",
                 headers=headers,
             )
-            try:
-                resp.raise_for_status()
-            except httpx.HTTPStatusError:
-                logger.error("EB get_balances HTTP %s: %s", resp.status_code, resp.text)
-                raise
+            _raise_for_account_status(resp, "get_balances")
             data = resp.json() if resp.content else {}
 
         balances_raw = data.get("balances", []) if isinstance(data, dict) else []
@@ -325,14 +398,7 @@ class EnableBankingProvider(BankProvider):
                 if continuation_key:
                     q["continuation_key"] = continuation_key
                 resp = await client.get(url, headers=headers, params=q)
-                try:
-                    resp.raise_for_status()
-                except httpx.HTTPStatusError:
-                    logger.error(
-                        "EB get_transactions HTTP %s (page %s): %s",
-                        resp.status_code, page, resp.text,
-                    )
-                    raise
+                _raise_for_account_status(resp, f"get_transactions (page {page})")
                 data = resp.json() if resp.content else {}
                 if not isinstance(data, dict):
                     logger.error("EB get_transactions unexpected payload: %s", resp.text)

@@ -83,6 +83,12 @@ export interface BudgetDashboard {
   bank_balance: number | null;
   bank_currency: string;
   bank_last_sync: string | null;
+  // Latest non-pending connection even when dead, so the UI can say "consenso
+  // scaduto il …" instead of "nessuna banca". Datetimes are naive UTC.
+  bank_status: 'active' | 'expired' | 'error' | null;
+  bank_institution: string | null;
+  bank_expires_at: string | null;
+  bank_error: string | null;
   month: string;
   total_income: number;
   total_expenses: number;

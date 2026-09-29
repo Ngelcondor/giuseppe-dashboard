@@ -13,6 +13,7 @@ import {
   type Transaction, type ScadenzaPreview, type Institution,
 } from '@/services/budgetService';
 import { getCurrentUserRole } from '@/services/scadenzeService';
+import { ApiError } from '@/types';
 import { ScadenzeMese } from '@/components/sd/ScadenzeMese';
 import { Abbonamenti } from '@/components/sd/Abbonamenti';
 
@@ -30,6 +31,7 @@ const errStyle: React.CSSProperties = { margin: '2px 0 0', fontSize: 12.5, color
 
 const FALLBACK: BudgetDashboard = {
   bank_connected: false, bank_balance: null, bank_currency: 'EUR', bank_last_sync: null,
+  bank_status: null, bank_institution: null, bank_expires_at: null, bank_error: null,
   month: monthFirstISO(new Date().getFullYear(), new Date().getMonth() + 1), total_income: 0, total_expenses: 0, net_balance: 0,
   categories: [], upcoming_scadenze: [], overdue_scadenze: [],
   scadenze_total: 0, scadenze_paid: 0, scadenze_remaining: 0, recent_transactions: [],
@@ -70,8 +72,14 @@ const fmtTxDate = (iso: string) =>
 const fmtMonthLabel = (iso: string) =>
   new Date(iso + 'T00:00:00').toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })
     .replace(/^./, (c) => c.toUpperCase());
+// The backend serialises naive UTC datetimes (no offset): without the 'Z' the
+// browser reads them as local time — 2h off in CEST.
+const parseUtc = (iso: string) => new Date(/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + 'Z');
 const fmtSync = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'mai';
+  iso ? parseUtc(iso).toLocaleString('it-IT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'mai';
+const fmtDay = (iso: string) => parseUtc(iso).toLocaleDateString('it-IT', { day: 'numeric', month: 'long' });
+// Warn this many days before the PSD2 consent lapses.
+const CONSENT_WARN_DAYS = 14;
 
 type Cat = { name: string; color: string; amount: number };
 function toCats(categories: CategorySpending[]): Cat[] {
@@ -163,7 +171,13 @@ export default function BudgetPage() {
       const r = await syncBankTransactions(30);
       setImportMsg(`${r.imported} transazioni sincronizzate${r.skipped ? ` · ${r.skipped} già presenti` : ''}`);
       await load();
-    } catch { setImportErr('Sincronizzazione non riuscita. Riprova.'); }
+    } catch (e) {
+      // 409 = consenso scaduto/revocato: il reload porta la card in "Ricollega".
+      if (e instanceof ApiError && e.statusCode === 409) {
+        setImportErr(typeof e.data?.detail === 'string' ? e.data.detail : 'Consenso bancario scaduto — ricollega il conto.');
+        await load();
+      } else setImportErr('Sincronizzazione non riuscita. Riprova.');
+    }
     finally { setSyncing(false); }
   };
 
@@ -205,6 +219,19 @@ export default function BudgetPage() {
   const net = Math.round(data.net_balance);
   const balance = data.bank_balance;                 // number | null
   const bankConnected = data.bank_connected || balance != null;
+  // Was connected, now isn't (consent lapsed / revoked / failed): offer a
+  // one-tap reconnect instead of the first-time "Nessuna banca collegata".
+  const bankLapsed = !bankConnected && (data.bank_status === 'expired' || data.bank_status === 'error');
+  const bankName = data.bank_institution || 'Conto';
+  // Calendar days (local), so "5 ottobre" seen on 29 settembre reads "tra 6 giorni".
+  const consentDaysLeft = bankConnected && data.bank_expires_at
+    ? (() => {
+        const e = parseUtc(data.bank_expires_at);
+        return Math.round((new Date(e.getFullYear(), e.getMonth(), e.getDate()).getTime()
+          - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86_400_000);
+      })()
+    : null;
+  const consentExpiring = consentDaysLeft != null && consentDaysLeft <= CONSENT_WARN_DAYS;
 
   // All categories offered in pickers: the canonical set + whatever's in use.
   const categoryNames = Array.from(
@@ -290,7 +317,7 @@ export default function BudgetPage() {
           <Button size="md" variant="secondary" isLoading={importing} onClick={() => fileRef.current?.click()}><FileUp size={15} style={{ marginRight: 6 }} />Importa CSV</Button>
           {bankConnected
             ? <Button size="md" variant="secondary" isLoading={syncing} onClick={doSync}><RefreshCw size={15} style={{ marginRight: 6 }} />Sincronizza</Button>
-            : <Button size="md" variant="primary" onClick={() => setBankOpen(true)}><Landmark size={15} style={{ marginRight: 6 }} />Aggiungi banca</Button>}
+            : <Button size="md" variant="primary" onClick={() => setBankOpen(true)}><Landmark size={15} style={{ marginRight: 6 }} />{bankLapsed ? 'Ricollega' : 'Aggiungi banca'}</Button>}
         </div>
       </header>
 
@@ -317,11 +344,65 @@ export default function BudgetPage() {
             <div style={{ minWidth: 220 }}>
               <div style={eyebrow}>Saldo disponibile</div>
               <div style={{ fontFamily: mono, fontSize: 'clamp(30px, 10vw, 44px)', fontWeight: 600, letterSpacing: '-.03em', color: 'rgb(var(--color-heading))', lineHeight: 1, marginTop: 10 }}>{balance != null ? eur(balance, true) : '€ —'}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 15 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 15, flexWrap: 'wrap' }}>
                 <span style={{ width: 9, height: 9, borderRadius: '50%', background: 'rgb(16 185 129)', flex: 'none' }} />
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'rgb(16 185 129)' }}>Connesso</span>
                 <span style={{ fontSize: 13, color: 'rgb(var(--color-tertiary))' }}>· {data.bank_currency} · ultimo sync {fmtSync(data.bank_last_sync)}</span>
               </div>
+              {balance == null && (
+                <p style={{ margin: '8px 0 0', fontSize: 12.5, color: 'rgb(var(--color-muted))' }}>Saldo non disponibile al momento — la banca non ha risposto.</p>
+              )}
+              {data.bank_error && (
+                <p title={data.bank_error} style={{ margin: '8px 0 0', fontSize: 12.5, color: 'rgb(245 158 11)' }}>Ultimo sync non riuscito — riprova con Sincronizza.</p>
+              )}
+              {consentExpiring && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, padding: '8px 12px', borderRadius: 10, background: 'rgb(245 158 11/0.10)', border: '1px solid rgb(245 158 11/0.32)', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12.5, color: 'rgb(var(--color-heading))' }}>
+                    Il consenso {bankName} scade {consentDaysLeft! <= 0 ? 'oggi' : consentDaysLeft === 1 ? 'domani' : `tra ${consentDaysLeft} giorni`} ({fmtDay(data.bank_expires_at!)}).
+                  </span>
+                  {!isGuest && (
+                    <button type="button" onClick={() => setBankOpen(true)}
+                      style={{ fontSize: 12.5, fontWeight: 600, color: 'rgb(245 158 11)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+                      Rinnova ora →
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="sd-m-full sd-t-noindent" style={{ display: 'flex', gap: 36, alignItems: 'center', paddingLeft: 36, borderLeft: '1px solid rgb(var(--color-border))', flexWrap: 'wrap' }}>
+              <Stat label="Entrate" value={eur(income)} color="rgb(16 185 129)" />
+              <Stat label="Uscite" value={eur(spent)} color="rgb(239 68 68)" />
+              <Stat label="Netto" value={(net >= 0 ? '+' : '−') + eur(Math.abs(net)).replace('−', '')} />
+            </div>
+          </div>
+        </Card>
+      ) : bankLapsed ? (
+        <Card i={1} pad="24px 28px" style={{ marginBottom: 18, borderColor: 'rgb(245 158 11/0.45)' }}>
+          <div style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'space-between', gap: 36, flexWrap: 'wrap' }}>
+            <div style={{ minWidth: 220, flex: 1, maxWidth: 520 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: 'rgb(245 158 11)', flex: 'none' }} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'rgb(245 158 11)' }}>Scollegato</span>
+                <span style={{ fontSize: 13, color: 'rgb(var(--color-tertiary))' }}>· {bankName} · ultimo sync {fmtSync(data.bank_last_sync)}</span>
+              </div>
+              <div style={{ fontSize: 17, fontWeight: 600, color: 'rgb(var(--color-heading))', marginTop: 12 }}>
+                {data.bank_status === 'expired' && data.bank_expires_at && parseUtc(data.bank_expires_at).getTime() <= Date.now()
+                  ? `Il consenso ${bankName} è scaduto il ${fmtDay(data.bank_expires_at)}`
+                  : `${bankName} non è più collegato`}
+              </div>
+              {/* Raw provider errors are technical: kept in the tooltip, not the copy. */}
+              <p title={data.bank_error ?? undefined} style={{ margin: '6px 0 0', fontSize: 13.5, color: 'rgb(var(--color-tertiary))', lineHeight: 1.5 }}>
+                {data.bank_status === 'error'
+                  ? 'L’ultimo tentativo di collegamento non è andato a buon fine. '
+                  : 'Per legge (PSD2) l’accesso in lettura va riconfermato periodicamente nell’app della banca. '}
+                Le transazioni già importate restano; ricollegando riprendono saldo e sincronizzazione.
+              </p>
+              {!isGuest && (
+                <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <Button variant="primary" onClick={() => setBankOpen(true)}><Landmark size={15} style={{ marginRight: 6 }} />Ricollega {bankName}</Button>
+                  <Button variant="secondary" onClick={() => fileRef.current?.click()}>Importa CSV</Button>
+                </div>
+              )}
             </div>
             <div className="sd-m-full sd-t-noindent" style={{ display: 'flex', gap: 36, alignItems: 'center', paddingLeft: 36, borderLeft: '1px solid rgb(var(--color-border))', flexWrap: 'wrap' }}>
               <Stat label="Entrate" value={eur(income)} color="rgb(16 185 129)" />
@@ -444,8 +525,8 @@ export default function BudgetPage() {
           <Button variant="danger" isLoading={busy} onClick={confirmDelete}>Elimina</Button>
         </div>
       </Sheet>
-      <Sheet open={bankOpen} onClose={() => setBankOpen(false)} title="Aggiungi banca" subtitle="Open Banking · Enable Banking · sola lettura">
-        <BankConnectForm key={bankOpen ? 'open' : 'closed'} onCancel={() => setBankOpen(false)} />
+      <Sheet open={bankOpen} onClose={() => setBankOpen(false)} title={data.bank_institution ? 'Ricollega banca' : 'Aggiungi banca'} subtitle="Open Banking · Enable Banking · sola lettura">
+        <BankConnectForm key={bankOpen ? 'open' : 'closed'} preferred={data.bank_institution} onCancel={() => setBankOpen(false)} />
       </Sheet>
     </div>
   );
@@ -721,7 +802,7 @@ function CategoryEditForm({ current, categoryNames, onSubmit, onCancel }: { curr
 }
 
 /* ── Bank connect (Enable Banking) ── */
-function BankConnectForm({ onCancel }: { onCancel: () => void }) {
+function BankConnectForm({ preferred, onCancel }: { preferred?: string | null; onCancel: () => void }) {
   const [country, setCountry] = useState<'ES' | 'IT'>('ES');
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [loading, setLoading] = useState(false);
@@ -732,11 +813,12 @@ function BankConnectForm({ onCancel }: { onCancel: () => void }) {
     let alive = true;
     setLoading(true); setError('');
     listInstitutions(country)
-      .then((list) => { if (alive) setInstitutions(list); })
+      // The previously connected bank goes first: a reconnect is one tap.
+      .then((list) => { if (alive) setInstitutions(preferred ? [...list].sort((a, b) => Number(b.name === preferred) - Number(a.name === preferred)) : list); })
       .catch(() => { if (alive) { setInstitutions([]); setError('Impossibile caricare le banche. Riprova più tardi.'); } })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [country]);
+  }, [country, preferred]);
 
   const connect = async (bankId: string) => {
     setConnectingId(bankId); setError('');
@@ -781,7 +863,9 @@ function BankConnectForm({ onCancel }: { onCancel: () => void }) {
                   : <Landmark size={17} />}
               </span>
               <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 500, color: 'rgb(var(--color-heading))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{inst.name}</span>
-              {connectingId === inst.id && <span style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>Avvio…</span>}
+              {connectingId === inst.id
+                ? <span style={{ fontSize: 12, color: 'rgb(var(--color-tertiary))' }}>Avvio…</span>
+                : inst.name === preferred && <span style={{ fontSize: 11, fontWeight: 600, color: 'rgb(16 185 129)', flex: 'none' }}>ultimo usato</span>}
             </button>
           ))}
         </div>

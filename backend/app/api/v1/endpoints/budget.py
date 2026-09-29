@@ -7,6 +7,7 @@ from sqlalchemy import func
 from datetime import date, datetime, timedelta
 from typing import List, Optional
 from calendar import monthrange
+from collections import Counter
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_editor
@@ -42,6 +43,7 @@ from app.schemas.budget import (
     CSVImportResponse,
 )
 from app.services.bank_factory import get_bank_provider
+from app.services.bank_provider import BankSessionExpired
 from app.services.category_service import categorize, subscription_keywords, TRANSFER_CATEGORY
 from app.services.csv_import_service import parse_revolut_csv
 
@@ -84,12 +86,24 @@ async def get_bank_status(
     }
 
 
+CONSENT_EXPIRED_MSG = "Consenso PSD2 scaduto — ricollega il conto"
+SESSION_REVOKED_MSG = "La banca ha chiuso la sessione (consenso scaduto o revocato) — ricollega il conto"
+
+
+async def _expire_connection(db: AsyncSession, connection: BankConnection, reason: str) -> None:
+    connection.status = BankConnectionStatus.EXPIRED
+    connection.last_sync_error = reason
+    db.add(connection)
+    await db.commit()
+    logger.info("Bank connection %s expired: %s", connection.id, reason)
+
+
 async def _active_connection(db: AsyncSession, user_id) -> Optional[BankConnection]:
     """Latest ACTIVE connection for the user, honestly expiring stale consents.
 
-    Il consenso PSD2 dura ~90 giorni (expires_at): se è passato, la connessione
+    Il consenso PSD2 ha una scadenza (expires_at): se è passata, la connessione
     viene marcata EXPIRED qui — così l'API non finge un conto collegato che il
-    provider rifiuterebbe, e il frontend torna a proporre il collegamento.
+    provider rifiuterebbe, e il frontend propone di ricollegarlo.
     """
     result = await db.execute(
         select(BankConnection).where(
@@ -99,13 +113,20 @@ async def _active_connection(db: AsyncSession, user_id) -> Optional[BankConnecti
     )
     connection = result.scalars().first()
     if connection and connection.expires_at and connection.expires_at < datetime.utcnow():
-        connection.status = BankConnectionStatus.EXPIRED
-        connection.last_sync_error = "Consenso PSD2 scaduto — ricollega il conto"
-        db.add(connection)
-        await db.commit()
-        logger.info("Bank connection %s expired (consent past expires_at)", connection.id)
+        await _expire_connection(db, connection, CONSENT_EXPIRED_MSG)
         return None
     return connection
+
+
+async def _latest_connection(db: AsyncSession, user_id) -> Optional[BankConnection]:
+    """Most recent non-PENDING connection (active, expired or error) — for status display."""
+    result = await db.execute(
+        select(BankConnection).where(
+            (BankConnection.user_id == user_id)
+            & (BankConnection.status != BankConnectionStatus.PENDING)
+        ).order_by(BankConnection.created_at.desc())
+    )
+    return result.scalars().first()
 
 
 @router.get("/bank/institutions", response_model=List[InstitutionResponse])
@@ -225,10 +246,24 @@ async def bank_auth_callback(
         connection.account_name = acc.name or "Conto"
         connection.currency = acc.currency
         connection.status = BankConnectionStatus.ACTIVE
-        connection.expires_at = datetime.utcnow() + timedelta(days=90)
+        # The expiry the bank actually granted; 90 days only if not reported.
+        connection.expires_at = acc.valid_until or (datetime.utcnow() + timedelta(days=90))
         connection.last_sync_error = None
-
         db.add(connection)
+
+        # A reconnect (renewal) supersedes the previous connection(s).
+        previous = await db.execute(
+            select(BankConnection).where(
+                (BankConnection.user_id == current_user["sub"])
+                & (BankConnection.status == BankConnectionStatus.ACTIVE)
+                & (BankConnection.id != connection.id)
+            )
+        )
+        for old in previous.scalars().all():
+            old.status = BankConnectionStatus.EXPIRED
+            old.last_sync_error = "Sostituita da un nuovo collegamento"
+            db.add(old)
+
         await db.commit()
         await db.refresh(connection)
 
@@ -281,6 +316,9 @@ async def get_bank_balance(
             )
             for b in balances
         ]
+    except BankSessionExpired:
+        await _expire_connection(db, connection, SESSION_REVOKED_MSG)
+        raise HTTPException(status_code=409, detail=SESSION_REVOKED_MSG)
     except Exception as e:
         logger.error(f"Error fetching balance: {e}")
         raise HTTPException(status_code=502, detail=f"Errore recupero saldo: {str(e)}")
@@ -294,10 +332,16 @@ async def sync_bank_transactions(
 ) -> CSVImportResponse:
     """
     Sync transactions from the configured bank provider.
-    Deduplicates by external_id (per user).
+    Deduplicates by external_id (per user), plus a content match against rows
+    from previous connections (reconnects may re-key transactions).
     """
     connection = await _active_connection(db, current_user["sub"])
     if not connection or not connection.account_id:
+        # 409 (not 404) when the consent just lapsed: the UI reloads into the
+        # "ricollega" state instead of reporting a generic failure.
+        latest = await _latest_connection(db, current_user["sub"])
+        if latest and latest.status == BankConnectionStatus.EXPIRED:
+            raise HTTPException(status_code=409, detail=latest.last_sync_error or CONSENT_EXPIRED_MSG)
         raise HTTPException(status_code=404, detail="Nessun conto collegato")
 
     provider = get_bank_provider()
@@ -329,6 +373,35 @@ async def sync_bank_transactions(
             )
             seen_ids = {row[0] for row in existing.all()}
 
+        # Safety net for reconnects: if the bank issues new transaction ids for
+        # the new session, the external_id dedup above misses and the first sync
+        # would double 90 days of history. Rows imported by OTHER (older)
+        # connections and NOT already matched by id in this batch are matched by
+        # content instead — a multiset, so two identical coffees on the same day
+        # still map one-to-one. With stable ids every old row matches by id and
+        # this set stays empty.
+        def _sig(d, amount, ttype, desc) -> tuple:
+            return (d, round(float(amount), 2), getattr(ttype, "value", ttype), (desc or "")[:500])
+
+        batch_ids = set(ext_ids)
+        prior = await db.execute(
+            select(
+                Transaction.external_id, Transaction.date, Transaction.amount,
+                Transaction.transaction_type, Transaction.description,
+            ).where(
+                (Transaction.user_id == current_user["sub"])
+                & (Transaction.source == TransactionSource.BANK_SYNC)
+                & (Transaction.date >= date_from)
+                & (
+                    (Transaction.bank_connection_id != connection.id)
+                    | (Transaction.bank_connection_id.is_(None))
+                )
+            )
+        )
+        prior_sigs = Counter(
+            _sig(*row[1:]) for row in prior.all() if row[0] not in batch_ids
+        )
+
         for tx in tx_data.booked:
             try:
                 ext_id = tx.transaction_id
@@ -345,6 +418,14 @@ async def sync_bank_transactions(
                 seen_ids.add(ext_id)  # dedup anche i duplicati intra-batch
 
                 txn_type = TransactionType.INCOME if tx.amount > 0 else TransactionType.EXPENSE
+                description = (tx.description or "N/A")[:500]
+                tx_date = tx.booking_date or date.today()
+
+                sig = _sig(tx_date, abs(tx.amount), txn_type, description)
+                if prior_sigs[sig] > 0:
+                    prior_sigs[sig] -= 1
+                    skipped += 1
+                    continue
 
                 # Category: MCC first, then merchant/description keyword match.
                 mcc = tx.merchant_category_code or ""
@@ -362,9 +443,9 @@ async def sync_bank_transactions(
                     user_id=current_user["sub"],
                     amount=abs(tx.amount),
                     category=category,
-                    description=(tx.description or "N/A")[:500],
+                    description=description,
                     transaction_type=txn_type,
-                    date=tx.booking_date or date.today(),
+                    date=tx_date,
                     source=TransactionSource.BANK_SYNC,
                     external_id=ext_id,
                     bank_connection_id=connection.id,
@@ -396,6 +477,10 @@ async def sync_bank_transactions(
 
     except HTTPException:
         raise
+    except BankSessionExpired:
+        # Raised by the fetch, before any row is added — nothing to roll back.
+        await _expire_connection(db, connection, SESSION_REVOKED_MSG)
+        raise HTTPException(status_code=409, detail=SESSION_REVOKED_MSG)
     except Exception as e:
         connection.last_sync_at = datetime.utcnow()
         connection.last_sync_error = str(e)
@@ -689,13 +774,10 @@ async def get_budget_dashboard(
     dashboard = BudgetDashboard(month=month_start)
 
     # ── 1. Bank connection & balance ──────────────────────────────────────────
-    result = await db.execute(
-        select(BankConnection).where(
-            (BankConnection.user_id == view_user_id)
-            & (BankConnection.status == BankConnectionStatus.ACTIVE)
-        ).order_by(BankConnection.created_at.desc())
-    )
-    bank_conn = result.scalars().first()
+    # _active_connection flips a lapsed consent to EXPIRED here too — before,
+    # the dashboard kept saying "Connesso" (with a silent null balance) until a
+    # manual sync failed and the card suddenly read "nessuna banca collegata".
+    bank_conn = await _active_connection(db, view_user_id)
 
     if bank_conn and bank_conn.account_id:
         dashboard.bank_connected = True
@@ -727,7 +809,22 @@ async def get_budget_dashboard(
                     if chosen.currency:
                         dashboard.bank_currency = chosen.currency
             except Exception as e:
+                # Deliberately NOT expiring on BankSessionExpired here: this runs
+                # on every load (guests included) and a spurious 4xx would flip a
+                # working connection to EXPIRED, undoable only by a new SCA. The
+                # UI shows "saldo non disponibile"; the user-triggered sync (or
+                # the consent date) is what marks the connection dead.
                 logger.warning(f"Could not fetch balance for dashboard: {e}")
+
+    # Status of the live connection, else of the most recent dead one (a failed
+    # reconnect attempt must not mask a still-working connection).
+    shown = bank_conn if dashboard.bank_connected else await _latest_connection(db, view_user_id)
+    if shown:
+        dashboard.bank_status = getattr(shown.status, "value", shown.status)
+        dashboard.bank_institution = shown.institution_name
+        dashboard.bank_expires_at = shown.expires_at
+        dashboard.bank_error = shown.last_sync_error
+        dashboard.bank_last_sync = shown.last_sync_at
 
     # ── 2. Monthly transactions ───────────────────────────────────────────────
     result = await db.execute(

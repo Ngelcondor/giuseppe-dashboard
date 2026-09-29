@@ -226,6 +226,12 @@ class BudgetDashboard(BaseModel):
     bank_balance: Optional[float] = None
     bank_currency: str = "EUR"
     bank_last_sync: Optional[datetime] = None
+    # Latest non-pending connection, even when it's no longer usable, so the UI
+    # can say "consenso scaduto il …" instead of "nessuna banca collegata".
+    bank_status: Optional[str] = None          # active | expired | error
+    bank_institution: Optional[str] = None
+    bank_expires_at: Optional[datetime] = None
+    bank_error: Optional[str] = None
 
     # Monthly summary
     month: date

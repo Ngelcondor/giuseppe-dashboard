@@ -134,7 +134,9 @@ const addMonths = (iso: string, n: number): string => {
 //     of collapsing onto its next due date (the bug: list stopped at that month).
 //   - subscription: one row per charge dall'inizio del MESE CORRENTE (una ricarica
 //     spuntata il giorno 1 resta visibile "Pagata" per tutto il mese, non sparisce
-//     l'indomani), up to the projection horizon.
+//     l'indomani), up to the projection horizon. Earlier charges survive only if
+//     they were ticked paid — that's the real history (Storico), without
+//     back-filling years of never-tracked charges.
 // A completed (or fully-paid) plan collapses back to a single row that CARRIES
 // the settled state in occPaid — before, the collapsed row of a paid plan read
 // as unpaid and the tick never survived a reload.
@@ -166,7 +168,11 @@ function expandDeadline(d: Deadline): ScadenzaItem[] {
     const out: ScadenzaItem[] = [];
     let when = d.due_date;
     let guard = 0;
-    while (when < monthStart && guard < 1200) { when = addMonths(when, step); guard += 1; }
+    while (when < monthStart && guard < 1200) {
+      if (paidSet.has(when)) out.push({ ...base, id: `${d.id}@${when}`, data: when, occPaid: true, occurrence: true });
+      when = addMonths(when, step);
+      guard += 1;
+    }
     while (when <= horizon && guard < 1200) {
       out.push({ ...base, id: `${d.id}@${when}`, data: when, occPaid: paidSet.has(when), occurrence: true });
       when = addMonths(when, step);
