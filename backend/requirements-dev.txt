@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest
+# Embedded Postgres for tests/integration (wheels for Python <= 3.12, like prod).
+pgserver

@@ -68,6 +68,8 @@ class DeadlineResponse(DeadlineBase):
     is_completed: bool
     completed_at: Optional[datetime] = None
     completion_notes: Optional[str] = None
+    # Paid dates that were ticked automatically from a bank transaction.
+    auto_paid_occurrences: Optional[List[str]] = None
     created_at: datetime
     updated_at: datetime
 

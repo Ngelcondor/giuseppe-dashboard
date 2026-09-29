@@ -82,6 +82,10 @@ class BankConnection(Base):
     last_sync_at = Column(DateTime, nullable=True)
     last_sync_error = Column(Text, nullable=True)
     expires_at = Column(DateTime, nullable=True)
+    # Provider session (Enable Banking session_id) — lets us re-read the
+    # session's account list without a new SCA. Nullable: added by
+    # _sync_missing_columns on existing DBs.
+    session_id = Column(String(255), nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -91,6 +95,34 @@ class BankConnection(Base):
 
     def __repr__(self) -> str:
         return f"<BankConnection(id={self.id}, institution={self.institution_name}, status={self.status})>"
+
+
+class BankAccount(Base):
+    """One account of a bank connection (a consent can cover several: Revolut
+    returns one per currency). Only sync_enabled accounts feed transactions;
+    by default just the primary one, so own-account transfers and foreign
+    currencies (Transaction has no currency) never mix into the EUR totals."""
+
+    __tablename__ = "bank_accounts"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    connection_id = Column(
+        UUID(as_uuid=True), ForeignKey("bank_connections.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+
+    account_uid = Column(String(255), nullable=False)  # provider id for balance/tx calls
+    iban = Column(String(50), nullable=True)
+    name = Column(String(255), nullable=True)
+    currency = Column(String(10), nullable=False, default="EUR")
+    is_primary = Column(Boolean, nullable=False, default=False)
+    sync_enabled = Column(Boolean, nullable=False, default=False)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<BankAccount(uid={self.account_uid}, currency={self.currency}, primary={self.is_primary})>"
 
 
 # ─── Transaction ──────────────────────────────────────────────────────────────
@@ -142,6 +174,12 @@ class Transaction(Base):
     linked_scadenza_id = Column(
         UUID(as_uuid=True), ForeignKey("scadenze.id"), nullable=True, index=True
     )
+
+    # The deadline occurrence this transaction paid (bank auto-tick). A linked
+    # transaction is never matched again, so one charge can't tick two plans.
+    # Plain nullable columns (no FK) so _sync_missing_columns can add them.
+    linked_deadline_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    linked_occurrence = Column(Date, nullable=True)
 
     notes = Column(String(500), nullable=True)
 

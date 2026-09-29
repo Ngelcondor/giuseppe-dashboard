@@ -15,6 +15,7 @@ from app.models.deadline import (
     RecurrenceType,
     RecurrenceInterval,
 )
+from app.services.auto_tick_service import record_untick
 from app.schemas.deadline import (
     DeadlineCreate,
     DeadlineResponse,
@@ -107,6 +108,9 @@ async def update_deadline(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deadline not found")
 
     update_data = deadline_update.dict(exclude_unset=True)
+    # Unticking an auto-ticked one-off: remember it so the bank matcher won't redo it.
+    if update_data.get("is_completed") is False and deadline.is_completed:
+        record_untick(deadline, deadline.due_date.isoformat())
     for field, value in update_data.items():
         if value is not None:
             setattr(deadline, field, value)
@@ -318,12 +322,14 @@ async def set_occurrence_paid(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deadline not found")
 
     iso = request.date.isoformat()
-    dates = list(deadline.paid_occurrences or [])
+    # JSON null / non-list rows exist in prod: treat them as empty.
+    dates = list(deadline.paid_occurrences) if isinstance(deadline.paid_occurrences, list) else []
     if request.paid:
         if iso not in dates:
             dates.append(iso)
     else:
         dates = [d for d in dates if d != iso]
+        record_untick(deadline, iso)
     # Reassign (not in-place) so SQLAlchemy detects the JSON column change.
     deadline.paid_occurrences = sorted(dates)
 

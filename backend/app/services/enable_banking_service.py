@@ -297,11 +297,12 @@ class EnableBankingProvider(BankProvider):
         # The consent the bank actually granted (may differ from what we asked).
         access = data.get("access") if isinstance(data.get("access"), dict) else {}
         valid_until = _parse_utc_naive(access.get("valid_until"))
+        session_id = data.get("session_id") or None
 
         for acc in raw_accounts:
             # accounts items may be plain uid strings or full objects
             if isinstance(acc, str):
-                accounts.append(BankAccountInfo(account_id=acc, valid_until=valid_until))
+                accounts.append(BankAccountInfo(account_id=acc, valid_until=valid_until, session_id=session_id))
                 continue
             if not isinstance(acc, dict):
                 logger.warning("EB complete_auth: skipping account of type %s", type(acc))
@@ -327,6 +328,7 @@ class EnableBankingProvider(BankProvider):
                     currency=currency,
                     owner_name=owner_name,
                     valid_until=valid_until,
+                    session_id=session_id,
                 )
             )
 

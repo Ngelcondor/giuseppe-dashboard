@@ -9,7 +9,7 @@ from app.models.focus import PomodoroSession, FocusScore
 from app.models.habit import Habit, HabitLog
 from app.models.mood import MoodEntry, SensoryLog
 from app.models.scadenza import Scadenza, TipoScadenza
-from app.models.budget import Transaction, BudgetGoal, BankConnection
+from app.models.budget import Transaction, BudgetGoal, BankConnection, BankAccount
 from app.models.ctf import CTFPlatform, CTFChallenge
 from app.models.meal import MealPlan
 from app.models.notification import PushSubscription, Notification
@@ -39,6 +39,7 @@ __all__ = [
     "Transaction",
     "BudgetGoal",
     "BankConnection",
+    "BankAccount",
     "CTFPlatform",
     "CTFChallenge",
     "MealPlan",

@@ -37,6 +37,8 @@ class BankAccountInfo:
     owner_name: Optional[str] = None
     # Consent expiry granted by the bank (naive UTC), when the provider reports it.
     valid_until: Optional[datetime] = None
+    # Provider session the account belongs to (same for every account of a consent).
+    session_id: Optional[str] = None
 
 
 @dataclass

@@ -130,6 +130,15 @@ _BNPL_PROVIDERS = (
     "findomestic", "younited", "oney", "floa", "agos", "compass",
     "wandoo", "quebueno",
 )
+# The unambiguous BNPL brands: a charge naming one is financing even when the
+# merchant after it matches a keyword rule ("Cofidis Amazon", "Scalapay* Amazon",
+# "Klarna*palau De La M"), so these are checked BEFORE the keyword rules. The
+# short names above (oney, floa, agos, compass) stay in the late check only —
+# as substrings they'd hit unrelated words ("pagos", "money").
+_BNPL_STRONG = (
+    "klarna", "scalapay", "sequra", "clearpay", "afterpay", "cofidis",
+    "findomestic", "younited", "wandoo", "quebueno",
+)
 # Installment / loan markers. Combined with PayPal (or seen on their own) they
 # mean a rata/prestito rather than a normal purchase.
 _INSTALLMENT_MARKERS = (
@@ -162,6 +171,10 @@ def subscription_keywords(titles: list[str] | None) -> set[str]:
         n = " ".join((title or "").lower().split())
         if len(n) < 4:
             continue
+        # A subscription named after a lender ("Klarna" Plus) must not turn every
+        # Klarna rata into "Abbonamenti": financing wins, no keyword at all.
+        if n.split()[0].strip("*·-") in _BNPL_STRONG + ("paypal",):
+            continue
         kws.add(n)
         first = n.split()[0]
         if len(first) >= 4 and first not in _GENERIC_BRANDS:
@@ -185,7 +198,8 @@ def categorize(
     ("To EUR"), which are internal and map to "Trasferimenti" (excluded). Real
     income (From <person>, sales, loans, top-ups) stays Entrate.
 
-    For expenses the order is: subscriptions → keyword rules (named payees like
+    For expenses the order is: named BNPL lenders (Klarna, Scalapay, Cofidis…
+    → "Rate", whatever the merchant after them) → subscriptions → keyword rules (named payees like
     420, rent→Casa, merchants) → MCC → outgoing transfers (giroconti →
     "Trasferimenti", excluded from Uscite) → financing (Rate) → "Varie". Keyword
     rules run BEFORE the transfer check so a meaningful P2P payment (rent, 420)
@@ -202,6 +216,9 @@ def categorize(
     # amounts are real Apple subscriptions; the rest are in-app (game) purchases.
     if "apple.com/bill" in haystack:
         return "Abbonamenti" if round(amount or 0.0, 2) in _APPLE_SUB_AMOUNTS else "Gaming"
+
+    if any(p in haystack for p in _BNPL_STRONG):
+        return "Rate"
 
     if sub_keywords and any(kw in haystack for kw in sub_keywords):
         return "Abbonamenti"
