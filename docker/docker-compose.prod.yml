@@ -176,6 +176,9 @@ services:
       # serving the pre-renewal cert until recreated (Aug 2026 outage).
       - /etc/letsencrypt/live/dashboard.elcondor.dev:/etc/letsencrypt/live/dashboard.elcondor.dev:ro
       - /etc/letsencrypt/archive/dashboard.elcondor.dev:/etc/letsencrypt/archive/dashboard.elcondor.dev:ro
+      # AIBudget (aibudget.elcondor.dev): same live/archive DIR mounts as above.
+      - /etc/letsencrypt/live/aibudget.elcondor.dev:/etc/letsencrypt/live/aibudget.elcondor.dev:ro
+      - /etc/letsencrypt/archive/aibudget.elcondor.dev:/etc/letsencrypt/archive/aibudget.elcondor.dev:ro
       # Webroot for certbot --webroot HTTP-01 renewals (no nginx restart needed):
       - /var/www/certbot:/var/www/certbot:ro
     depends_on:
@@ -183,6 +186,8 @@ services:
       - backend
     networks:
       - gd-network
+      # Shared only with aibudget-prod-nginx; created once: docker network create edge
+      - edge
     restart: always
 
 volumes:
@@ -192,3 +197,5 @@ volumes:
 networks:
   gd-network:
     driver: bridge
+  edge:
+    external: true
