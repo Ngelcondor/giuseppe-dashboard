@@ -59,11 +59,9 @@ services:
       ALLOW_ADMIN_INIT: "false"
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
-      # Enable Banking (open banking). APP_SECRET (private RSA key, single-line
-      # with \n) comes from docker/.env; APP_ID + redirect have prod defaults.
-      ENABLE_BANKING_APP_ID: ${ENABLE_BANKING_APP_ID:-ce2e676c-fd45-4df0-9055-cc4fbe0c2447}
-      ENABLE_BANKING_APP_SECRET: ${ENABLE_BANKING_APP_SECRET:-}
-      ENABLE_BANKING_REDIRECT_URL: ${ENABLE_BANKING_REDIRECT_URL:-https://dashboard.elcondor.dev/dashboard/budget}
+      # Niente Enable Banking: i conti bancari stanno in AIBudget
+      # (aibudget.elcondor.dev). Senza credenziali get_bank_provider() è None e
+      # Finanze lavora solo su dati locali e import CSV.
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -108,13 +106,9 @@ services:
       LOG_LEVEL: warning
       CALDAV_SYNC_ENABLED: ${CALDAV_SYNC_ENABLED:-true}
       CALDAV_DEFAULT_SYNC_INTERVAL: ${CALDAV_DEFAULT_SYNC_INTERVAL:-15}
-      # Nightly bank sync (sync_bank_connections) + its push notifications need
-      # the same Enable Banking / VAPID config as the backend.
+      # Push notifications sent from tasks need the same VAPID config as the backend.
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
-      ENABLE_BANKING_APP_ID: ${ENABLE_BANKING_APP_ID:-ce2e676c-fd45-4df0-9055-cc4fbe0c2447}
-      ENABLE_BANKING_APP_SECRET: ${ENABLE_BANKING_APP_SECRET:-}
-      ENABLE_BANKING_REDIRECT_URL: ${ENABLE_BANKING_REDIRECT_URL:-https://dashboard.elcondor.dev/dashboard/budget}
     depends_on:
       redis:
         condition: service_healthy

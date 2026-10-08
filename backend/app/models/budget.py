@@ -45,6 +45,9 @@ class BankConnectionStatus(str, Enum):
     EXPIRED = "expired"
     ERROR = "error"
     PENDING = "pending"
+    # Sessione chiusa da Enable Banking con scripts/revoke_bank_sessions.py:
+    # i conti bancari ora stanno in AIBudget.
+    REVOKED = "revoked"
 
 
 # ─── Bank Connection (GoCardless / Open Banking) ─────────────────────────────

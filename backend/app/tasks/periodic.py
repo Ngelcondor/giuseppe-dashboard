@@ -503,26 +503,3 @@ def sync_single_calendar(connection_id: str):
 
     return _run_async(_inner())
 
-
-@celery_app.task
-def sync_bank_connections():
-    """Nightly bank sync: transactions (+ auto-tick Scadenze), balances, consent warnings."""
-    from app.services.bank_factory import get_bank_provider
-    from app.services.bank_sync_service import run_nightly
-    import redis.asyncio as aioredis
-
-    async def _inner():
-        engine = create_async_engine(settings.DATABASE_URL)
-        session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-        # Own Redis client: app.core.redis's global pool is bound to the loop
-        # that created it, and every task runs in a fresh asyncio.run loop.
-        client = aioredis.from_url(settings.REDIS_URL, encoding="utf8", decode_responses=True)
-        try:
-            async with session_factory() as db:
-                report = await run_nightly(db, get_bank_provider(), client=client)
-                logger.warning("nightly bank sync: %s", report)
-        finally:
-            await client.close()
-            await engine.dispose()
-
-    _run_async(_inner())

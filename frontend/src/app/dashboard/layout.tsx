@@ -3,7 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { ArrowUpRight } from 'lucide-react';
 import { getMe, canSee, type Me } from '@/services/settingsService';
+import { AIBUDGET_URL } from '@/lib/constants';
 
 /* ── Study Desk shell ──────────────────────────────────────────────────────
    Dark-glass dashboard frame aligned to the Login: ambient 3D gyroscope +
@@ -13,16 +15,19 @@ import { getMe, canSee, type Me } from '@/services/settingsService';
    Requires the dark-glass CSS block appended to globals.css — see
    handoff/globals-additions.css. */
 
-type NavItem = { label: string; href: string; dot: string; wip?: boolean; section?: string };
+type NavItem = { label: string; href: string; dot: string; wip?: boolean; section?: string; external?: boolean };
 
 // `section` = chiave di visibilità per gli ospiti (vedi settingsService.SECTIONS);
 // le voci senza section (Home, Impostazioni) sono sempre visibili.
+// `external` = altra app in una nuova scheda, nascosta agli ospiti: non hanno
+// un account lì (AIBudget ha la registrazione chiusa).
 const NAV: NavItem[] = [
   { label: 'Home', href: '/dashboard', dot: 'rgb(99 102 241)' },
   { label: 'Università', href: '/dashboard/universita', dot: 'rgb(99 102 241)', section: 'universita' },
   { label: 'Studio', href: '/dashboard/study', dot: 'rgb(99 102 241)', section: 'studio' },
   { label: 'Calendario', href: '/dashboard/calendar', dot: 'rgb(99 102 241)', section: 'calendario' },
   { label: 'Finanze', href: '/dashboard/budget', dot: 'rgb(16 185 129)', section: 'finanze' },
+  { label: 'AIBudget', href: AIBUDGET_URL, dot: 'rgb(16 185 129)', external: true },
   { label: 'Smart Home', href: '/dashboard/smart-home', dot: 'rgb(245 158 11)', section: 'smart_home' },
   { label: 'Cyber Feed', href: '/dashboard/feed', dot: 'rgb(129 140 248)', section: 'feed' },
   { label: 'Salute', href: '/dashboard/salute', dot: 'rgb(244 63 94)', wip: true, section: 'salute' },
@@ -61,7 +66,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => { alive = false; };
   }, []);
 
-  const visibleNav = NAV.filter((item) => !item.section || canSee(me, item.section));
+  const visibleNav = NAV.filter((item) =>
+    (!item.section || canSee(me, item.section)) && !(item.external && me?.role === 'guest'));
   useEffect(() => { localStorage.setItem('sd-lowstim', lowStim ? '1' : '0'); }, [lowStim]);
   useEffect(() => { localStorage.setItem('sd-theme', theme); }, [theme]);
 
@@ -154,11 +160,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             <nav className="sd-nav" style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 26 }}>
               {visibleNav.map((item) => {
-                const on = isActive(pathname, item.href);
+                const on = !item.external && isActive(pathname, item.href);
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
+                    {...(item.external ? { target: '_blank', rel: 'noopener noreferrer', title: `${item.label} · si apre in una nuova scheda` } : {})}
                     data-active={on ? 'true' : undefined}
                     className="sd-nav-item sd-press"
                     style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 11, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: '11px 13px', borderRadius: 11, cursor: 'pointer', color: 'rgb(var(--color-heading))', fontSize: 14.5, fontWeight: 500, textDecoration: 'none' }}
@@ -174,6 +181,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       >
                         WIP
                       </span>
+                    )}
+                    {item.external && (
+                      <ArrowUpRight size={15} aria-hidden="true" style={{ position: 'relative', flex: 'none', color: 'rgb(var(--color-tertiary))' }} />
                     )}
                   </Link>
                 );
