@@ -3,6 +3,10 @@ export const API_BASE_URL = _rawApiUrl.includes('/api/v1')
   ? _rawApiUrl
   : `${_rawApiUrl.replace(/\/$/, '')}/api/v1`;
 
+// AIBudget (repo Ngelcondor/aibudget): l'app delle finanze con i conti bancari.
+// La dashboard non si collega più alle banche e rimanda qui.
+export const AIBUDGET_URL = 'https://aibudget.elcondor.dev';
+
 export const WIDGET_SIZES = {
   MIN_WIDTH: 1,
   MIN_HEIGHT: 1,
