@@ -52,7 +52,6 @@ const INTEGRATIONS: { key: string; title: string; desc: string; fields: FieldDef
   { key: 'htb', title: 'Hack The Box', desc: 'API token per progressi CPTS e box.', fields: [{ name: 'api_token', label: 'API token', placeholder: 'eyJ0eXAiOiJKV1Qi…' }] },
   { key: 'hue', title: 'Philips Hue', desc: 'Bridge locale per le luci.', fields: [{ name: 'bridge_ip', label: 'Bridge IP', placeholder: '192.168.1.20' }, { name: 'app_key', label: 'App key', placeholder: 'xxxxxxxx…' }] },
   { key: 'shelly', title: 'Shelly', desc: 'Cloud auth key + server per i consumi.', fields: [{ name: 'auth_key', label: 'Auth key', placeholder: 'MWE…' }, { name: 'server', label: 'Server', placeholder: 'shelly-12-eu.shelly.cloud' }] },
-  { key: 'openbanking', title: 'Open Banking', desc: 'Provider per saldo e transazioni.', fields: [{ name: 'provider', label: 'Provider', placeholder: 'gocardless / enablebanking' }] },
 ];
 
 export default function ImpostazioniPage() {

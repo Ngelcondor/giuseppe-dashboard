@@ -6,7 +6,7 @@ export const metadata: Metadata = {
 };
 
 const CONTACT = 'giuseppe.dianasr@hotmail.it';
-const UPDATED = 'June 23, 2026';
+const UPDATED = 'October 8, 2026';
 
 const page: React.CSSProperties = {
   minHeight: '100vh', background: '#ffffff', color: '#1a1a1f',
@@ -36,10 +36,9 @@ export default function TermsPage() {
         <h2 style={h2}>What the App does</h2>
         <p style={p}>
           The App aggregates the user&rsquo;s own information — studies, deadlines and personal
-          finances. For finances it connects, read-only, to the user&rsquo;s own bank accounts through
-          Enable Banking&rsquo;s Account Information Service (AIS) to display balances and transactions.
-          The App does not initiate payments and does not provide financial, investment, tax or legal
-          advice.
+          finances. For finances it works on data the user enters manually or imports from bank
+          statement files; it does not connect to bank accounts. The App does not initiate payments and
+          does not provide financial, investment, tax or legal advice.
         </p>
 
         <h2 style={h2}>Personal use</h2>
@@ -48,12 +47,11 @@ export default function TermsPage() {
           your sign-in credentials secure and for the accuracy of any data you enter manually.
         </p>
 
-        <h2 style={h2}>Open banking</h2>
+        <h2 style={h2}>Bank connections</h2>
         <p style={p}>
-          Bank connectivity is provided by Enable Banking Oy, a licensed AISP under PSD2. Use of the
-          bank-connection feature is also subject to Enable Banking&rsquo;s terms and to your
-          bank&rsquo;s conditions. Connections require periodic re-authentication and can be revoked at
-          any time.
+          Until October 2026 the App could connect, read-only, to the user&rsquo;s own bank accounts
+          through Enable Banking Oy, a licensed AISP under PSD2. Those connections were revoked on
+          October 8, 2026 and the feature is no longer offered.
         </p>
 
         <h2 style={h2}>No warranty</h2>
