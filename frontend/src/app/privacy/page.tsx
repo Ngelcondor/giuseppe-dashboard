@@ -2,12 +2,12 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Privacy Policy · Giuseppe Dashboard',
-  description: 'How Giuseppe Dashboard handles personal and bank account data.',
+  description: 'How Giuseppe Dashboard handles personal data.',
 };
 
 // Privacy contact — change here if you prefer a different address.
 const CONTACT = 'giuseppe.dianasr@hotmail.it';
-const UPDATED = 'June 23, 2026';
+const UPDATED = 'October 8, 2026';
 
 const page: React.CSSProperties = {
   minHeight: '100vh', background: '#ffffff', color: '#1a1a1f',
@@ -45,23 +45,23 @@ export default function PrivacyPage() {
         <p style={p}>
           <strong>Account data</strong>: the email address and credentials used to sign in to the App.
           <br />
-          <strong>Bank account data</strong>: when you connect a bank account, the App retrieves —
-          read-only — account details, balances and transactions through Enable Banking&rsquo;s
-          Account Information Service (AIS). The App never receives or stores your online banking
-          login credentials; authentication happens on your bank&rsquo;s own page.
+          <strong>Personal finance data</strong>: transactions and payment deadlines that the user
+          enters manually or imports from bank statement files (CSV).
         </p>
 
-        <h2 style={h2}>Role of Enable Banking</h2>
+        <h2 style={h2}>Bank connections (until October 2026)</h2>
         <p style={p}>
-          Bank connectivity is provided by Enable Banking Oy, a licensed Account Information Service
-          Provider (AISP) under PSD2, acting as a processor for the account data retrieval. Their
-          handling of the bank interaction is governed by Enable Banking&rsquo;s own terms and privacy
-          policy.
+          Between June and October 2026 the App retrieved — read-only — account details, balances and
+          transactions from the user&rsquo;s own bank accounts through Enable Banking Oy, a licensed
+          Account Information Service Provider (AISP) under PSD2. The App never received or stored
+          online banking login credentials. All bank connections were revoked on October 8, 2026: the
+          App no longer contacts Enable Banking or any bank. Transactions retrieved before that date
+          remain stored as part of the user&rsquo;s history.
         </p>
 
         <h2 style={h2}>Purpose &amp; legal basis</h2>
         <p style={p}>
-          Data is processed solely to display the user&rsquo;s own financial overview (balances,
+          Data is processed solely to display the user&rsquo;s own financial overview (income,
           spending by category, upcoming payments) — i.e. at the user&rsquo;s own request and for their
           own personal use. The data is never sold, shared with third parties, used for advertising,
           or processed by third-party analytics.
@@ -70,15 +70,14 @@ export default function PrivacyPage() {
         <h2 style={h2}>Storage &amp; retention</h2>
         <p style={p}>
           Data is stored on a private, access-controlled server located in the EU, and is retained
-          only while the account/bank connection is active. Bank connections expire automatically
-          (PSD2 requires re-authentication at least every 90 days) and can be disconnected at any
-          time, which removes the associated access.
+          until the user deletes it or closes the account. Cached bank balances were deleted when the
+          bank connections were revoked.
         </p>
 
         <h2 style={h2}>Your rights</h2>
         <p style={p}>
-          Under the GDPR you may request access to, correction of, or deletion of your data, and you
-          may withdraw a bank connection at any time. To exercise these rights, contact{' '}
+          Under the GDPR you may request access to, correction of, or deletion of your data. To
+          exercise these rights, contact{' '}
           <a style={a} href={`mailto:${CONTACT}`}>{CONTACT}</a>.
         </p>
 
